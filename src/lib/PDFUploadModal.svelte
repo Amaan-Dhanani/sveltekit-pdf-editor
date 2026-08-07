@@ -1,141 +1,143 @@
 <script lang="ts">
-	import { createEventDispatcher, onMount } from 'svelte';
-	import { X, Upload, File } from 'lucide-svelte';
+    import { createEventDispatcher, onMount } from 'svelte';
+    // Alias the File icon so it doesn't conflict with the native browser File type
+    import { X, Upload, File as FileIcon } from 'lucide-svelte';
 
-	export let isOpen = false;
+    export let isOpen = false;
 
-	const dispatch = createEventDispatcher();
+    interface SavedDocument {
+        id: string;
+        name: string;
+        date: string;
+        pdfBlob: string;
+        allObjects: any[];
+    }
 
-	let savedDocuments = [];
-	let selectedFile: File | null = null;
-	let documentName = '';
-	let error = '';
+    const dispatch = createEventDispatcher();
 
-	onMount(() => {
-		loadSavedDocuments();
-	});
+    let savedDocuments: SavedDocument[] = [];
+    // Now TypeScript knows this is the native Web File object
+    let selectedFile: File | null = null; 
+    let documentName = '';
+    let error = '';
 
-	function loadSavedDocuments() {
-		const savedDocsString = localStorage.getItem('savedDocuments');
-		if (savedDocsString) {
-			savedDocuments = JSON.parse(savedDocsString);
-		}
-	}
+    onMount(() => {
+        loadSavedDocuments();
+    });
 
-	function closeModal() {
-		isOpen = false;
-		selectedFile = null;
-		documentName = '';
-		error = '';
-		dispatch('close');
-	}
+    function loadSavedDocuments() {
+        const savedDocsString = localStorage.getItem('savedDocuments');
+        if (savedDocsString) {
+            savedDocuments = JSON.parse(savedDocsString);
+        }
+    }
 
-	function handleFileChange(e) {
-		const files = e.target.files;
-		if (files && files[0]) {
-			selectedFile = files[0];
+    function closeModal() {
+        isOpen = false;
+        selectedFile = null;
+        documentName = '';
+        error = '';
+        dispatch('close');
+    }
 
-			// Auto-populate the document name from the file name (without extension)
-			const fileName = selectedFile.name;
-			documentName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
-		}
-	}
+    function handleFileChange(e: Event) {
+        const target = e.target as HTMLInputElement;
+        const files = target.files;
+        if (files && files[0]) {
+            selectedFile = files[0];
 
-	async function handleSubmit() {
-		if (!selectedFile) {
-			error = 'Please select a PDF file';
-			return;
-		}
+            const fileName = files[0].name;
+            documentName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+        }
+    }
 
-		if (!documentName.trim()) {
-			error = 'Please enter a document name';
-			return;
-		}
+    async function handleSubmit() {
+        if (!selectedFile) {
+            error = 'Please select a PDF file';
+            return;
+        }
 
-		try {
-			// Read the file as a blob
-			const pdfBlob = selectedFile;
+        if (!documentName.trim()) {
+            error = 'Please enter a document name';
+            return;
+        }
 
-			// Create a new document entry
-			const newDoc = {
-				id: Date.now().toString(),
-				name: documentName,
-				date: new Date().toISOString(),
-				pdfBlob: await blobToBase64(pdfBlob),
-				allObjects: []
-			};
+        try {
+            const pdfBlob = selectedFile;
 
-			// Save the document to localStorage
-			savedDocuments = [newDoc, ...savedDocuments];
-			localStorage.setItem('savedDocuments', JSON.stringify(savedDocuments));
+            const newDoc: SavedDocument = {
+                id: Date.now().toString(),
+                name: documentName,
+                date: new Date().toISOString(),
+                pdfBlob: await blobToBase64(pdfBlob),
+                allObjects: []
+            };
 
-			// Dispatch the document loaded event
-			dispatch('documentSelected', {
-				pdfBlob,
-				name: documentName,
-				allObjects: []
-			});
+            savedDocuments = [newDoc, ...savedDocuments];
+            localStorage.setItem('savedDocuments', JSON.stringify(savedDocuments));
 
-			closeModal();
-		} catch (err) {
-			error = 'Failed to process the PDF file';
-			console.error(err);
-		}
-	}
+            dispatch('documentSelected', {
+                pdfBlob,
+                name: documentName,
+                allObjects: []
+            });
 
-	function loadDocument(doc) {
-		try {
-			const pdfBlob = base64ToBlob(doc.pdfBlob, 'application/pdf');
+            closeModal();
+        } catch (err) {
+            error = 'Failed to process the PDF file';
+            console.error(err);
+        }
+    }
 
-			// Dispatch the document loaded event
-			dispatch('documentSelected', {
-				pdfBlob,
-				name: doc.name,
-				allObjects: doc.allObjects || []
-			});
+    function loadDocument(doc: SavedDocument) {
+        try {
+            const pdfBlob = base64ToBlob(doc.pdfBlob, 'application/pdf');
 
-			closeModal();
-		} catch (err) {
-			error = 'Failed to load the saved document';
-			console.error(err);
-		}
-	}
+            dispatch('documentSelected', {
+                pdfBlob,
+                name: doc.name,
+                allObjects: doc.allObjects || []
+            });
 
-	function deleteDocument(id, event) {
-		event.stopPropagation();
+            closeModal();
+        } catch (err) {
+            error = 'Failed to load the saved document';
+            console.error(err);
+        }
+    }
 
-		savedDocuments = savedDocuments.filter((doc) => doc.id !== id);
-		localStorage.setItem('savedDocuments', JSON.stringify(savedDocuments));
-	}
+    function deleteDocument(id: string, event: Event) {
+        event.stopPropagation();
 
-	// Helper function to convert Blob to base64
-	function blobToBase64(blob) {
-		return new Promise((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onload = () => resolve(reader.result);
-			reader.onerror = reject;
-			reader.readAsDataURL(blob);
-		});
-	}
+        savedDocuments = savedDocuments.filter((doc) => doc.id !== id);
+        localStorage.setItem('savedDocuments', JSON.stringify(savedDocuments));
+    }
 
-	// Helper function to convert base64 to Blob
-	function base64ToBlob(base64, type) {
-		const byteString = atob(base64.split(',')[1]);
-		const arrayBuffer = new ArrayBuffer(byteString.length);
-		const int8Array = new Uint8Array(arrayBuffer);
+    function blobToBase64(blob: Blob): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
 
-		for (let i = 0; i < byteString.length; i++) {
-			int8Array[i] = byteString.charCodeAt(i);
-		}
+    function base64ToBlob(base64: string, type: string): Blob {
+        const byteString = atob(base64.split(',')[1]);
+        const arrayBuffer = new ArrayBuffer(byteString.length);
+        const int8Array = new Uint8Array(arrayBuffer);
 
-		return new Blob([int8Array], { type });
-	}
+        for (let i = 0; i < byteString.length; i++) {
+            int8Array[i] = byteString.charCodeAt(i);
+        }
 
-	// Format date for display
-	function formatDate(dateString) {
-		const date = new Date(dateString);
-		return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-	}
+        return new Blob([int8Array], { type });
+    }
+
+    function formatDate(dateString: string): string {
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    }
 </script>
 
 {#if isOpen}
@@ -226,7 +228,7 @@
 								}}
 							>
 								<div class="mr-3 text-gray-400">
-									<File size={24} />
+									<FileIcon size={24} />
 								</div>
 								<div class="flex-1">
 									<p class="font-medium text-gray-800">{doc.name}</p>

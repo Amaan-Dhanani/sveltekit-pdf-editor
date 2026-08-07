@@ -25,7 +25,7 @@
 	export let teacherMarkName = 'User';
 	export let homework_info: any = undefined;
 	export let isPageLoading = false;
-	export let wasmUrl = '/vendor/embedpdf/pdfium.wasm?v=2.14.4';
+	export const wasmUrl = '/vendor/embedpdf/pdfium.wasm?v=2.14.4';
 	export let handleSave: ((annotations: any[][]) => void | Promise<void>) | undefined = undefined;
 	export let handleComplete: ((annotations: any[][]) => void | Promise<void>) | undefined = undefined;
 	export let onSaveAnnotations: ((annotations: any[][]) => void | Promise<void>) | undefined = undefined;

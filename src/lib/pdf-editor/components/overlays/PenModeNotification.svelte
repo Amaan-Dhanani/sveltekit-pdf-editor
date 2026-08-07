@@ -14,7 +14,7 @@
 {#if isPenMode}
 	<div
 		transition:fly={{ x: -10, y: 0, duration: 200 }}
-		class="fixed top-20 left-4 z-[60] max-[640px]:top-32 max-[640px]:left-5"
+		class="fixed top-20 left-4 z-60 max-[640px]:top-32 max-[640px]:left-5"
 		style="touch-action: manipulation; -webkit-user-select: none; user-select: none; pointer-events: none;"
 	>
 		<div

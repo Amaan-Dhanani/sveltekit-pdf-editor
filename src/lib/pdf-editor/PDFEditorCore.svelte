@@ -749,7 +749,7 @@
 	let isPagePreviewOpen = $state(false);
 
 	// Homework info modal
-	let view_homework_info = $state();
+	let view_homework_info = $state<HTMLDialogElement | undefined>();
 
 	async function nextPage() {
 		if (saveState.hasUnsavedChanges) {
@@ -5565,9 +5565,3 @@
 		}
 	}
 </style>
-
-
-
-
-
-

@@ -7,7 +7,7 @@
 		LucideCloudLightning,
 		LucidePauseCircle
 	} from 'lucide-svelte';
-	import type { SaveState } from '../../context/pdfEditorContext';
+	import type { SaveState } from '../../context/pdfEditorContext.svelte.ts';
 
 	interface Props {
 		saveState: SaveState;

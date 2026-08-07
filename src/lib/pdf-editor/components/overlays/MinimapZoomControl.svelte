@@ -913,7 +913,7 @@
 
 <!-- Fixed positioning to prevent iOS zoom issues -->
 <div
-	class="minimap-zoom-control fixed left-4 z-[80] transition-[bottom] duration-300"
+	class="minimap-zoom-control fixed left-4 z-80 transition-[bottom] duration-300"
 	class:bottom-24={toolbarPosition === 'bottom' && shouldAvoidBottomToolbar}
 	class:bottom-4={toolbarPosition !== 'bottom' || !shouldAvoidBottomToolbar}
 	style="touch-action: manipulation; -webkit-user-select: none; user-select: none;"
@@ -1070,7 +1070,7 @@
 			<button
 				onclick={toggleMenu}
 				{disabled}
-				class="flex min-w-[64px] items-center justify-center px-3 text-sm font-semibold text-gray-800 transition-all hover:bg-gray-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+				class="flex min-w-16 items-center justify-center px-3 text-sm font-semibold text-gray-800 transition-all hover:bg-gray-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
 				title="Zoom controls"
 			>
 				{zoomPercentage}%
@@ -1107,7 +1107,7 @@
 				<button
 					onclick={toggleMenu}
 					{disabled}
-					class="min-w-[56px] rounded px-2 py-1 text-xs font-semibold text-gray-900 hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-40"
+					class="min-w-14 rounded px-2 py-1 text-xs font-semibold text-gray-900 hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-40"
 					title="Zoom controls"
 				>
 					{zoomPercentage}%
@@ -1148,7 +1148,7 @@
 			>
 				{#each minimapPages as page (page.pageNo)}
 					<div
-						class="absolute overflow-hidden rounded-[2px] border bg-white/90 shadow-sm"
+						class="absolute overflow-hidden rounded-xs border bg-white/90 shadow-sm"
 						class:border-amber-500={page.isCurrent}
 						class:border-gray-300={!page.isCurrent}
 						class:ring-2={page.isCurrent}

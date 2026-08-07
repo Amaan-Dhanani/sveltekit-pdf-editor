@@ -110,7 +110,7 @@
 </script>
 <!-- Toolbar - Position toggleable between bottom, left, and right -->
 <div
-	class="pdf-editor-touch-controls fixed z-[70] transform transition-all duration-300 {toolbarPosition === 'bottom'
+	class="pdf-editor-touch-controls fixed z-70 transform transition-all duration-300 {toolbarPosition === 'bottom'
 		? 'bottom-6 left-1/2 max-w-[calc(100vw-1rem)] -translate-x-1/2'
 		: toolbarPosition === 'left'
 			? 'top-1/2 left-4 max-h-[calc(100dvh-12rem)] -translate-y-1/2'

@@ -384,7 +384,7 @@
 				<section class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
 					<label
 						for="pdf-file"
-						class="group flex min-h-[22rem] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-white p-8 text-center shadow-sm transition hover:border-orange-300 hover:bg-orange-50/40"
+						class="group flex min-h-88 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-white p-8 text-center shadow-sm transition hover:border-orange-300 hover:bg-orange-50/40"
 						class:border-orange-400={isDragActive}
 						class:bg-orange-50={isDragActive}
 						on:dragenter={handleDragEnter}
@@ -437,7 +437,7 @@
 
 						{#if savedDocuments.length === 0}
 							<div
-								class="mt-6 flex min-h-[16rem] flex-col items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center"
+								class="mt-6 flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center"
 							>
 								<FileText class="h-10 w-10 text-zinc-400" />
 								<h3 class="mt-3 text-sm font-semibold text-zinc-800">No previous PDFs yet</h3>
@@ -446,7 +446,7 @@
 								</p>
 							</div>
 						{:else}
-							<div class="mt-6 grid max-h-[34rem] gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
+							<div class="mt-6 grid max-h-136 gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
 								{#each savedDocuments as doc}
 									<article
 										class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm"
@@ -513,7 +513,7 @@
 	</main>
 
 	{#if isSaveJsonModalOpen}
-		<div class="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
+		<div class="fixed inset-0 z-120 flex items-center justify-center bg-black/50 p-4">
 			<button
 				type="button"
 				class="absolute inset-0 cursor-default"
@@ -546,7 +546,7 @@
 				</header>
 
 				<div class="min-h-0 flex-1 overflow-auto bg-gray-950 p-4">
-					<pre class="whitespace-pre-wrap break-words text-xs leading-5 text-amber-100"><code
+					<pre class="whitespace-pre-wrap wrap-break-word text-xs leading-5 text-amber-100"><code
 							>{saveJsonOutput}</code
 						></pre>
 				</div>
