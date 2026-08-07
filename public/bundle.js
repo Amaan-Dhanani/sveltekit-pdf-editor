@@ -1,0 +1,11025 @@
+(function(l, r) { if (!l || l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (self.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(self.document);
+var app = (function () {
+	'use strict';
+
+	var DEV = true;
+
+	// Store the references to globals in case someone tries to monkey patch these, causing the below
+	// to de-opt (this occurs often when using popular extensions).
+	var is_array = Array.isArray;
+	var index_of = Array.prototype.indexOf;
+	var includes = Array.prototype.includes;
+	var array_from = Array.from;
+	var define_property = Object.defineProperty;
+	var get_descriptor = Object.getOwnPropertyDescriptor;
+	var get_descriptors = Object.getOwnPropertyDescriptors;
+	var object_prototype = Object.prototype;
+	var array_prototype = Array.prototype;
+	var get_prototype_of = Object.getPrototypeOf;
+	var is_extensible = Object.isExtensible;
+
+	/**
+	 * @param {any} thing
+	 * @returns {thing is Function}
+	 */
+	function is_function(thing) {
+		return typeof thing === 'function';
+	}
+
+	const noop$1 = () => {};
+
+	/** @param {Function} fn */
+	function run(fn) {
+		return fn();
+	}
+
+	/** @param {Array<() => void>} arr */
+	function run_all(arr) {
+		for (var i = 0; i < arr.length; i++) {
+			arr[i]();
+		}
+	}
+
+	/**
+	 * TODO replace with Promise.withResolvers once supported widely enough
+	 * @template [T=void]
+	 */
+	function deferred() {
+		/** @type {(value: T) => void} */
+		var resolve;
+
+		/** @type {(reason: any) => void} */
+		var reject;
+
+		/** @type {Promise<T>} */
+		var promise = new Promise((res, rej) => {
+			resolve = res;
+			reject = rej;
+		});
+
+		// @ts-expect-error
+		return { promise, resolve, reject };
+	}
+
+	// General flags
+	const DERIVED = 1 << 1;
+	const EFFECT = 1 << 2;
+	const RENDER_EFFECT = 1 << 3;
+	/**
+	 * An effect that does not destroy its child effects when it reruns.
+	 * Runs as part of render effects, i.e. not eagerly as part of tree traversal or effect flushing.
+	 */
+	const MANAGED_EFFECT = 1 << 24;
+	/**
+	 * An effect that does not destroy its child effects when it reruns (like MANAGED_EFFECT).
+	 * Runs eagerly as part of tree traversal or effect flushing.
+	 */
+	const BLOCK_EFFECT = 1 << 4;
+	const BRANCH_EFFECT = 1 << 5;
+	const ROOT_EFFECT = 1 << 6;
+	const BOUNDARY_EFFECT = 1 << 7;
+	/**
+	 * Indicates that a reaction is connected to an effect root — either it is an effect,
+	 * or it is a derived that is depended on by at least one effect. If a derived has
+	 * no dependents, we can disconnect it from the graph, allowing it to either be
+	 * GC'd or reconnected later if an effect comes to depend on it again
+	 */
+	const CONNECTED = 1 << 9;
+	const CLEAN = 1 << 10;
+	const DIRTY = 1 << 11;
+	const MAYBE_DIRTY = 1 << 12;
+	const INERT = 1 << 13;
+	const DESTROYED = 1 << 14;
+	/** Set once a reaction has run for the first time */
+	const REACTION_RAN = 1 << 15;
+	/** Effect is in the process of getting destroyed. Can be observed in child teardown functions */
+	const DESTROYING = 1 << 25;
+
+	// Flags exclusive to effects
+	/**
+	 * 'Transparent' effects do not create a transition boundary.
+	 * This is on a block effect 99% of the time but may also be on a branch effect if its parent block effect was pruned
+	 */
+	const EFFECT_TRANSPARENT = 1 << 16;
+	const EAGER_EFFECT = 1 << 17;
+	const HEAD_EFFECT = 1 << 18;
+	const EFFECT_PRESERVED = 1 << 19;
+	const USER_EFFECT = 1 << 20;
+	const EFFECT_OFFSCREEN = 1 << 25;
+
+	// Flags exclusive to deriveds
+	/**
+	 * Tells that we marked this derived and its reactions as visited during the "mark as (maybe) dirty"-phase.
+	 * Will be lifted during execution of the derived and during checking its dirty state (both are necessary
+	 * because a derived might be checked but not executed). This is a pure performance optimization flag and
+	 * should not be used for any other purpose!
+	 */
+	const WAS_MARKED = 1 << 16;
+
+	// Flags used for async
+	const REACTION_IS_UPDATING = 1 << 21;
+	const ASYNC = 1 << 22;
+
+	const ERROR_VALUE = 1 << 23;
+
+	const STATE_SYMBOL = Symbol('$state');
+	const LEGACY_PROPS = Symbol('legacy props');
+	const LOADING_ATTR_SYMBOL = Symbol('');
+	const PROXY_PATH_SYMBOL = Symbol('proxy path');
+	const ATTRIBUTES_CACHE = Symbol('attributes');
+	const CLASS_CACHE = Symbol('class');
+	const STYLE_CACHE = Symbol('style');
+	const TEXT_CACHE = Symbol('text');
+	const FORM_RESET_HANDLER = Symbol('form reset');
+	/** An anchor might change, via this symbol on the original anchor we can tell HMR about the updated anchor */
+	const HMR_ANCHOR = Symbol('hmr anchor');
+
+	/** allow users to ignore aborted signal errors if `reason.name === 'StaleReactionError` */
+	const STALE_REACTION = new (class StaleReactionError extends Error {
+		name = 'StaleReactionError';
+		message = 'The reaction that called `getAbortSignal()` was re-run or destroyed';
+	})();
+	const ELEMENT_NODE = 1;
+	const DOCUMENT_FRAGMENT_NODE = 11;
+
+	/* This file is generated by scripts/process-messages/index.js. Do not edit! */
+
+
+	/**
+	 * An invariant violation occurred, meaning Svelte's internal assumptions were flawed. This is a bug in Svelte, not your app — please open an issue at https://github.com/sveltejs/svelte, citing the following message: "%message%"
+	 * @param {string} message
+	 * @returns {never}
+	 */
+	function invariant_violation(message) {
+		{
+			const error = new Error(`invariant_violation\nAn invariant violation occurred, meaning Svelte's internal assumptions were flawed. This is a bug in Svelte, not your app — please open an issue at https://github.com/sveltejs/svelte, citing the following message: "${message}"\nhttps://svelte.dev/e/invariant_violation`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * `%name%(...)` can only be used during component initialisation
+	 * @param {string} name
+	 * @returns {never}
+	 */
+	function lifecycle_outside_component(name) {
+		{
+			const error = new Error(`lifecycle_outside_component\n\`${name}(...)\` can only be used during component initialisation\nhttps://svelte.dev/e/lifecycle_outside_component`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Attempted to render a snippet without a `{@render}` block. This would cause the snippet code to be stringified instead of its content being rendered to the DOM. To fix this, change `{snippet}` to `{@render snippet()}`.
+	 * @returns {never}
+	 */
+	function snippet_without_render_tag() {
+		{
+			const error = new Error(`snippet_without_render_tag\nAttempted to render a snippet without a \`{@render}\` block. This would cause the snippet code to be stringified instead of its content being rendered to the DOM. To fix this, change \`{snippet}\` to \`{@render snippet()}\`.\nhttps://svelte.dev/e/snippet_without_render_tag`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/* This file is generated by scripts/process-messages/index.js. Do not edit! */
+
+
+	/**
+	 * Cannot create a `$derived(...)` with an `await` expression outside of an effect tree
+	 * @returns {never}
+	 */
+	function async_derived_orphan() {
+		{
+			const error = new Error(`async_derived_orphan\nCannot create a \`$derived(...)\` with an \`await\` expression outside of an effect tree\nhttps://svelte.dev/e/async_derived_orphan`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Using `bind:value` together with a checkbox input is not allowed. Use `bind:checked` instead
+	 * @returns {never}
+	 */
+	function bind_invalid_checkbox_value() {
+		{
+			const error = new Error(`bind_invalid_checkbox_value\nUsing \`bind:value\` together with a checkbox input is not allowed. Use \`bind:checked\` instead\nhttps://svelte.dev/e/bind_invalid_checkbox_value`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Calling `%method%` on a component instance (of %component%) is no longer valid in Svelte 5
+	 * @param {string} method
+	 * @param {string} component
+	 * @returns {never}
+	 */
+	function component_api_changed(method, component) {
+		{
+			const error = new Error(`component_api_changed\nCalling \`${method}\` on a component instance (of ${component}) is no longer valid in Svelte 5\nhttps://svelte.dev/e/component_api_changed`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Attempted to instantiate %component% with `new %name%`, which is no longer valid in Svelte 5. If this component is not under your control, set the `compatibility.componentApi` compiler option to `4` to keep it working.
+	 * @param {string} component
+	 * @param {string} name
+	 * @returns {never}
+	 */
+	function component_api_invalid_new(component, name) {
+		{
+			const error = new Error(`component_api_invalid_new\nAttempted to instantiate ${component} with \`new ${name}\`, which is no longer valid in Svelte 5. If this component is not under your control, set the \`compatibility.componentApi\` compiler option to \`4\` to keep it working.\nhttps://svelte.dev/e/component_api_invalid_new`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * A derived value cannot reference itself recursively
+	 * @returns {never}
+	 */
+	function derived_references_self() {
+		{
+			const error = new Error(`derived_references_self\nA derived value cannot reference itself recursively\nhttps://svelte.dev/e/derived_references_self`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Keyed each block has duplicate key `%value%` at indexes %a% and %b%
+	 * @param {string} a
+	 * @param {string} b
+	 * @param {string | undefined | null} [value]
+	 * @returns {never}
+	 */
+	function each_key_duplicate(a, b, value) {
+		{
+			const error = new Error(`each_key_duplicate\n${value
+			? `Keyed each block has duplicate key \`${value}\` at indexes ${a} and ${b}`
+			: `Keyed each block has duplicate key at indexes ${a} and ${b}`}\nhttps://svelte.dev/e/each_key_duplicate`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Keyed each block has key that is not idempotent — the key for item at index %index% was `%a%` but is now `%b%`. Keys must be the same each time for a given item
+	 * @param {string} index
+	 * @param {string} a
+	 * @param {string} b
+	 * @returns {never}
+	 */
+	function each_key_volatile(index, a, b) {
+		{
+			const error = new Error(`each_key_volatile\nKeyed each block has key that is not idempotent — the key for item at index ${index} was \`${a}\` but is now \`${b}\`. Keys must be the same each time for a given item\nhttps://svelte.dev/e/each_key_volatile`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * `%rune%` cannot be used inside an effect cleanup function
+	 * @param {string} rune
+	 * @returns {never}
+	 */
+	function effect_in_teardown(rune) {
+		{
+			const error = new Error(`effect_in_teardown\n\`${rune}\` cannot be used inside an effect cleanup function\nhttps://svelte.dev/e/effect_in_teardown`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Effect cannot be created inside a `$derived` value that was not itself created inside an effect
+	 * @returns {never}
+	 */
+	function effect_in_unowned_derived() {
+		{
+			const error = new Error(`effect_in_unowned_derived\nEffect cannot be created inside a \`$derived\` value that was not itself created inside an effect\nhttps://svelte.dev/e/effect_in_unowned_derived`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * `%rune%` can only be used inside an effect (e.g. during component initialisation)
+	 * @param {string} rune
+	 * @returns {never}
+	 */
+	function effect_orphan(rune) {
+		{
+			const error = new Error(`effect_orphan\n\`${rune}\` can only be used inside an effect (e.g. during component initialisation)\nhttps://svelte.dev/e/effect_orphan`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Maximum update depth exceeded. This typically indicates that an effect reads and writes the same piece of state
+	 * @returns {never}
+	 */
+	function effect_update_depth_exceeded() {
+		{
+			const error = new Error(`effect_update_depth_exceeded\nMaximum update depth exceeded. This typically indicates that an effect reads and writes the same piece of state\nhttps://svelte.dev/e/effect_update_depth_exceeded`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Cannot do `bind:%key%={undefined}` when `%key%` has a fallback value
+	 * @param {string} key
+	 * @returns {never}
+	 */
+	function props_invalid_value(key) {
+		{
+			const error = new Error(`props_invalid_value\nCannot do \`bind:${key}={undefined}\` when \`${key}\` has a fallback value\nhttps://svelte.dev/e/props_invalid_value`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * The `%rune%` rune is only available inside `.svelte` and `.svelte.js/ts` files
+	 * @param {string} rune
+	 * @returns {never}
+	 */
+	function rune_outside_svelte(rune) {
+		{
+			const error = new Error(`rune_outside_svelte\nThe \`${rune}\` rune is only available inside \`.svelte\` and \`.svelte.js/ts\` files\nhttps://svelte.dev/e/rune_outside_svelte`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Property descriptors defined on `$state` objects must contain `value` and always be `enumerable`, `configurable` and `writable`.
+	 * @returns {never}
+	 */
+	function state_descriptors_fixed() {
+		{
+			const error = new Error(`state_descriptors_fixed\nProperty descriptors defined on \`$state\` objects must contain \`value\` and always be \`enumerable\`, \`configurable\` and \`writable\`.\nhttps://svelte.dev/e/state_descriptors_fixed`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Cannot set prototype of `$state` object
+	 * @returns {never}
+	 */
+	function state_prototype_fixed() {
+		{
+			const error = new Error(`state_prototype_fixed\nCannot set prototype of \`$state\` object\nhttps://svelte.dev/e/state_prototype_fixed`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * Updating state inside `$derived(...)`, `$inspect(...)` or a template expression is forbidden. If the value should not be reactive, declare it without `$state`
+	 * @returns {never}
+	 */
+	function state_unsafe_mutation() {
+		{
+			const error = new Error(`state_unsafe_mutation\nUpdating state inside \`$derived(...)\`, \`$inspect(...)\` or a template expression is forbidden. If the value should not be reactive, declare it without \`$state\`\nhttps://svelte.dev/e/state_unsafe_mutation`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	/**
+	 * A `<svelte:boundary>` `reset` function cannot be called while an error is still being handled
+	 * @returns {never}
+	 */
+	function svelte_boundary_reset_onerror() {
+		{
+			const error = new Error(`svelte_boundary_reset_onerror\nA \`<svelte:boundary>\` \`reset\` function cannot be called while an error is still being handled\nhttps://svelte.dev/e/svelte_boundary_reset_onerror`);
+
+			error.name = 'Svelte error';
+
+			throw error;
+		}
+	}
+
+	const EACH_ITEM_REACTIVE = 1;
+	const EACH_INDEX_REACTIVE = 1 << 1;
+	/** See EachBlock interface metadata.is_controlled for an explanation what this is */
+	const EACH_IS_CONTROLLED = 1 << 2;
+	const EACH_IS_ANIMATED = 1 << 3;
+	const EACH_ITEM_IMMUTABLE = 1 << 4;
+
+	const PROPS_IS_IMMUTABLE = 1;
+	const PROPS_IS_RUNES = 1 << 1;
+	const PROPS_IS_UPDATED = 1 << 2;
+	const PROPS_IS_BINDABLE = 1 << 3;
+	const PROPS_IS_LAZY_INITIAL = 1 << 4;
+	const TRANSITION_GLOBAL = 1 << 2;
+
+	const TEMPLATE_FRAGMENT = 1;
+	const TEMPLATE_USE_IMPORT_NODE = 1 << 1;
+
+	const UNINITIALIZED = Symbol('uninitialized');
+
+	// Dev-time component properties
+	const FILENAME = Symbol('filename');
+
+	const NAMESPACE_HTML = 'http://www.w3.org/1999/xhtml';
+
+	/* This file is generated by scripts/process-messages/index.js. Do not edit! */
+
+
+	var bold$1 = 'font-weight: bold';
+	var normal$1 = 'font-weight: normal';
+
+	/**
+	 * Detected reactivity loss when reading `%name%`. This happens when state is read in an async function after an earlier `await`
+	 * @param {string} name
+	 */
+	function await_reactivity_loss(name) {
+		{
+			console.warn(`%c[svelte] await_reactivity_loss\n%cDetected reactivity loss when reading \`${name}\`. This happens when state is read in an async function after an earlier \`await\`\nhttps://svelte.dev/e/await_reactivity_loss`, bold$1, normal$1);
+		}
+	}
+
+	/**
+	 * Your `console.%method%` contained `$state` proxies. Consider using `$inspect(...)` or `$state.snapshot(...)` instead
+	 * @param {string} method
+	 */
+	function console_log_state(method) {
+		{
+			console.warn(`%c[svelte] console_log_state\n%cYour \`console.${method}\` contained \`$state\` proxies. Consider using \`$inspect(...)\` or \`$state.snapshot(...)\` instead\nhttps://svelte.dev/e/console_log_state`, bold$1, normal$1);
+		}
+	}
+
+	/**
+	 * Reading a derived belonging to a now-destroyed effect may result in stale values
+	 */
+	function derived_inert() {
+		{
+			console.warn(`%c[svelte] derived_inert\n%cReading a derived belonging to a now-destroyed effect may result in stale values\nhttps://svelte.dev/e/derived_inert`, bold$1, normal$1);
+		}
+	}
+
+	/**
+	 * The `value` property of a `<select multiple>` element should be an array, but it received a non-array value. The selection will be kept as is.
+	 */
+	function select_multiple_invalid_value() {
+		{
+			console.warn(`%c[svelte] select_multiple_invalid_value\n%cThe \`value\` property of a \`<select multiple>\` element should be an array, but it received a non-array value. The selection will be kept as is.\nhttps://svelte.dev/e/select_multiple_invalid_value`, bold$1, normal$1);
+		}
+	}
+
+	/**
+	 * Reactive `$state(...)` proxies and the values they proxy have different identities. Because of this, comparisons with `%operator%` will produce unexpected results
+	 * @param {string} operator
+	 */
+	function state_proxy_equality_mismatch(operator) {
+		{
+			console.warn(`%c[svelte] state_proxy_equality_mismatch\n%cReactive \`$state(...)\` proxies and the values they proxy have different identities. Because of this, comparisons with \`${operator}\` will produce unexpected results\nhttps://svelte.dev/e/state_proxy_equality_mismatch`, bold$1, normal$1);
+		}
+	}
+
+	/**
+	 * A `<svelte:boundary>` `reset` function only resets the boundary the first time it is called
+	 */
+	function svelte_boundary_reset_noop() {
+		{
+			console.warn(`%c[svelte] svelte_boundary_reset_noop\n%cA \`<svelte:boundary>\` \`reset\` function only resets the boundary the first time it is called\nhttps://svelte.dev/e/svelte_boundary_reset_noop`, bold$1, normal$1);
+		}
+	}
+
+	/** @import { TemplateNode } from '#client' */
+
+
+	/** @param {TemplateNode} node */
+	function reset(node) {
+		return;
+	}
+
+	function next(count = 1) {
+	}
+
+	/** @import { Equals } from '#client' */
+
+	/** @type {Equals} */
+	function equals$1(value) {
+		return value === this.v;
+	}
+
+	/**
+	 * @param {unknown} a
+	 * @param {unknown} b
+	 * @returns {boolean}
+	 */
+	function safe_not_equal(a, b) {
+		return a != a
+			? b == b
+			: a !== b || (a !== null && typeof a === 'object') || typeof a === 'function';
+	}
+
+	/** @type {Equals} */
+	function safe_equals(value) {
+		return !safe_not_equal(value, this.v);
+	}
+
+	/** True if experimental.async=true */
+	/** True if we're not certain that we only have Svelte 5 code in the compilation */
+	let legacy_mode_flag = false;
+	/** True if $inspect.trace is used */
+	let tracing_mode_flag = false;
+
+	function enable_legacy_mode_flag() {
+		legacy_mode_flag = true;
+	}
+
+	/* This file is generated by scripts/process-messages/index.js. Do not edit! */
+
+
+	var bold = 'font-weight: bold';
+	var normal = 'font-weight: normal';
+
+	/**
+	 * The following properties cannot be cloned with `$state.snapshot` — the return value contains the originals:
+	 * 
+	 * %properties%
+	 * @param {string | undefined | null} [properties]
+	 */
+	function state_snapshot_uncloneable(properties) {
+		{
+			console.warn(
+				`%c[svelte] state_snapshot_uncloneable\n%c${properties
+				? `The following properties cannot be cloned with \`$state.snapshot\` — the return value contains the originals:
+
+${properties}`
+				: 'Value cannot be cloned with `$state.snapshot` — the original value was returned'}\nhttps://svelte.dev/e/state_snapshot_uncloneable`,
+				bold,
+				normal
+			);
+		}
+	}
+
+	/** @import { Snapshot } from './types' */
+
+	/**
+	 * In dev, we keep track of which properties could not be cloned. In prod
+	 * we don't bother, but we keep a dummy array around so that the
+	 * signature stays the same
+	 * @type {string[]}
+	 */
+	const empty = [];
+
+	/**
+	 * @template T
+	 * @param {T} value
+	 * @param {boolean} [skip_warning]
+	 * @param {boolean} [no_tojson]
+	 * @returns {Snapshot<T>}
+	 */
+	function snapshot(value, skip_warning = false, no_tojson = false) {
+		if (!skip_warning) {
+			/** @type {string[]} */
+			const paths = [];
+
+			const copy = clone(value, new Map(), '', paths, null, no_tojson);
+			if (paths.length === 1 && paths[0] === '') {
+				// value could not be cloned
+				state_snapshot_uncloneable();
+			} else if (paths.length > 0) {
+				// some properties could not be cloned
+				const slice = paths.length > 10 ? paths.slice(0, 7) : paths.slice(0, 10);
+				const excess = paths.length - slice.length;
+
+				let uncloned = slice.map((path) => `- <value>${path}`).join('\n');
+				if (excess > 0) uncloned += `\n- ...and ${excess} more`;
+
+				state_snapshot_uncloneable(uncloned);
+			}
+
+			return copy;
+		}
+
+		return clone(value, new Map(), '', empty, null, no_tojson);
+	}
+
+	/**
+	 * @template T
+	 * @param {T} value
+	 * @param {Map<T, Snapshot<T>>} cloned
+	 * @param {string} path
+	 * @param {string[]} paths
+	 * @param {null | T} [original] The original value, if `value` was produced from a `toJSON` call
+	 * @param {boolean} [no_tojson]
+	 * @returns {Snapshot<T>}
+	 */
+	function clone(value, cloned, path, paths, original = null, no_tojson = false) {
+		if (typeof value === 'object' && value !== null) {
+			var unwrapped = cloned.get(value);
+			if (unwrapped !== undefined) return unwrapped;
+
+			if (value instanceof Map) return /** @type {Snapshot<T>} */ (new Map(value));
+			if (value instanceof Set) return /** @type {Snapshot<T>} */ (new Set(value));
+
+			if (is_array(value)) {
+				var copy = /** @type {Snapshot<any>} */ (Array(value.length));
+				cloned.set(value, copy);
+
+				if (original !== null) {
+					cloned.set(original, copy);
+				}
+
+				for (var i = 0; i < value.length; i += 1) {
+					var element = value[i];
+					if (i in value) {
+						copy[i] = clone(element, cloned, `${path}[${i}]` , paths, null, no_tojson);
+					}
+				}
+
+				return copy;
+			}
+
+			if (get_prototype_of(value) === object_prototype) {
+				/** @type {Snapshot<any>} */
+				copy = {};
+				cloned.set(value, copy);
+
+				if (original !== null) {
+					cloned.set(original, copy);
+				}
+
+				for (var key of Object.keys(value)) {
+					copy[key] = clone(
+						// @ts-expect-error
+						value[key],
+						cloned,
+						`${path}.${key}` ,
+						paths,
+						null,
+						no_tojson
+					);
+				}
+
+				return copy;
+			}
+
+			if (value instanceof Date) {
+				return /** @type {Snapshot<T>} */ (structuredClone(value));
+			}
+
+			if (typeof (/** @type {T & { toJSON?: any } } */ (value).toJSON) === 'function' && !no_tojson) {
+				return clone(
+					/** @type {T & { toJSON(): any } } */ (value).toJSON(),
+					cloned,
+					`${path}.toJSON()` ,
+					paths,
+					// Associate the instance with the toJSON clone
+					value
+				);
+			}
+		}
+
+		if (value instanceof EventTarget) {
+			// can't be cloned
+			return /** @type {Snapshot<T>} */ (value);
+		}
+
+		try {
+			return /** @type {Snapshot<T>} */ (structuredClone(value));
+		} catch (e) {
+			{
+				paths.push(path);
+			}
+
+			return /** @type {Snapshot<T>} */ (value);
+		}
+	}
+
+	/** @import { Derived, Reaction, Value } from '#client' */
+
+	/**
+	 * @param {Value} source
+	 * @param {string} label
+	 */
+	function tag(source, label) {
+		source.label = label;
+		tag_proxy(source.v, label);
+
+		return source;
+	}
+
+	/**
+	 * @param {unknown} value
+	 * @param {string} label
+	 */
+	function tag_proxy(value, label) {
+		// @ts-expect-error
+		value?.[PROXY_PATH_SYMBOL]?.(label);
+		return value;
+	}
+
+	/**
+	 * @param {string} label
+	 * @returns {Error & { stack: string } | null}
+	 */
+	function get_error(label) {
+		const error = new Error();
+		const stack = get_stack();
+
+		if (stack.length === 0) {
+			return null;
+		}
+
+		stack.unshift('\n');
+
+		define_property(error, 'stack', {
+			value: stack.join('\n')
+		});
+
+		define_property(error, 'name', {
+			value: label
+		});
+
+		return /** @type {Error & { stack: string }} */ (error);
+	}
+
+	/**
+	 * @returns {string[]}
+	 */
+	function get_stack() {
+		// @ts-ignore - doesn't exist everywhere
+		const limit = Error.stackTraceLimit;
+		// @ts-ignore - doesn't exist everywhere
+		Error.stackTraceLimit = Infinity;
+		const stack = new Error().stack;
+		// @ts-ignore - doesn't exist everywhere
+		Error.stackTraceLimit = limit;
+
+		if (!stack) return [];
+
+		const lines = stack.split('\n');
+		const new_lines = [];
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			const posixified = line.replaceAll('\\', '/');
+
+			if (line.trim() === 'Error') {
+				continue;
+			}
+
+			if (line.includes('validate_each_keys')) {
+				return [];
+			}
+
+			if (posixified.includes('svelte/src/internal') || posixified.includes('node_modules/.vite')) {
+				continue;
+			}
+
+			new_lines.push(line);
+		}
+
+		return new_lines;
+	}
+
+	/**
+	 * @param {boolean} condition
+	 * @param {string} message
+	 */
+	function invariant(condition, message) {
+
+		if (!condition) invariant_violation(message);
+	}
+
+	/** @import { ComponentContext, DevStackEntry, Effect } from '#client' */
+
+	/** @type {ComponentContext | null} */
+	let component_context = null;
+
+	/** @param {ComponentContext | null} context */
+	function set_component_context(context) {
+		component_context = context;
+	}
+
+	/** @type {DevStackEntry | null} */
+	let dev_stack = null;
+
+	/** @param {DevStackEntry | null} stack */
+	function set_dev_stack(stack) {
+		dev_stack = stack;
+	}
+
+	/**
+	 * Execute a callback with a new dev stack entry
+	 * @param {() => any} callback - Function to execute
+	 * @param {DevStackEntry['type']} type - Type of block/component
+	 * @param {any} component - Component function
+	 * @param {number} line - Line number
+	 * @param {number} column - Column number
+	 * @param {Record<string, any>} [additional] - Any additional properties to add to the dev stack entry
+	 * @returns {any}
+	 */
+	function add_svelte_meta(callback, type, component, line, column, additional) {
+		const parent = dev_stack;
+
+		dev_stack = {
+			type,
+			file: component[FILENAME],
+			line,
+			column,
+			parent,
+			...additional
+		};
+
+		try {
+			return callback();
+		} finally {
+			dev_stack = parent;
+		}
+	}
+
+	/**
+	 * The current component function. Different from current component context:
+	 * ```html
+	 * <!-- App.svelte -->
+	 * <Foo>
+	 *   <Bar /> <!-- context == Foo.svelte, function == App.svelte -->
+	 * </Foo>
+	 * ```
+	 * @type {ComponentContext['function']}
+	 */
+	let dev_current_component_function = null;
+
+	/** @param {ComponentContext['function']} fn */
+	function set_dev_current_component_function(fn) {
+		dev_current_component_function = fn;
+	}
+
+	/**
+	 * @param {Record<string, unknown>} props
+	 * @param {any} runes
+	 * @param {Function} [fn]
+	 * @returns {void}
+	 */
+	function push(props, runes = false, fn) {
+		component_context = {
+			p: component_context,
+			i: false,
+			c: null,
+			e: null,
+			s: props,
+			x: null,
+			r: /** @type {Effect} */ (active_effect),
+			l: legacy_mode_flag && !runes ? { s: null, u: null, $: [] } : null
+		};
+
+		{
+			// component function
+			component_context.function = fn;
+			dev_current_component_function = fn;
+		}
+	}
+
+	/**
+	 * @template {Record<string, any>} T
+	 * @param {T} [component]
+	 * @returns {T}
+	 */
+	function pop(component) {
+		var context = /** @type {ComponentContext} */ (component_context);
+		var effects = context.e;
+
+		if (effects !== null) {
+			context.e = null;
+
+			for (var fn of effects) {
+				create_user_effect(fn);
+			}
+		}
+
+		if (component !== undefined) {
+			context.x = component;
+		}
+
+		context.i = true;
+
+		component_context = context.p;
+
+		{
+			dev_current_component_function = component_context?.function ?? null;
+		}
+
+		return component ?? /** @type {T} */ ({});
+	}
+
+	/** @returns {boolean} */
+	function is_runes() {
+		return !legacy_mode_flag || (component_context !== null && component_context.l === null);
+	}
+
+	/** @type {Array<() => void>} */
+	let micro_tasks = [];
+
+	function run_micro_tasks() {
+		var tasks = micro_tasks;
+		micro_tasks = [];
+		run_all(tasks);
+	}
+
+	/**
+	 * @param {() => void} fn
+	 */
+	function queue_micro_task(fn) {
+		if (micro_tasks.length === 0 && !is_flushing_sync) {
+			var tasks = micro_tasks;
+			queueMicrotask(() => {
+				// If this is false, a flushSync happened in the meantime. Do _not_ run new scheduled microtasks in that case
+				// as the ordering of microtasks would be broken at that point - consider this case:
+				// - queue_micro_task schedules microtask A to flush task X
+				// - synchronously after, flushSync runs, processing task X
+				// - synchronously after, some other microtask B is scheduled, but not through queue_micro_task but for example a Promise.resolve() in user code
+				// - synchronously after, queue_micro_task schedules microtask C to flush task Y
+				// - one tick later, microtask A now resolves, flushing task Y before microtask B, which is incorrect
+				// This if check prevents that race condition (that realistically will only happen in tests)
+				if (tasks === micro_tasks) run_micro_tasks();
+			});
+		}
+
+		micro_tasks.push(fn);
+	}
+
+	/**
+	 * Synchronously run any queued tasks.
+	 */
+	function flush_tasks() {
+		while (micro_tasks.length > 0) {
+			run_micro_tasks();
+		}
+	}
+
+	/** @import { Derived, Effect } from '#client' */
+	/** @import { Boundary } from './dom/blocks/boundary.js' */
+
+	const adjustments = new WeakMap();
+
+	/**
+	 * @param {unknown} error
+	 */
+	function handle_error(error) {
+		var effect = active_effect;
+
+		// for unowned deriveds, don't throw until we read the value
+		if (effect === null) {
+			/** @type {Derived} */ (active_reaction).f |= ERROR_VALUE;
+			return error;
+		}
+
+		if (error instanceof Error && !adjustments.has(error)) {
+			adjustments.set(error, get_adjustments(error, effect));
+		}
+
+		// if the error occurred while creating this subtree, we let it
+		// bubble up until it hits a boundary that can handle it, unless
+		// it's an $effect in which case it doesn't run immediately
+		if ((effect.f & REACTION_RAN) === 0 && (effect.f & EFFECT) === 0) {
+			if (!effect.parent && error instanceof Error) {
+				apply_adjustments(error);
+			}
+
+			throw error;
+		}
+
+		// otherwise we bubble up the effect tree ourselves
+		invoke_error_boundary(error, effect);
+	}
+
+	/**
+	 * @param {unknown} error
+	 * @param {Effect | null} effect
+	 */
+	function invoke_error_boundary(error, effect) {
+		if (effect !== null && (effect.f & DESTROYED) !== 0) {
+			return;
+		}
+
+		while (effect !== null) {
+			if ((effect.f & BOUNDARY_EFFECT) !== 0) {
+				if ((effect.f & REACTION_RAN) === 0) {
+					// we are still creating the boundary effect
+					throw error;
+				}
+
+				try {
+					/** @type {Boundary} */ (effect.b).error(error);
+					return;
+				} catch (e) {
+					error = e;
+				}
+			}
+
+			effect = effect.parent;
+		}
+
+		if (error instanceof Error) {
+			apply_adjustments(error);
+		}
+
+		throw error;
+	}
+
+	/**
+	 * Add useful information to the error message/stack in development
+	 * @param {Error} error
+	 * @param {Effect} effect
+	 */
+	function get_adjustments(error, effect) {
+		const message_descriptor = get_descriptor(error, 'message');
+
+		// if the message was already changed and it's not configurable we can't change it
+		// or it will throw a different error swallowing the original error
+		if (message_descriptor && !message_descriptor.configurable) return;
+
+		var indent = is_firefox ? '  ' : '\t';
+		var component_stack = `\n${indent}in ${effect.fn?.name || '<unknown>'}`;
+		var context = effect.ctx;
+
+		while (context !== null) {
+			component_stack += `\n${indent}in ${context.function?.[FILENAME].split('/').pop()}`;
+			context = context.p;
+		}
+
+		return {
+			message: error.message + `\n${component_stack}\n`,
+			stack: error.stack
+				?.split('\n')
+				.filter((line) => !line.includes('svelte/src/internal'))
+				.join('\n')
+		};
+	}
+
+	/**
+	 * @param {Error} error
+	 */
+	function apply_adjustments(error) {
+		const adjusted = adjustments.get(error);
+
+		if (adjusted) {
+			define_property(error, 'message', {
+				value: adjusted.message
+			});
+
+			define_property(error, 'stack', {
+				value: adjusted.stack
+			});
+		}
+	}
+
+	/** @import { Derived, Signal } from '#client' */
+
+	const STATUS_MASK = -7169;
+
+	/**
+	 * @param {Signal} signal
+	 * @param {number} status
+	 */
+	function set_signal_status(signal, status) {
+		signal.f = (signal.f & STATUS_MASK) | status;
+	}
+
+	/**
+	 * Set a derived's status to CLEAN or MAYBE_DIRTY based on its connection state.
+	 * @param {Derived} derived
+	 */
+	function update_derived_status(derived) {
+		// Only mark as MAYBE_DIRTY if disconnected and has dependencies.
+		if ((derived.f & CONNECTED) !== 0 || derived.deps === null) {
+			set_signal_status(derived, CLEAN);
+		} else {
+			set_signal_status(derived, MAYBE_DIRTY);
+		}
+	}
+
+	/** @import { Derived, Effect, Value } from '#client' */
+
+	/**
+	 * @param {Value[] | null} deps
+	 */
+	function clear_marked(deps) {
+		if (deps === null) return;
+
+		for (const dep of deps) {
+			if ((dep.f & DERIVED) === 0 || (dep.f & WAS_MARKED) === 0) {
+				continue;
+			}
+
+			dep.f ^= WAS_MARKED;
+
+			clear_marked(/** @type {Derived} */ (dep).deps);
+		}
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @param {Set<Effect>} dirty_effects
+	 * @param {Set<Effect>} maybe_dirty_effects
+	 */
+	function defer_effect(effect, dirty_effects, maybe_dirty_effects) {
+		if ((effect.f & DIRTY) !== 0) {
+			dirty_effects.add(effect);
+		} else if ((effect.f & MAYBE_DIRTY) !== 0) {
+			maybe_dirty_effects.add(effect);
+		}
+
+		// Since we're not executing these effects now, we need to clear any WAS_MARKED flags
+		// so that other batches can correctly reach these effects during their own traversal
+		clear_marked(effect.deps);
+
+		// mark as clean so they get scheduled if they depend on pending async state
+		set_signal_status(effect, CLEAN);
+	}
+
+	/** @import { StoreReferencesContainer } from '#client' */
+	/** @import { Store } from '#shared' */
+
+	/**
+	 * Whether or not the prop currently being read is a store binding, as in
+	 * `<Child bind:x={$y} />`. If it is, we treat the prop as mutable even in
+	 * runes mode, and skip `binding_property_non_reactive` validation
+	 */
+	let is_store_binding = false;
+
+	/**
+	 * Returns a tuple that indicates whether `fn()` reads a prop that is a store binding.
+	 * Used to prevent `binding_property_non_reactive` validation false positives and
+	 * ensure that these props are treated as mutable even in runes mode
+	 * @template T
+	 * @param {() => T} fn
+	 * @returns {[T, boolean]}
+	 */
+	function capture_store_binding(fn) {
+		var previous_is_store_binding = is_store_binding;
+
+		try {
+			is_store_binding = false;
+			return [fn(), is_store_binding];
+		} finally {
+			is_store_binding = previous_is_store_binding;
+		}
+	}
+
+	let listening_to_form_reset = false;
+
+	function add_form_reset_listener() {
+		if (!listening_to_form_reset) {
+			listening_to_form_reset = true;
+			document.addEventListener(
+				'reset',
+				(evt) => {
+					// Needs to happen one tick later or else the dom properties of the form
+					// elements have not updated to their reset values yet
+					Promise.resolve().then(() => {
+						if (!evt.defaultPrevented) {
+							for (const e of /**@type {HTMLFormElement} */ (evt.target).elements) {
+								/** @type {any} */ (e)[FORM_RESET_HANDLER]?.();
+							}
+						}
+					});
+				},
+				// In the capture phase to guarantee we get noticed of it (no possibility of stopPropagation)
+				{ capture: true }
+			);
+		}
+	}
+
+	/**
+	 * @template T
+	 * @param {() => T} fn
+	 */
+	function without_reactive_context(fn) {
+		var previous_reaction = active_reaction;
+		var previous_effect = active_effect;
+		set_active_reaction(null);
+		set_active_effect(null);
+		try {
+			return fn();
+		} finally {
+			set_active_reaction(previous_reaction);
+			set_active_effect(previous_effect);
+		}
+	}
+
+	/**
+	 * Listen to the given event, and then instantiate a global form reset listener if not already done,
+	 * to notify all bindings when the form is reset
+	 * @param {HTMLElement} element
+	 * @param {string} event
+	 * @param {(is_reset?: true) => void} handler
+	 * @param {(is_reset?: true) => void} [on_reset]
+	 */
+	function listen_to_event_and_reset_event(element, event, handler, on_reset = handler) {
+		element.addEventListener(event, () => without_reactive_context(handler));
+		const prev = /** @type {any} */ (element)[FORM_RESET_HANDLER];
+		if (prev) {
+			// special case for checkbox that can have multiple binds (group & checked)
+			/** @type {any} */ (element)[FORM_RESET_HANDLER] = () => {
+				prev();
+				on_reset(true);
+			};
+		} else {
+			/** @type {any} */ (element)[FORM_RESET_HANDLER] = () => on_reset(true);
+		}
+
+		add_form_reset_listener();
+	}
+
+	/**
+	 * Returns a `subscribe` function that integrates external event-based systems with Svelte's reactivity.
+	 * It's particularly useful for integrating with web APIs like `MediaQuery`, `IntersectionObserver`, or `WebSocket`.
+	 *
+	 * If `subscribe` is called inside an effect (including indirectly, for example inside a getter),
+	 * the `start` callback will be called with an `update` function. Whenever `update` is called, the effect re-runs.
+	 *
+	 * If `start` returns a cleanup function, it will be called when the effect is destroyed.
+	 *
+	 * If `subscribe` is called in multiple effects, `start` will only be called once as long as the effects
+	 * are active, and the returned teardown function will only be called when all effects are destroyed.
+	 *
+	 * It's best understood with an example. Here's an implementation of [`MediaQuery`](https://svelte.dev/docs/svelte/svelte-reactivity#MediaQuery):
+	 *
+	 * ```js
+	 * import { createSubscriber } from 'svelte/reactivity';
+	 * import { on } from 'svelte/events';
+	 *
+	 * export class MediaQuery {
+	 * 	#query;
+	 * 	#subscribe;
+	 *
+	 * 	constructor(query) {
+	 * 		this.#query = window.matchMedia(`(${query})`);
+	 *
+	 * 		this.#subscribe = createSubscriber((update) => {
+	 * 			// when the `change` event occurs, re-run any effects that read `this.current`
+	 * 			const off = on(this.#query, 'change', update);
+	 *
+	 * 			// stop listening when all the effects are destroyed
+	 * 			return () => off();
+	 * 		});
+	 * 	}
+	 *
+	 * 	get current() {
+	 * 		// This makes the getter reactive, if read in an effect
+	 * 		this.#subscribe();
+	 *
+	 * 		// Return the current state of the query, whether or not we're in an effect
+	 * 		return this.#query.matches;
+	 * 	}
+	 * }
+	 * ```
+	 * @param {(update: () => void) => (() => void) | void} start
+	 * @since 5.7.0
+	 */
+	function createSubscriber(start) {
+		let subscribers = 0;
+		let version = source(0);
+		/** @type {(() => void) | void} */
+		let stop;
+
+		{
+			tag(version, 'createSubscriber version');
+		}
+
+		return () => {
+			if (effect_tracking()) {
+				get(version);
+
+				render_effect(() => {
+					if (subscribers === 0) {
+						stop = untrack(() => start(() => increment(version)));
+					}
+
+					subscribers += 1;
+
+					return () => {
+						queue_micro_task(() => {
+							// Only count down after a microtask, else we would reach 0 before our own render effect reruns,
+							// but reach 1 again when the tick callback of the prior teardown runs. That would mean we
+							// re-subcribe unnecessarily and create a memory leak because the old subscription is never cleaned up.
+							subscribers -= 1;
+
+							if (subscribers === 0) {
+								stop?.();
+								stop = undefined;
+								// Increment the version to ensure any dependent deriveds are marked dirty when the subscription is picked up again later.
+								// If we didn't do this then the comparison of write versions would determine that the derived has a later version than
+								// the subscriber, and it would not be re-run.
+								increment(version);
+							}
+						});
+					};
+				});
+			}
+		};
+	}
+
+	/** @import { Effect, Source, TemplateNode, } from '#client' */
+
+	/**
+	 * @typedef {{
+	 * 	 onerror?: ((error: unknown, reset: () => void) => void) | null;
+	 *   failed?: ((anchor: Node, error: () => unknown, reset: () => () => void) => void) | null;
+	 *   pending?: ((anchor: Node) => void) | null;
+	 * }} BoundaryProps
+	 */
+
+	var flags = EFFECT_TRANSPARENT | EFFECT_PRESERVED;
+
+	/**
+	 * @param {TemplateNode} node
+	 * @param {BoundaryProps} props
+	 * @param {((anchor: Node) => void)} children
+	 * @param {((error: unknown) => unknown) | undefined} [transform_error]
+	 * @returns {void}
+	 */
+	function boundary(node, props, children, transform_error) {
+		new Boundary(node, props, children, transform_error);
+	}
+
+	class Boundary {
+		/** @type {Boundary | null} */
+		parent;
+
+		is_pending = false;
+
+		/**
+		 * API-level transformError transform function. Transforms errors before they reach the `failed` snippet.
+		 * Inherited from parent boundary, or defaults to identity.
+		 * @type {(error: unknown) => unknown}
+		 */
+		transform_error;
+
+		/** @type {TemplateNode} */
+		#anchor;
+
+		/** @type {TemplateNode | null} */
+		#hydrate_open = null;
+
+		/** @type {BoundaryProps} */
+		#props;
+
+		/** @type {((anchor: Node) => void)} */
+		#children;
+
+		/** @type {Effect} */
+		#effect;
+
+		/** @type {Effect | null} */
+		#main_effect = null;
+
+		/** @type {Effect | null} */
+		#pending_effect = null;
+
+		/** @type {Effect | null} */
+		#failed_effect = null;
+
+		/** @type {DocumentFragment | null} */
+		#offscreen_fragment = null;
+
+		#local_pending_count = 0;
+		#pending_count = 0;
+		#pending_count_update_queued = false;
+
+		/** @type {Set<Effect>} */
+		#dirty_effects = new Set();
+
+		/** @type {Set<Effect>} */
+		#maybe_dirty_effects = new Set();
+
+		/**
+		 * A source containing the number of pending async deriveds/expressions.
+		 * Only created if `$effect.pending()` is used inside the boundary,
+		 * otherwise updating the source results in needless `Batch.ensure()`
+		 * calls followed by no-op flushes
+		 * @type {Source<number> | null}
+		 */
+		#effect_pending = null;
+
+		#effect_pending_subscriber = createSubscriber(() => {
+			this.#effect_pending = source(this.#local_pending_count);
+
+			{
+				tag(this.#effect_pending, '$effect.pending()');
+			}
+
+			return () => {
+				this.#effect_pending = null;
+			};
+		});
+
+		/**
+		 * @param {TemplateNode} node
+		 * @param {BoundaryProps} props
+		 * @param {((anchor: Node) => void)} children
+		 * @param {((error: unknown) => unknown) | undefined} [transform_error]
+		 */
+		constructor(node, props, children, transform_error) {
+			this.#anchor = node;
+			this.#props = props;
+
+			this.#children = (anchor) => {
+				var effect = /** @type {Effect} */ (active_effect);
+
+				effect.b = this;
+				effect.f |= BOUNDARY_EFFECT;
+
+				children(anchor);
+			};
+
+			this.parent = /** @type {Effect} */ (active_effect).b;
+
+			// Inherit transform_error from parent boundary, or use the provided one, or default to identity
+			this.transform_error = transform_error ?? this.parent?.transform_error ?? ((e) => e);
+
+			this.#effect = block(() => {
+				{
+					this.#render();
+				}
+			}, flags);
+		}
+
+		#hydrate_resolved_content() {
+			try {
+				this.#main_effect = branch(() => this.#children(this.#anchor));
+			} catch (error) {
+				this.error(error);
+			}
+		}
+
+		/**
+		 * @param {unknown} error The deserialized error from the server's hydration comment
+		 */
+		#hydrate_failed_content(error) {
+			const failed = this.#props.failed;
+			const { reset, invoke_onerror } = this.#create_reset(error);
+
+			// `onerror` may mutate state, which is disallowed while hydrating
+			queue_micro_task(invoke_onerror);
+
+			if (!failed) return;
+
+			this.#failed_effect = branch(() => {
+				failed(
+					this.#anchor,
+					() => error,
+					() => reset
+				);
+			});
+		}
+
+		/**
+		 * Creates the `reset` function for a failed boundary, along with a function
+		 * that invokes `onerror` with it (if provided)
+		 * @param {unknown} error
+		 * @returns {{ reset: () => void, invoke_onerror: () => void }}
+		 */
+		#create_reset(error) {
+			var did_reset = false;
+			var calling_on_error = false;
+
+			const reset = () => {
+				if (did_reset) {
+					svelte_boundary_reset_noop();
+					return;
+				}
+
+				did_reset = true;
+
+				if (calling_on_error) {
+					svelte_boundary_reset_onerror();
+				}
+
+				if (this.#failed_effect !== null) {
+					pause_effect(this.#failed_effect, () => {
+						this.#failed_effect = null;
+					});
+				}
+
+				this.#run(() => {
+					this.#render();
+				});
+			};
+
+			const invoke_onerror = () => {
+				try {
+					calling_on_error = true;
+					this.#props.onerror?.(error, reset);
+					calling_on_error = false;
+				} catch (err) {
+					invoke_error_boundary(err, this.#effect && this.#effect.parent);
+				}
+			};
+
+			return { reset, invoke_onerror };
+		}
+
+		#hydrate_pending_content() {
+			const pending = this.#props.pending;
+			if (!pending) return;
+
+			this.is_pending = true;
+			this.#pending_effect = branch(() => pending(this.#anchor));
+
+			queue_micro_task(() => {
+				var fragment = (this.#offscreen_fragment = document.createDocumentFragment());
+				var anchor = create_text();
+
+				fragment.append(anchor);
+
+				this.#main_effect = this.#run(() => {
+					return branch(() => this.#children(anchor));
+				});
+
+				if (this.#pending_count === 0) {
+					this.#anchor.before(fragment);
+					this.#offscreen_fragment = null;
+
+					pause_effect(/** @type {Effect} */ (this.#pending_effect), () => {
+						this.#pending_effect = null;
+					});
+
+					this.#resolve(/** @type {Batch} */ (current_batch));
+				}
+			});
+		}
+
+		#render() {
+			try {
+				this.is_pending = this.has_pending_snippet();
+				this.#pending_count = 0;
+				this.#local_pending_count = 0;
+
+				this.#main_effect = branch(() => {
+					this.#children(this.#anchor);
+				});
+
+				if (this.#pending_count > 0) {
+					var fragment = (this.#offscreen_fragment = document.createDocumentFragment());
+					move_effect(this.#main_effect, fragment);
+
+					const pending = /** @type {(anchor: Node) => void} */ (this.#props.pending);
+					this.#pending_effect = branch(() => pending(this.#anchor));
+				} else {
+					this.#resolve(/** @type {Batch} */ (current_batch));
+				}
+			} catch (error) {
+				this.error(error);
+			}
+		}
+
+		/**
+		 * @param {Batch} batch
+		 */
+		#resolve(batch) {
+			this.is_pending = false;
+
+			// any effects that were previously deferred should be transferred
+			// to the batch, which will flush in the next microtask
+			batch.transfer_effects(this.#dirty_effects, this.#maybe_dirty_effects);
+		}
+
+		/**
+		 * Defer an effect inside a pending boundary until the boundary resolves
+		 * @param {Effect} effect
+		 */
+		defer_effect(effect) {
+			defer_effect(effect, this.#dirty_effects, this.#maybe_dirty_effects);
+		}
+
+		/**
+		 * Returns `false` if the effect exists inside a boundary whose pending snippet is shown
+		 * @returns {boolean}
+		 */
+		is_rendered() {
+			return !this.is_pending && (!this.parent || this.parent.is_rendered());
+		}
+
+		has_pending_snippet() {
+			return !!this.#props.pending;
+		}
+
+		/**
+		 * @template T
+		 * @param {() => T} fn
+		 */
+		#run(fn) {
+			var previous_effect = active_effect;
+			var previous_reaction = active_reaction;
+			var previous_ctx = component_context;
+
+			set_active_effect(this.#effect);
+			set_active_reaction(this.#effect);
+			set_component_context(this.#effect.ctx);
+
+			try {
+				Batch.ensure();
+				return fn();
+			} catch (e) {
+				handle_error(e);
+				return null;
+			} finally {
+				set_active_effect(previous_effect);
+				set_active_reaction(previous_reaction);
+				set_component_context(previous_ctx);
+			}
+		}
+
+		/**
+		 * Updates the pending count associated with the currently visible pending snippet,
+		 * if any, such that we can replace the snippet with content once work is done
+		 * @param {1 | -1} d
+		 * @param {Batch} batch
+		 */
+		#update_pending_count(d, batch) {
+			if (!this.has_pending_snippet()) {
+				if (this.parent) {
+					this.parent.#update_pending_count(d, batch);
+				}
+
+				// if there's no parent, we're in a scope with no pending snippet
+				return;
+			}
+
+			this.#pending_count += d;
+
+			if (this.#pending_count === 0) {
+				this.#resolve(batch);
+
+				if (this.#pending_effect) {
+					pause_effect(this.#pending_effect, () => {
+						this.#pending_effect = null;
+					});
+				}
+
+				if (this.#offscreen_fragment) {
+					this.#anchor.before(this.#offscreen_fragment);
+					this.#offscreen_fragment = null;
+				}
+			}
+		}
+
+		/**
+		 * Update the source that powers `$effect.pending()` inside this boundary,
+		 * and controls when the current `pending` snippet (if any) is removed.
+		 * Do not call from inside the class
+		 * @param {1 | -1} d
+		 * @param {Batch} batch
+		 */
+		update_pending_count(d, batch) {
+			this.#update_pending_count(d, batch);
+
+			this.#local_pending_count += d;
+
+			if (!this.#effect_pending || this.#pending_count_update_queued) return;
+			this.#pending_count_update_queued = true;
+
+			queue_micro_task(() => {
+				this.#pending_count_update_queued = false;
+				if (this.#effect_pending) {
+					internal_set(this.#effect_pending, this.#local_pending_count);
+				}
+			});
+		}
+
+		get_effect_pending() {
+			this.#effect_pending_subscriber();
+			return get(/** @type {Source<number>} */ (this.#effect_pending));
+		}
+
+		/** @param {unknown} error */
+		error(error) {
+			// If we have nothing to capture the error, or if we hit an error while
+			// rendering the fallback, re-throw for another boundary to handle
+			if (!this.#props.onerror && !this.#props.failed) {
+				throw error;
+			}
+
+			if (current_batch?.is_fork) {
+				if (this.#main_effect) current_batch.skip_effect(this.#main_effect);
+				if (this.#pending_effect) current_batch.skip_effect(this.#pending_effect);
+				if (this.#failed_effect) current_batch.skip_effect(this.#failed_effect);
+
+				current_batch.oncommit(() => {
+					this.#handle_error(error);
+				});
+			} else {
+				this.#handle_error(error);
+			}
+		}
+
+		/**
+		 * @param {unknown} error
+		 */
+		#handle_error(error) {
+			if (this.#main_effect) {
+				destroy_effect(this.#main_effect);
+				this.#main_effect = null;
+			}
+
+			if (this.#pending_effect) {
+				destroy_effect(this.#pending_effect);
+				this.#pending_effect = null;
+			}
+
+			if (this.#failed_effect) {
+				destroy_effect(this.#failed_effect);
+				this.#failed_effect = null;
+			}
+
+			let failed = this.#props.failed;
+
+			/** @param {unknown} transformed_error */
+			const handle_error_result = (transformed_error) => {
+				const { reset, invoke_onerror } = this.#create_reset(transformed_error);
+
+				invoke_onerror();
+
+				if (failed) {
+					this.#failed_effect = this.#run(() => {
+						try {
+							return branch(() => {
+								// errors in `failed` snippets cause the boundary to error again
+								// TODO Svelte 6: revisit this decision, most likely better to go to parent boundary instead
+								var effect = /** @type {Effect} */ (active_effect);
+
+								effect.b = this;
+								effect.f |= BOUNDARY_EFFECT;
+
+								failed(
+									this.#anchor,
+									() => transformed_error,
+									() => reset
+								);
+							});
+						} catch (error) {
+							invoke_error_boundary(error, /** @type {Effect} */ (this.#effect.parent));
+							return null;
+						}
+					});
+				}
+			};
+
+			queue_micro_task(() => {
+				// Run the error through the API-level transformError transform (e.g. SvelteKit's handleError)
+				/** @type {unknown} */
+				var result;
+				try {
+					result = this.transform_error(error);
+				} catch (e) {
+					invoke_error_boundary(e, this.#effect && this.#effect.parent);
+					return;
+				}
+
+				if (
+					result !== null &&
+					typeof result === 'object' &&
+					typeof (/** @type {any} */ (result).then) === 'function'
+				) {
+					// transformError returned a Promise — wait for it
+					/** @type {any} */ (result).then(
+						handle_error_result,
+						/** @param {unknown} e */
+						(e) => invoke_error_boundary(e, this.#effect && this.#effect.parent)
+					);
+				} else {
+					// Synchronous result — handle immediately
+					handle_error_result(result);
+				}
+			});
+		}
+	}
+
+	/** @import { Blocker, Effect, Source, Value } from '#client' */
+
+	/**
+	 * @param {Blocker[]} blockers
+	 * @param {Array<() => any>} sync
+	 * @param {Array<() => Promise<any>>} async
+	 * @param {(values: Value[]) => any} fn
+	 */
+	function flatten(blockers, sync, async, fn) {
+		const d = is_runes() ? derived : derived_safe_equal;
+
+		// Filter out already-settled blockers - no need to wait for them
+		var pending = blockers.filter((b) => !b.settled);
+
+		var deriveds = sync.map(d);
+
+		{
+			deriveds.forEach((d, i) => {
+				// TODO this is kinda useful for debugging but a lousy implementation —
+				// maybe the compiler could pass through the template string
+				d.label = sync[i]
+					.toString()
+					.replace('() => ', '')
+					.replaceAll('$.eager(() => ', '$state.eager(')
+					.replace(/\$\.get\((.+?)\)/g, (_, id) => id);
+			});
+		}
+
+		if (async.length === 0 && pending.length === 0) {
+			fn(deriveds);
+			return;
+		}
+
+		var parent = /** @type {Effect} */ (active_effect);
+
+		var restore = capture();
+		var blocker_promise =
+			pending.length === 1
+				? pending[0].promise
+				: pending.length > 1
+					? Promise.all(pending.map((b) => b.promise))
+					: null;
+
+		/**
+		 * @param {Source[]} async
+		 */
+		function finish(async) {
+			if ((parent.f & DESTROYED) !== 0) {
+				return;
+			}
+
+			restore();
+
+			try {
+				fn([...deriveds, ...async]);
+			} catch (error) {
+				invoke_error_boundary(error, parent);
+			}
+
+			unset_context();
+		}
+
+		var decrement_pending = increment_pending();
+
+		// Fast path: blockers but no async expressions
+		if (async.length === 0) {
+			/** @type {Promise<any>} */ (blocker_promise).then(() => finish([])).finally(decrement_pending);
+			return;
+		}
+
+		// Full path: has async expressions
+		function run() {
+			Promise.all(async.map((expression) => async_derived(expression)))
+				.then(finish)
+				.catch((error) => invoke_error_boundary(error, parent))
+				.finally(decrement_pending);
+		}
+
+		if (blocker_promise) {
+			blocker_promise.then(() => {
+				restore();
+				run();
+				unset_context();
+			});
+		} else {
+			run();
+		}
+	}
+
+	/**
+	 * Captures the current effect context so that we can restore it after
+	 * some asynchronous work has happened (so that e.g. `await a + b`
+	 * causes `b` to be registered as a dependency).
+	 */
+	function capture() {
+		var previous_effect = /** @type {Effect} */ (active_effect);
+		var previous_reaction = active_reaction;
+		var previous_component_context = component_context;
+		var previous_batch = /** @type {Batch} */ (current_batch);
+
+		{
+			var previous_dev_stack = dev_stack;
+		}
+
+		return function restore(activate_batch = true) {
+			set_active_effect(previous_effect);
+			set_active_reaction(previous_reaction);
+			set_component_context(previous_component_context);
+
+			if (activate_batch && (previous_effect.f & DESTROYED) === 0) {
+				// TODO we only need optional chaining here because `{#await ...}` blocks
+				// are anomalous. Once we retire them we can get rid of it
+				previous_batch?.activate();
+				previous_batch?.apply();
+			}
+
+			{
+				set_reactivity_loss_tracker(null);
+				set_dev_stack(previous_dev_stack);
+			}
+		};
+	}
+
+	/**
+	 * Reset `current_async_effect` after the `promise` resolves, so
+	 * that we can emit `await_reactivity_loss` warnings
+	 * @template T
+	 * @param {Promise<T>} promise
+	 * @returns {Promise<() => T>}
+	 */
+	async function track_reactivity_loss(promise) {
+		var previous_reactivity_loss_tracker = reactivity_loss_tracker;
+		// Ensure that unrelated reads after an async operation is kicked off don't cause false positives
+		queueMicrotask(() => {
+			if (reactivity_loss_tracker === previous_reactivity_loss_tracker) {
+				set_reactivity_loss_tracker(null);
+			}
+		});
+
+		var value = await promise;
+
+		return () => {
+			set_reactivity_loss_tracker(previous_reactivity_loss_tracker);
+			// While this can result in false negatives it also guards against the more important
+			// false positives that would occur if this is the last in a chain of async operations,
+			// and the reactivity_loss_tracker would then stay around until the next async operation happens.
+			queueMicrotask(() => {
+				if (reactivity_loss_tracker === previous_reactivity_loss_tracker) {
+					set_reactivity_loss_tracker(null);
+				}
+			});
+
+			return value;
+		};
+	}
+
+	function unset_context(deactivate_batch = true) {
+		set_active_effect(null);
+		set_active_reaction(null);
+		set_component_context(null);
+		if (deactivate_batch) current_batch?.deactivate();
+
+		{
+			set_reactivity_loss_tracker(null);
+			set_dev_stack(null);
+		}
+	}
+
+	/**
+	 * @returns {(skip?: boolean) => void}
+	 */
+	function increment_pending() {
+		var effect = /** @type {Effect} */ (active_effect);
+		var boundary = effect.b; // undefined if called outside the render tree, e.g. a standalone $effect.root
+		var batch = /** @type {Batch} */ (current_batch);
+		var blocking = !!boundary?.is_rendered();
+
+		boundary?.update_pending_count(1, batch);
+		batch.increment(blocking, effect);
+
+		return () => {
+			boundary?.update_pending_count(-1, batch);
+			batch.decrement(blocking, effect);
+		};
+	}
+
+	/** @import { Derived, Effect, Reaction, Source, Value } from '#client' */
+	/** @import { Batch } from './batch.js'; */
+	/** @import { Boundary } from '../dom/blocks/boundary.js'; */
+
+	/**
+	 * This allows us to track 'reactivity loss' that occurs when signals
+	 * are read after a non-context-restoring `await`. Dev-only
+	 * @type {{ effect: Effect, effect_deps: Set<Value>, warned: boolean } | null}
+	 */
+	let reactivity_loss_tracker = null;
+
+	/** @param {{ effect: Effect, effect_deps: Set<Value>, warned: boolean } | null} v */
+	function set_reactivity_loss_tracker(v) {
+		reactivity_loss_tracker = v;
+	}
+
+	const recent_async_deriveds = new Set();
+
+	/**
+	 * @template V
+	 * @param {() => V} fn
+	 * @returns {Derived<V>}
+	 */
+	/*#__NO_SIDE_EFFECTS__*/
+	function derived(fn) {
+		var flags = DERIVED | DIRTY;
+
+		if (active_effect !== null) {
+			// Since deriveds are evaluated lazily, any effects created inside them are
+			// created too late to ensure that the parent effect is added to the tree
+			active_effect.f |= EFFECT_PRESERVED;
+		}
+
+		/** @type {Derived<V>} */
+		const signal = {
+			ctx: component_context,
+			deps: null,
+			effects: null,
+			equals: equals$1,
+			f: flags,
+			fn,
+			reactions: null,
+			rv: 0,
+			v: /** @type {V} */ (UNINITIALIZED),
+			wv: 0,
+			parent: active_effect,
+			ac: null
+		};
+
+		return signal;
+	}
+
+	const OBSOLETE = Symbol('obsolete');
+
+	/**
+	 * @template V
+	 * @param {() => V | Promise<V>} fn
+	 * @param {string} [label]
+	 * @param {string} [location] If provided, print a warning if the value is not read immediately after update
+	 * @returns {Promise<Source<V>>}
+	 */
+	/*#__NO_SIDE_EFFECTS__*/
+	function async_derived(fn, label, location) {
+		let parent = /** @type {Effect | null} */ (active_effect);
+
+		if (parent === null) {
+			async_derived_orphan();
+		}
+
+		var promise = /** @type {Promise<V>} */ (/** @type {unknown} */ (undefined));
+		var signal = source(/** @type {V} */ (UNINITIALIZED));
+
+		signal.label = fn.toString();
+
+		// only suspend in async deriveds created on initialisation
+		var should_suspend = !active_reaction;
+
+		/** @type {Set<ReturnType<typeof deferred<V>>>} */
+		var deferreds = new Set();
+
+		async_effect(() => {
+			var effect = /** @type {Effect} */ (active_effect);
+
+			{
+				reactivity_loss_tracker = { effect, effect_deps: new Set(), warned: false };
+			}
+
+			/** @type {ReturnType<typeof deferred<V>>} */
+			var d = deferred();
+			promise = d.promise;
+
+			try {
+				// If this code is changed at some point, make sure to still access the then property
+				// of fn() to read any signals it might access, so that we track them as dependencies.
+				// We call `unset_context` to undo any `save` calls that happen inside `fn()`
+				Promise.resolve(fn())
+					.then(d.resolve, (e) => {
+						// if the promise was rejected by the user, via `getAbortSignal`, then
+						// wait for a subsequent resolution instead of flushing the batch
+						if (e !== STALE_REACTION) d.reject(e);
+					})
+					.finally(unset_context);
+			} catch (error) {
+				d.reject(error);
+				unset_context();
+			}
+
+			{
+				if (reactivity_loss_tracker) {
+					// Reused deps from previous run (indices 0 to skipped_deps-1)
+					// We deliberately only track direct dependencies of the async expression to encourage
+					// dependencies being directly visible at the point of the expression
+					if (effect.deps !== null) {
+						for (let i = 0; i < skipped_deps; i += 1) {
+							reactivity_loss_tracker.effect_deps.add(effect.deps[i]);
+						}
+					}
+
+					// New deps discovered this run
+					if (new_deps !== null) {
+						for (let i = 0; i < new_deps.length; i += 1) {
+							reactivity_loss_tracker.effect_deps.add(new_deps[i]);
+						}
+					}
+				}
+
+				reactivity_loss_tracker = null;
+			}
+
+			var batch = /** @type {Batch} */ (current_batch);
+
+			if (should_suspend) {
+				// we only increment the batch's pending state for updates, not creation, otherwise
+				// we will decrement to zero before the work that depends on this promise (e.g. a
+				// template effect) has initialized, causing the batch to resolve prematurely
+				if ((effect.f & REACTION_RAN) !== 0) {
+					var decrement_pending = increment_pending();
+				}
+
+				if (
+					// boundary can be null if the async derived is inside an $effect.root not connected to the component render tree
+					parent.b?.is_rendered()
+				) {
+					batch.async_deriveds.get(effect)?.reject(OBSOLETE);
+				} else {
+					// While the boundary is still showing pending, a new run supersedes all older in-flight runs
+					// for this async expression. Cancel eagerly so resolution cannot commit stale values.
+					for (const d of deferreds.values()) {
+						d.reject(OBSOLETE);
+					}
+				}
+
+				deferreds.add(d);
+				batch.async_deriveds.set(effect, d);
+			}
+
+			/**
+			 * @param {any} value
+			 * @param {unknown} error
+			 */
+			const handler = (value, error = undefined) => {
+				{
+					reactivity_loss_tracker = null;
+				}
+
+				decrement_pending?.();
+				deferreds.delete(d);
+
+				if (error === OBSOLETE) return;
+
+				batch.activate();
+
+				if (error) {
+					signal.f |= ERROR_VALUE;
+
+					// @ts-expect-error the error is the wrong type, but we don't care
+					internal_set(signal, error);
+				} else {
+					if ((signal.f & ERROR_VALUE) !== 0) {
+						signal.f ^= ERROR_VALUE;
+					}
+
+					internal_set(signal, value);
+				}
+
+				batch.deactivate();
+			};
+
+			d.promise.then(handler, (e) => handler(null, e || 'unknown'));
+		});
+
+		teardown(() => {
+			for (const d of deferreds) {
+				d.reject(OBSOLETE);
+			}
+		});
+
+		{
+			// add a flag that lets this be printed as a derived
+			// when using `$inspect.trace()`
+			signal.f |= ASYNC;
+		}
+
+		return new Promise((fulfil) => {
+			/** @param {Promise<V>} p */
+			function next(p) {
+				function go() {
+					if (p === promise) {
+						fulfil(signal);
+					} else {
+						// if the effect re-runs before the initial promise
+						// resolves, delay resolution until we have a value
+						next(promise);
+					}
+				}
+
+				p.then(go, go);
+			}
+
+			next(promise);
+		});
+	}
+
+	/**
+	 * @template V
+	 * @param {() => V} fn
+	 * @returns {Derived<V>}
+	 */
+	/*#__NO_SIDE_EFFECTS__*/
+	function derived_safe_equal(fn) {
+		const signal = derived(fn);
+		signal.equals = safe_equals;
+		return signal;
+	}
+
+	/**
+	 * @param {Derived} derived
+	 * @returns {void}
+	 */
+	function destroy_derived_effects(derived) {
+		var effects = derived.effects;
+
+		if (effects !== null) {
+			derived.effects = null;
+
+			for (var i = 0; i < effects.length; i += 1) {
+				destroy_effect(/** @type {Effect} */ (effects[i]));
+			}
+		}
+	}
+
+	/**
+	 * The currently updating deriveds, used to detect infinite recursion
+	 * in dev mode and provide a nicer error than 'too much recursion'
+	 * @type {Derived[]}
+	 */
+	let stack = [];
+
+	/**
+	 * @template T
+	 * @param {Derived} derived
+	 * @returns {T}
+	 */
+	function execute_derived(derived) {
+		var value;
+		var prev_active_effect = active_effect;
+		var parent = derived.parent;
+
+		if (
+			!is_destroying_effect &&
+			parent !== null &&
+			derived.v !== UNINITIALIZED && // if it was never evaluated before, it's guaranteed to fail downstream, so we try to execute instead
+			(parent.f & (DESTROYED | INERT)) !== 0
+		) {
+			derived_inert();
+
+			return derived.v;
+		}
+
+		set_active_effect(parent);
+
+		{
+			let prev_eager_effects = eager_effects;
+			set_eager_effects(new Set());
+			try {
+				if (includes.call(stack, derived)) {
+					derived_references_self();
+				}
+
+				stack.push(derived);
+
+				derived.f &= ~WAS_MARKED;
+				destroy_derived_effects(derived);
+				value = update_reaction(derived);
+			} finally {
+				set_active_effect(prev_active_effect);
+				set_eager_effects(prev_eager_effects);
+				stack.pop();
+			}
+		}
+
+		return value;
+	}
+
+	/**
+	 * @param {Derived} derived
+	 * @returns {void}
+	 */
+	function update_derived(derived) {
+		var value = execute_derived(derived);
+
+		if (!derived.equals(value)) {
+			derived.wv = increment_write_version();
+
+			// in a fork, we don't update the underlying value, just `batch_values`.
+			// the underlying value will be updated when the fork is committed.
+			// otherwise, the next time we get here after a 'real world' state
+			// change, `derived.equals` may incorrectly return `true`
+			if (!current_batch?.is_fork || derived.deps === null) {
+				if (current_batch !== null) {
+					// We also write to previous_batch because if it exists, it is a sign that we're
+					// currently in the process of flushing effects. These updates to deriveds may belong
+					// to the previous batch, not the new one (which can already exist if an earlier
+					// effect wrote to a source). This can cause bugs when running batch.#commit() later,
+					// but not adding it to current_batch can, too, so we add it to both.
+					// See https://github.com/sveltejs/svelte/pull/18117 for more details.
+					current_batch.capture(derived, value, true);
+					previous_batch?.capture(derived, value, true);
+				} else {
+					derived.v = value;
+				}
+
+				// deriveds without dependencies should never be recomputed
+				if (derived.deps === null) {
+					set_signal_status(derived, CLEAN);
+					return;
+				}
+			}
+		}
+
+		// don't mark derived clean if we're reading it inside a
+		// cleanup function, or it will cache a stale value
+		if (is_destroying_effect) {
+			return;
+		}
+
+		// During time traveling we don't want to reset the status so that
+		// traversal of the graph in the other batches still happens
+		if (batch_values !== null) {
+			// only cache the value if we're in a tracking context, otherwise we won't
+			// clear the cache in `mark_reactions` when dependencies are updated
+			if (effect_tracking() || current_batch?.is_fork) {
+				batch_values.set(derived, value);
+			}
+		} else {
+			update_derived_status(derived);
+		}
+	}
+
+	/**
+	 * @param {Derived} derived
+	 */
+	function freeze_derived_effects(derived) {
+		if (derived.effects === null) return;
+
+		for (const e of derived.effects) {
+			// if the effect has a teardown function or abort signal, call it
+			if (e.teardown || e.ac) {
+				e.teardown?.();
+				if (e.ac !== null) {
+					without_reactive_context(() => {
+						/** @type {AbortController} */ (e.ac).abort(STALE_REACTION);
+						e.ac = null;
+					});
+				}
+
+				// make it a noop so it doesn't get called again if the derived
+				// is unfrozen. we don't set it to `null`, because the existence
+				// of a teardown function is what determines whether the
+				// effect runs again during unfreezing (but not for teardown-only effects)
+				if (e.fn !== null) e.teardown = noop$1;
+
+				remove_reactions(e, 0);
+				destroy_effect_children(e);
+			}
+		}
+	}
+
+	/**
+	 * @param {Derived} derived
+	 */
+	function unfreeze_derived_effects(derived) {
+		if (derived.effects === null) return;
+
+		for (const e of derived.effects) {
+			// if the effect was previously frozen — indicated by the presence
+			// of a teardown function — unfreeze it
+			if (e.teardown && e.fn !== null) {
+				update_effect(e);
+			}
+		}
+	}
+
+	/** @import { Fork } from 'svelte' */
+	/** @import { Derived, Effect, Reaction, Source, Value } from '#client' */
+
+	/** @type {Batch | null} */
+	let first_batch = null;
+
+	/** @type {Batch | null} */
+	let last_batch = null;
+
+	/** @type {Batch | null} */
+	let current_batch = null;
+
+	/**
+	 * This is needed to avoid overwriting inputs
+	 * @type {Batch | null}
+	 */
+	let previous_batch = null;
+
+	/**
+	 * When time travelling (i.e. working in one batch, while other batches
+	 * still have ongoing work), we ignore the real values of affected
+	 * signals in favour of their values within the batch
+	 * @type {Map<Value, any> | null}
+	 */
+	let batch_values = null;
+
+	/** @type {Effect | null} */
+	let last_scheduled_effect = null;
+
+	let is_flushing_sync = false;
+	let is_processing = false;
+
+	/**
+	 * During traversal, this is an array. Newly created effects are (if not immediately
+	 * executed) pushed to this array, rather than going through the scheduling
+	 * rigamarole that would cause another turn of the flush loop.
+	 * @type {Effect[] | null}
+	 */
+	let collected_effects = null;
+
+	/**
+	 * An array of effects that are marked during traversal as a result of a `set`
+	 * (not `internal_set`) call. These will be added to the next batch and
+	 * trigger another `batch.process()`
+	 * @type {Effect[] | null}
+	 * @deprecated when we get rid of legacy mode and stores, we can get rid of this
+	 */
+	let legacy_updates = null;
+
+	var flush_count = 0;
+
+	/** @type {Set<Value>} */
+	var source_stacks = new Set();
+
+	let uid = 1;
+
+	class Batch {
+		id = uid++;
+
+		/** True as soon as `#process` was called */
+		#started = false;
+
+		linked = true;
+
+		/** @type {Batch | null} */
+		#prev = null;
+
+		/** @type {Batch | null} */
+		#next = null;
+
+		/** @type {Map<Effect, ReturnType<typeof deferred<any>>>} */
+		async_deriveds = new Map();
+
+		/**
+		 * The current values of any signals that are updated in this batch.
+		 * Tuple format: [value, is_derived] (note: is_derived is false for deriveds, too, if they were overridden via assignment)
+		 * They keys of this map are identical to `this.#previous`
+		 * @type {Map<Value, [any, boolean]>}
+		 */
+		current = new Map();
+
+		/**
+		 * The values of any signals (sources and deriveds) that are updated in this batch _before_ those updates took place.
+		 * They keys of this map are identical to `this.#current`
+		 * @type {Map<Value, any>}
+		 */
+		previous = new Map();
+
+		/**
+		 * When the batch is committed (and the DOM is updated), we need to remove old branches
+		 * and append new ones by calling the functions added inside (if/each/key/etc) blocks
+		 * @type {Set<(batch: Batch) => void>}
+		 */
+		#commit_callbacks = new Set();
+
+		/**
+		 * If a fork is discarded, we need to destroy any effects that are no longer needed
+		 * @type {Set<(batch: Batch) => void>}
+		 */
+		#discard_callbacks = new Set();
+
+		/**
+		 * The number of async effects that are currently in flight
+		 */
+		#pending = 0;
+
+		/**
+		 * Async effects that are currently in flight, _not_ inside a pending boundary
+		 * @type {Map<Effect, number>}
+		 */
+		#blocking_pending = new Map();
+
+		/**
+		 * A deferred that resolves when the batch is committed, used with `settled()`
+		 * TODO replace with Promise.withResolvers once supported widely enough
+		 * @type {{ promise: Promise<void>, resolve: (value?: any) => void, reject: (reason: unknown) => void } | null}
+		 */
+		#deferred = null;
+
+		/**
+		 * The root effects that need to be flushed
+		 * @type {Effect[]}
+		 */
+		#roots = [];
+
+		/**
+		 * Effects created while this batch was active.
+		 * @type {Effect[]}
+		 */
+		#new_effects = [];
+
+		/**
+		 * Deferred effects (which run after async work has completed) that are DIRTY
+		 * @type {Set<Effect>}
+		 */
+		#dirty_effects = new Set();
+
+		/**
+		 * Deferred effects that are MAYBE_DIRTY
+		 * @type {Set<Effect>}
+		 */
+		#maybe_dirty_effects = new Set();
+
+		/**
+		 * A map of branches that still exist, but will be destroyed when this batch
+		 * is committed — we skip over these during `process`.
+		 * The value contains child effects that were dirty/maybe_dirty before being reset,
+		 * so they can be rescheduled if the branch survives.
+		 * @type {Map<Effect, { d: Effect[], m: Effect[] }>}
+		 */
+		#skipped_branches = new Map();
+
+		/**
+		 * Inverse of #skipped_branches which we need to tell prior batches to unskip them when committing
+		 * @type {Set<Effect>}
+		 */
+		#unskipped_branches = new Set();
+
+		is_fork = false;
+
+		#decrement_queued = false;
+
+		constructor() {
+			// link batch
+			if (last_batch === null) {
+				first_batch = last_batch = this;
+			} else {
+				last_batch.#next = this;
+				this.#prev = last_batch;
+			}
+
+			last_batch = this;
+		}
+
+		#is_deferred() {
+			if (this.is_fork) return true;
+
+			for (const effect of this.#blocking_pending.keys()) {
+				var e = effect;
+				var skipped = false;
+
+				while (e.parent !== null) {
+					if (this.#skipped_branches.has(e)) {
+						skipped = true;
+						break;
+					}
+
+					e = e.parent;
+				}
+
+				if (!skipped) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		/**
+		 * Add an effect to the #skipped_branches map and reset its children
+		 * @param {Effect} effect
+		 */
+		skip_effect(effect) {
+			if (!this.#skipped_branches.has(effect)) {
+				this.#skipped_branches.set(effect, { d: [], m: [] });
+			}
+			this.#unskipped_branches.delete(effect);
+		}
+
+		/**
+		 * Remove an effect from the #skipped_branches map and reschedule
+		 * any tracked dirty/maybe_dirty child effects
+		 * @param {Effect} effect
+		 * @param {(e: Effect) => void} callback
+		 */
+		unskip_effect(effect, callback = (e) => this.schedule(e)) {
+			var tracked = this.#skipped_branches.get(effect);
+			if (tracked) {
+				this.#skipped_branches.delete(effect);
+
+				for (var e of tracked.d) {
+					set_signal_status(e, DIRTY);
+					callback(e);
+				}
+
+				for (e of tracked.m) {
+					set_signal_status(e, MAYBE_DIRTY);
+					callback(e);
+				}
+			}
+			this.#unskipped_branches.add(effect);
+		}
+
+		#process() {
+			this.#started = true;
+
+			if (flush_count++ > 1000) {
+				this.#unlink();
+				infinite_loop_guard();
+			}
+
+			{
+				// track all the values that were updated during this flush,
+				// so that they can be reset afterwards
+				for (const value of this.current.keys()) {
+					source_stacks.add(value);
+				}
+			}
+
+			// We always reschedule previously-deferred effects, not just when
+			// #is_deferred() is true, because traversing the tree could make
+			// an if block that contains the last blocking pending effect falsy,
+			// causing the block to no longer be deferred.
+			for (const e of this.#dirty_effects) {
+				this.#maybe_dirty_effects.delete(e);
+				set_signal_status(e, DIRTY);
+				this.schedule(e);
+			}
+
+			for (const e of this.#maybe_dirty_effects) {
+				set_signal_status(e, MAYBE_DIRTY);
+				this.schedule(e);
+			}
+
+			const roots = this.#roots;
+			this.#roots = [];
+
+			this.apply();
+
+			/** @type {Effect[]} */
+			var effects = (collected_effects = []);
+
+			/** @type {Effect[]} */
+			var render_effects = [];
+
+			/**
+			 * @type {Effect[]}
+			 * @deprecated when we get rid of legacy mode and stores, we can get rid of this
+			 */
+			var updates = (legacy_updates = []);
+
+			for (const root of roots) {
+				try {
+					this.#traverse(root, effects, render_effects);
+				} catch (e) {
+					reset_all(root);
+					// If there's no async work left, this branch is now dead and needs
+					// to be discarded to not become a zombie that is never cleaned up.
+					// See https://github.com/sveltejs/svelte/issues/18221#issuecomment-4497918414
+					// for a (non-minimal) reproduction that demonstrates a case where this is necessary
+					// to not get follow-up false-positives via "batch has scheduled roots" invariant errors.
+					if (!this.#is_deferred()) this.discard();
+					throw e;
+				}
+			}
+
+			// any writes should take effect in a subsequent batch
+			current_batch = null;
+
+			if (updates.length > 0) {
+				var batch = Batch.ensure();
+				for (const e of updates) {
+					batch.schedule(e);
+				}
+			}
+
+			collected_effects = null;
+			legacy_updates = null;
+
+			// if the batch has outstanding pending work, stash effects and bail
+			if (this.#is_deferred()) {
+				this.#defer_effects(render_effects);
+				this.#defer_effects(effects);
+
+				for (const [e, t] of this.#skipped_branches) {
+					reset_branch(e, t);
+				}
+
+				if (updates.length > 0) {
+					/** @type {Batch} */ (/** @type {unknown} */ (current_batch)).#process();
+				}
+
+				return;
+			}
+
+			const earlier_batch = this.#find_earlier_batch();
+
+			if (earlier_batch) {
+				// If this batch collected deferred effects during traversal, they still need
+				// to run after being merged into the earlier batch.
+				this.#defer_effects(render_effects);
+				this.#defer_effects(effects);
+				earlier_batch.#merge(this);
+				return;
+			}
+
+			// clear effects. Those that are still needed will be rescheduled through unskipping the skipped branches.
+			this.#dirty_effects.clear();
+			this.#maybe_dirty_effects.clear();
+
+			// append/remove branches
+			for (const fn of this.#commit_callbacks) fn(this);
+			this.#commit_callbacks.clear();
+
+			previous_batch = this;
+			flush_queued_effects(render_effects);
+			flush_queued_effects(effects);
+			previous_batch = null;
+
+			this.#deferred?.resolve();
+
+			var next_batch = /** @type {Batch | null} */ (/** @type {unknown} */ (current_batch));
+
+			if (this.#pending === 0 && (this.#roots.length === 0 || next_batch !== null)) {
+				this.#unlink();
+			}
+
+			// Edge case: During traversal new branches might create effects that run immediately and set state,
+			// causing an effect and therefore a root to be scheduled again. We need to traverse the current batch
+			// once more in that case - most of the time this will just clean up dirty branches.
+			if (this.#roots.length > 0) {
+				if (next_batch !== null) {
+					const batch = next_batch;
+					batch.#roots.push(...this.#roots.filter((r) => !batch.#roots.includes(r)));
+				} else {
+					next_batch = this;
+				}
+			}
+
+			if (next_batch !== null) {
+				next_batch.#process();
+			}
+		}
+
+		/**
+		 * Traverse the effect tree, executing effects or stashing
+		 * them for later execution as appropriate
+		 * @param {Effect} root
+		 * @param {Effect[]} effects
+		 * @param {Effect[]} render_effects
+		 */
+		#traverse(root, effects, render_effects) {
+			root.f ^= CLEAN;
+
+			var effect = root.first;
+
+			while (effect !== null) {
+				var flags = effect.f;
+				var is_branch = (flags & (BRANCH_EFFECT | ROOT_EFFECT)) !== 0;
+				var is_skippable_branch = is_branch && (flags & CLEAN) !== 0;
+
+				var skip = is_skippable_branch || (flags & INERT) !== 0 || this.#skipped_branches.has(effect);
+
+				if (!skip && effect.fn !== null) {
+					if (is_branch) {
+						effect.f ^= CLEAN;
+					} else if ((flags & EFFECT) !== 0) {
+						effects.push(effect);
+					} else if (is_dirty(effect)) {
+						if ((flags & BLOCK_EFFECT) !== 0) this.#maybe_dirty_effects.add(effect);
+						update_effect(effect);
+					}
+
+					var child = effect.first;
+
+					if (child !== null) {
+						effect = child;
+						continue;
+					}
+				}
+
+				while (effect !== null) {
+					var next = effect.next;
+
+					if (next !== null) {
+						effect = next;
+						break;
+					}
+
+					effect = effect.parent;
+				}
+			}
+		}
+
+		#find_earlier_batch() {
+			var batch = this.#prev;
+
+			while (batch !== null) {
+				if (!batch.is_fork) {
+					// if the batches are connected, break
+					for (const [value, [, is_derived]] of this.current) {
+						if (batch.current.has(value) && !is_derived) {
+							return batch;
+						}
+					}
+				}
+
+				batch = batch.#prev;
+			}
+
+			return null;
+		}
+
+		/**
+		 * @param {Batch} batch
+		 */
+		#merge(batch) {
+			for (const [source, value] of batch.current) {
+				if (!this.previous.has(source) && batch.previous.has(source)) {
+					this.previous.set(source, batch.previous.get(source));
+				}
+
+				this.current.set(source, value);
+			}
+
+			for (const [effect, deferred] of batch.async_deriveds) {
+				const d = this.async_deriveds.get(effect);
+				if (d) deferred.promise.then(d.resolve).catch(d.reject);
+			}
+
+			// Clear them or else those that are still pending might get rejected on discard (after merged-into batch is done).
+			// This can happen when batch Y merged into X and Y has a pending boundary and therefore still-pending async deriveds inside.
+			batch.async_deriveds.clear();
+
+			// Mark is not guaranteed not touch these, so we transfer them
+			this.transfer_effects(batch.#dirty_effects, batch.#maybe_dirty_effects);
+
+			/**
+			 * mark all effects that depend on `batch.current`, except the
+			 * async effects that we just resolved (TODO unless they depend
+			 * on values in this batch that are NOT in the later batch?).
+			 * Through this we also will populate the correct #skipped_branches,
+			 * oncommit callbacks etc, so we don't need to merge them separately.
+			 * @param {Value} value
+			 */
+			const mark = (value) => {
+				var reactions = value.reactions;
+				if (reactions === null) return;
+				// skip if value is derived and is neither dirty nor maybe dirty. transitive
+				// deriveds (a derived depending on another derived) are only MAYBE_DIRTY, so
+				// we must continue traversing them to reach the effects that depend on them
+				if ((value.f & DERIVED) !== 0 && (value.f & (DIRTY | MAYBE_DIRTY)) === 0) {
+					return;
+				}
+
+				for (const reaction of reactions) {
+					var flags = reaction.f;
+
+					if ((flags & DERIVED) !== 0) {
+						mark(/** @type {Derived} */ (reaction));
+					} else {
+						var effect = /** @type {Effect} */ (reaction);
+
+						if (flags & (ASYNC | BLOCK_EFFECT) && !this.async_deriveds.has(effect)) {
+							this.#maybe_dirty_effects.delete(effect);
+							set_signal_status(effect, DIRTY);
+							this.schedule(effect);
+						}
+					}
+				}
+			};
+
+			for (const source of this.current.keys()) {
+				mark(source);
+			}
+
+			this.oncommit(() => batch.discard());
+			batch.#unlink();
+
+			current_batch = this;
+			this.#process();
+		}
+
+		/**
+		 * @param {Effect[]} effects
+		 */
+		#defer_effects(effects) {
+			for (var i = 0; i < effects.length; i += 1) {
+				defer_effect(effects[i], this.#dirty_effects, this.#maybe_dirty_effects);
+			}
+		}
+
+		/**
+		 * Associate a change to a given source with the current
+		 * batch, noting its previous and current values
+		 * @param {Value} source
+		 * @param {any} value
+		 * @param {boolean} [is_derived]
+		 */
+		capture(source, value, is_derived = false) {
+			if (source.v !== UNINITIALIZED && !this.previous.has(source)) {
+				this.previous.set(source, source.v);
+			}
+
+			// Don't save errors in `batch_values`, or they won't be thrown in `runtime.js#get`
+			if ((source.f & ERROR_VALUE) === 0) {
+				this.current.set(source, [value, is_derived]);
+				batch_values?.set(source, value);
+			}
+
+			if (!this.is_fork) {
+				source.v = value;
+			}
+		}
+
+		activate() {
+			current_batch = this;
+		}
+
+		deactivate() {
+			current_batch = null;
+			batch_values = null;
+		}
+
+		flush() {
+			try {
+				if (DEV) {
+					source_stacks.clear();
+				}
+
+				is_processing = true;
+				current_batch = this;
+
+				this.#process();
+			} finally {
+				flush_count = 0;
+				last_scheduled_effect = null;
+				collected_effects = null;
+				legacy_updates = null;
+				is_processing = false;
+
+				current_batch = null;
+				batch_values = null;
+
+				old_values.clear();
+
+				{
+					for (const source of source_stacks) {
+						source.updated = null;
+					}
+				}
+			}
+		}
+
+		discard() {
+			for (const fn of this.#discard_callbacks) fn(this);
+			this.#discard_callbacks.clear();
+
+			for (const deferred of this.async_deriveds.values()) {
+				deferred.reject(OBSOLETE);
+			}
+
+			this.#unlink();
+			this.#deferred?.resolve();
+		}
+
+		/**
+		 * @param {Effect} effect
+		 */
+		register_created_effect(effect) {
+			this.#new_effects.push(effect);
+		}
+
+		#commit() {
+			// If there are other pending batches, they now need to be 'rebased' —
+			// in other words, we re-run block/async effects with the newly
+			// committed state, unless the batch in question has a more
+			// recent value for a given source
+			for (let batch = first_batch; batch !== null; batch = batch.#next) {
+				var is_earlier = batch.id < this.id;
+
+				/** @type {Source[]} */
+				var sources = [];
+
+				for (const [source, [value, is_derived]] of this.current) {
+					if (batch.current.has(source)) {
+						var batch_value = /** @type {[any, boolean]} */ (batch.current.get(source))[0]; // faster than destructuring
+
+						if (is_earlier && value !== batch_value) {
+							// bring the value up to date
+							batch.current.set(source, [value, is_derived]);
+						} else {
+							// same value or later batch has more recent value,
+							// no need to re-run these effects
+							continue;
+						}
+					}
+
+					sources.push(source);
+				}
+
+				if (is_earlier) {
+					// TODO do we need to restart these in some cases, instead of
+					// immediately resolving them? Likely not because of how this.apply() works.
+					for (const [effect, deferred] of this.async_deriveds) {
+						const d = batch.async_deriveds.get(effect);
+						if (d) deferred.promise.then(d.resolve).catch(d.reject);
+					}
+				}
+
+				var current = [...batch.current.keys()].filter(
+					(source) => !(/** @type {[any, boolean]} */ (batch.current.get(source))[1])
+				);
+
+				// If not started yet or no sources to update (which is e.g. possible for the very first batch) then bail
+				if (!batch.#started || current.length === 0) continue;
+
+				// Re-run async/block effects that depend on distinct values changed in both batches (ignoring deriveds)
+				var others = current.filter((source) => !this.current.has(source));
+
+				if (others.length === 0) {
+					if (is_earlier) {
+						// this batch is now obsolete and can be discarded
+						batch.discard();
+					}
+				} else if (sources.length > 0) {
+					// The microtask queue can contain the batch already scheduled to run right
+					// after this one is finished, so throwing the invariant would be wrong here.
+					if (!batch.#decrement_queued) {
+						invariant(batch.#roots.length === 0, 'Batch has scheduled roots');
+					}
+
+					// A batch was unskipped in a later batch -> tell prior batches to unskip it, too
+					if (is_earlier) {
+						for (const unskipped of this.#unskipped_branches) {
+							batch.unskip_effect(unskipped, (e) => {
+								if ((e.f & (BLOCK_EFFECT | ASYNC)) !== 0) {
+									batch.schedule(e);
+								} else {
+									batch.#defer_effects([e]);
+								}
+							});
+						}
+					}
+
+					batch.activate();
+
+					/** @type {Set<Value>} */
+					var marked = new Set();
+
+					/** @type {Map<Reaction, boolean>} */
+					var checked = new Map();
+
+					for (var source of sources) {
+						mark_effects(source, others, marked, checked);
+					}
+
+					checked = new Map();
+					var current_unequal = [...batch.current]
+						.filter(([c, v1]) => {
+							const v2 = this.current.get(c);
+							if (!v2) return true;
+							// Either their values are different or one is a derived but not the other
+							return v2[0] !== v1[0] || v2[1] !== v1[1];
+						})
+						.map(([c]) => c);
+
+					if (current_unequal.length > 0) {
+						for (const effect of this.#new_effects) {
+							if (
+								(effect.f & (DESTROYED | INERT | EAGER_EFFECT)) === 0 &&
+								depends_on(effect, current_unequal, checked)
+							) {
+								if ((effect.f & (ASYNC | BLOCK_EFFECT)) !== 0) {
+									set_signal_status(effect, DIRTY);
+									batch.schedule(effect);
+								} else {
+									batch.#dirty_effects.add(effect);
+								}
+							}
+						}
+					}
+
+					// Only apply and traverse when we know we triggered async work with marking the effects
+					// and know this won't run anyway right afterwards
+					if (batch.#roots.length > 0 && !batch.#decrement_queued) {
+						batch.apply();
+
+						for (var root of batch.#roots) {
+							batch.#traverse(root, [], []);
+						}
+
+						batch.#roots = [];
+					}
+
+					batch.deactivate();
+				}
+			}
+		}
+
+		/**
+		 * @param {boolean} blocking
+		 * @param {Effect} effect
+		 */
+		increment(blocking, effect) {
+			this.#pending += 1;
+
+			if (blocking) {
+				let blocking_pending_count = this.#blocking_pending.get(effect) ?? 0;
+				this.#blocking_pending.set(effect, blocking_pending_count + 1);
+			}
+		}
+
+		/**
+		 * @param {boolean} blocking
+		 * @param {Effect} effect
+		 */
+		decrement(blocking, effect) {
+			this.#pending -= 1;
+
+			if (blocking) {
+				let blocking_pending_count = this.#blocking_pending.get(effect) ?? 0;
+
+				if (blocking_pending_count === 1) {
+					this.#blocking_pending.delete(effect);
+				} else {
+					this.#blocking_pending.set(effect, blocking_pending_count - 1);
+				}
+			}
+
+			if (this.#decrement_queued) return;
+			this.#decrement_queued = true;
+
+			queue_micro_task(() => {
+				this.#decrement_queued = false;
+
+				if (this.linked) {
+					this.flush();
+				}
+			});
+		}
+
+		/**
+		 * @param {Set<Effect>} dirty_effects
+		 * @param {Set<Effect>} maybe_dirty_effects
+		 */
+		transfer_effects(dirty_effects, maybe_dirty_effects) {
+			for (const e of dirty_effects) {
+				this.#dirty_effects.add(e);
+			}
+
+			for (const e of maybe_dirty_effects) {
+				this.#maybe_dirty_effects.add(e);
+			}
+
+			dirty_effects.clear();
+			maybe_dirty_effects.clear();
+		}
+
+		/** @param {(batch: Batch) => void} fn */
+		oncommit(fn) {
+			this.#commit_callbacks.add(fn);
+		}
+
+		/** @param {(batch: Batch) => void} fn */
+		ondiscard(fn) {
+			this.#discard_callbacks.add(fn);
+		}
+
+		settled() {
+			return (this.#deferred ??= deferred()).promise;
+		}
+
+		static ensure() {
+			if (current_batch === null) {
+				const batch = (current_batch = new Batch());
+
+				if (!is_processing && !is_flushing_sync) {
+					queue_micro_task(() => {
+						if (!batch.#started) {
+							batch.flush();
+						}
+					});
+				}
+			}
+
+			return current_batch;
+		}
+
+		apply() {
+			{
+				batch_values = null;
+				return;
+			}
+		}
+
+		/**
+		 *
+		 * @param {Effect} effect
+		 */
+		schedule(effect) {
+			last_scheduled_effect = effect;
+
+			// defer render effects inside a pending boundary
+			// TODO the `REACTION_RAN` check is only necessary because of legacy `$:` effects AFAICT — we can remove later
+			if (
+				effect.b?.is_pending &&
+				(effect.f & (EFFECT | RENDER_EFFECT | MANAGED_EFFECT)) !== 0 &&
+				(effect.f & REACTION_RAN) === 0
+			) {
+				effect.b.defer_effect(effect);
+				return;
+			}
+
+			var e = effect;
+
+			while (e.parent !== null) {
+				e = e.parent;
+				var flags = e.f;
+
+				// if the effect is being scheduled because a parent (each/await/etc) block
+				// updated an internal source, or because a branch is being unskipped,
+				// bail out or we'll cause a second flush
+				if (collected_effects !== null && e === active_effect) {
+
+					// in sync mode, render effects run during traversal. in an extreme edge case
+					// — namely that we're setting a value inside a derived read during traversal —
+					// they can be made dirty after they have already been visited, in which
+					// case we shouldn't bail out. we also shouldn't bail out if we're
+					// updating a store inside a `$:`, since this might invalidate
+					// effects that were already visited
+					if (
+						(active_reaction === null || (active_reaction.f & DERIVED) === 0) &&
+						true
+					) {
+						return;
+					}
+				}
+
+				if ((flags & (ROOT_EFFECT | BRANCH_EFFECT)) !== 0) {
+					if ((flags & CLEAN) === 0) {
+						// branch is already dirty, bail
+						return;
+					}
+
+					e.f ^= CLEAN;
+				}
+			}
+
+			this.#roots.push(e);
+		}
+
+		#unlink() {
+			// #merge calls #unlink, discard later on does it again - prevent
+			// running it multiple times to not corrupt the linked list
+			if (!this.linked) return;
+
+			var prev = this.#prev;
+			var next = this.#next;
+
+			if (prev === null) {
+				first_batch = next;
+			} else {
+				prev.#next = next;
+			}
+
+			if (next === null) {
+				last_batch = prev;
+			} else {
+				next.#prev = prev;
+			}
+
+			this.linked = false;
+		}
+	}
+
+	// TODO Svelte@6 think about removing the callback argument.
+	/**
+	 * Synchronously flush any pending updates.
+	 * Returns void if no callback is provided, otherwise returns the result of calling the callback.
+	 * @template [T=void]
+	 * @param {(() => T) | undefined} [fn]
+	 * @returns {T}
+	 */
+	function flushSync(fn) {
+		var was_flushing_sync = is_flushing_sync;
+		is_flushing_sync = true;
+
+		try {
+			var result;
+
+			if (fn) ;
+
+			while (true) {
+				flush_tasks();
+
+				if (current_batch === null) {
+					return /** @type {T} */ (result);
+				}
+
+				current_batch.flush();
+			}
+		} finally {
+			is_flushing_sync = was_flushing_sync;
+		}
+	}
+
+	function infinite_loop_guard() {
+		{
+			var updates = new Map();
+
+			for (const source of /** @type {Batch} */ (current_batch).current.keys()) {
+				for (const [stack, update] of source.updated ?? []) {
+					var entry = updates.get(stack);
+
+					if (!entry) {
+						entry = { error: update.error, count: 0 };
+						updates.set(stack, entry);
+					}
+
+					entry.count += update.count;
+				}
+			}
+
+			for (const update of updates.values()) {
+				if (update.error) {
+					// eslint-disable-next-line no-console
+					console.error(update.error);
+				}
+			}
+		}
+
+		try {
+			effect_update_depth_exceeded();
+		} catch (error) {
+			{
+				// stack contains no useful information, replace it
+				define_property(error, 'stack', { value: '' });
+			}
+
+			// Best effort: invoke the boundary nearest the most recent
+			// effect and hope that it's relevant to the infinite loop
+			invoke_error_boundary(error, last_scheduled_effect);
+		}
+	}
+
+	/** @type {Set<Effect> | null} */
+	let eager_block_effects = null;
+
+	/**
+	 * @param {Array<Effect>} effects
+	 * @returns {void}
+	 */
+	function flush_queued_effects(effects) {
+		var length = effects.length;
+		if (length === 0) return;
+
+		var i = 0;
+
+		while (i < length) {
+			var effect = effects[i++];
+
+			if ((effect.f & (DESTROYED | INERT)) === 0 && is_dirty(effect)) {
+				eager_block_effects = new Set();
+
+				update_effect(effect);
+
+				// Effects with no dependencies or teardown do not get added to the effect tree.
+				// Deferred effects (e.g. `$effect(...)`) _are_ added to the tree because we
+				// don't know if we need to keep them until they are executed. Doing the check
+				// here (rather than in `update_effect`) allows us to skip the work for
+				// immediate effects.
+				if (
+					effect.deps === null &&
+					effect.first === null &&
+					effect.nodes === null &&
+					effect.teardown === null &&
+					effect.ac === null
+				) {
+					// remove this effect from the graph
+					unlink_effect(effect);
+				}
+
+				// If update_effect() has a flushSync() in it, we may have flushed another flush_queued_effects(),
+				// which already handled this logic and did set eager_block_effects to null.
+				if (eager_block_effects?.size > 0) {
+					old_values.clear();
+
+					for (const e of eager_block_effects) {
+						// Skip eager effects that have already been unmounted
+						if ((e.f & (DESTROYED | INERT)) !== 0) continue;
+
+						// Run effects in order from ancestor to descendant, else we could run into nullpointers
+						/** @type {Effect[]} */
+						const ordered_effects = [e];
+						let ancestor = e.parent;
+						while (ancestor !== null) {
+							if (eager_block_effects.has(ancestor)) {
+								eager_block_effects.delete(ancestor);
+								ordered_effects.push(ancestor);
+							}
+							ancestor = ancestor.parent;
+						}
+
+						for (let j = ordered_effects.length - 1; j >= 0; j--) {
+							const e = ordered_effects[j];
+							// Skip eager effects that have already been unmounted
+							if ((e.f & (DESTROYED | INERT)) !== 0) continue;
+							update_effect(e);
+						}
+					}
+
+					eager_block_effects.clear();
+				}
+			}
+		}
+
+		eager_block_effects = null;
+	}
+
+	/**
+	 * This is similar to `mark_reactions`, but it only marks async/block effects
+	 * depending on `value` and at least one of the other `sources`, so that
+	 * these effects can re-run after another batch has been committed
+	 * @param {Value} value
+	 * @param {Source[]} sources
+	 * @param {Set<Value>} marked
+	 * @param {Map<Reaction, boolean>} checked
+	 */
+	function mark_effects(value, sources, marked, checked) {
+		if (marked.has(value)) return;
+		marked.add(value);
+
+		if (value.reactions !== null) {
+			for (const reaction of value.reactions) {
+				const flags = reaction.f;
+
+				if ((flags & DERIVED) !== 0) {
+					mark_effects(/** @type {Derived} */ (reaction), sources, marked, checked);
+				} else if (
+					(flags & (ASYNC | BLOCK_EFFECT)) !== 0 &&
+					(flags & DIRTY) === 0 &&
+					depends_on(reaction, sources, checked)
+				) {
+					set_signal_status(reaction, DIRTY);
+					schedule_effect(/** @type {Effect} */ (reaction));
+				}
+			}
+		}
+	}
+
+	/**
+	 * @param {Reaction} reaction
+	 * @param {Source[]} sources
+	 * @param {Map<Reaction, boolean>} checked
+	 */
+	function depends_on(reaction, sources, checked) {
+		const depends = checked.get(reaction);
+		if (depends !== undefined) return depends;
+
+		if (reaction.deps !== null) {
+			for (const dep of reaction.deps) {
+				if (includes.call(sources, dep)) {
+					return true;
+				}
+
+				if ((dep.f & DERIVED) !== 0 && depends_on(/** @type {Derived} */ (dep), sources, checked)) {
+					checked.set(/** @type {Derived} */ (dep), true);
+					return true;
+				}
+			}
+		}
+
+		checked.set(reaction, false);
+
+		return false;
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @returns {void}
+	 */
+	function schedule_effect(effect) {
+		/** @type {Batch} */ (current_batch).schedule(effect);
+	}
+
+	/**
+	 * Mark all the effects inside a skipped branch CLEAN, so that
+	 * they can be correctly rescheduled later. Tracks dirty and maybe_dirty
+	 * effects so they can be rescheduled if the branch survives.
+	 * @param {Effect} effect
+	 * @param {{ d: Effect[], m: Effect[] }} tracked
+	 */
+	function reset_branch(effect, tracked) {
+		// clean branch = nothing dirty inside, no need to traverse further
+		if ((effect.f & BRANCH_EFFECT) !== 0 && (effect.f & CLEAN) !== 0) {
+			return;
+		}
+
+		if ((effect.f & DIRTY) !== 0) {
+			tracked.d.push(effect);
+		} else if ((effect.f & MAYBE_DIRTY) !== 0) {
+			tracked.m.push(effect);
+		}
+
+		set_signal_status(effect, CLEAN);
+
+		var e = effect.first;
+		while (e !== null) {
+			reset_branch(e, tracked);
+			e = e.next;
+		}
+	}
+
+	/**
+	 * Mark an entire effect tree clean following an error
+	 * @param {Effect} effect
+	 */
+	function reset_all(effect) {
+		set_signal_status(effect, CLEAN);
+
+		var e = effect.first;
+		while (e !== null) {
+			reset_all(e);
+			e = e.next;
+		}
+	}
+
+	/** @import { Derived, Effect, Source, Value } from '#client' */
+
+	/** @type {Set<Effect>} */
+	let eager_effects = new Set();
+
+	/** @type {Map<Source, any>} */
+	const old_values = new Map();
+
+	/**
+	 * @param {Set<any>} v
+	 */
+	function set_eager_effects(v) {
+		eager_effects = v;
+	}
+
+	let eager_effects_deferred = false;
+
+	function set_eager_effects_deferred() {
+		eager_effects_deferred = true;
+	}
+
+	/**
+	 * @template V
+	 * @param {V} v
+	 * @param {Error | null} [stack]
+	 * @returns {Source<V>}
+	 */
+	// TODO rename this to `state` throughout the codebase
+	function source(v, stack) {
+		/** @type {Value} */
+		var signal = {
+			f: 0, // TODO ideally we could skip this altogether, but it causes type errors
+			v,
+			reactions: null,
+			equals: equals$1,
+			rv: 0,
+			wv: 0
+		};
+
+		return signal;
+	}
+
+	/**
+	 * @template V
+	 * @param {V} v
+	 * @param {Error | null} [stack]
+	 */
+	/*#__NO_SIDE_EFFECTS__*/
+	function state(v, stack) {
+		const s = source(v);
+
+		push_reaction_value(s);
+
+		return s;
+	}
+
+	/**
+	 * @template V
+	 * @param {V} initial_value
+	 * @param {boolean} [immutable]
+	 * @returns {Source<V>}
+	 */
+	/*#__NO_SIDE_EFFECTS__*/
+	function mutable_source(initial_value, immutable = false, trackable = true) {
+		const s = source(initial_value);
+		if (!immutable) {
+			s.equals = safe_equals;
+		}
+
+		// bind the signal to the component context, in case we need to
+		// track updates to trigger beforeUpdate/afterUpdate callbacks
+		if (legacy_mode_flag && trackable && component_context !== null && component_context.l !== null) {
+			(component_context.l.s ??= []).push(s);
+		}
+
+		return s;
+	}
+
+	/**
+	 * @template V
+	 * @param {Value<V>} source
+	 * @param {V} value
+	 */
+	function mutate(source, value) {
+		set(
+			source,
+			untrack(() => get(source))
+		);
+		return value;
+	}
+
+	/**
+	 * @template V
+	 * @param {Source<V>} source
+	 * @param {V} value
+	 * @param {boolean} [should_proxy]
+	 * @returns {V}
+	 */
+	function set(source, value, should_proxy = false) {
+		if (
+			active_reaction !== null &&
+			// since we are untracking the function inside `$inspect.with` we need to add this check
+			// to ensure we error if state is set inside an inspect effect
+			(!untracking || (active_reaction.f & EAGER_EFFECT) !== 0) &&
+			is_runes() &&
+			(active_reaction.f & (DERIVED | BLOCK_EFFECT | ASYNC | EAGER_EFFECT)) !== 0 &&
+			(current_sources === null || !current_sources.has(source))
+		) {
+			state_unsafe_mutation();
+		}
+
+		let new_value = should_proxy ? proxy(value) : value;
+
+		{
+			tag_proxy(new_value, /** @type {string} */ (source.label));
+		}
+
+		return internal_set(source, new_value, legacy_updates);
+	}
+
+	/**
+	 * @template V
+	 * @param {Source<V>} source
+	 * @param {V} value
+	 * @param {Effect[] | null} [updated_during_traversal]
+	 * @returns {V}
+	 */
+	function internal_set(source, value, updated_during_traversal = null) {
+		if (!source.equals(value)) {
+			old_values.set(source, is_destroying_effect ? value : source.v);
+
+			var batch = Batch.ensure();
+			batch.capture(source, value);
+
+			{
+				if (active_effect !== null) {
+					source.updated ??= new Map();
+
+					// For performance reasons, when not using $inspect.trace, we only start collecting stack traces
+					// after the same source has been updated more than 5 times in the same flush cycle.
+					const count = (source.updated.get('')?.count ?? 0) + 1;
+					source.updated.set('', { error: /** @type {any} */ (null), count });
+
+					if (count > 5) {
+						const error = get_error('updated at');
+
+						if (error !== null) {
+							let entry = source.updated.get(error.stack);
+
+							if (!entry) {
+								entry = { error, count: 0 };
+								source.updated.set(error.stack, entry);
+							}
+
+							entry.count++;
+						}
+					}
+				}
+
+				if (active_effect !== null) {
+					source.set_during_effect = true;
+				}
+			}
+
+			if ((source.f & DERIVED) !== 0) {
+				const derived = /** @type {Derived} */ (source);
+
+				// if we are assigning to a dirty derived we set it to clean/maybe dirty but we also eagerly execute it to track the dependencies
+				if ((source.f & DIRTY) !== 0) {
+					execute_derived(derived);
+				}
+
+				// During time traveling we don't want to reset the status so that
+				// traversal of the graph in the other batches still happens
+				if (batch_values === null) {
+					update_derived_status(derived);
+				}
+			}
+
+			source.wv = increment_write_version();
+
+			// For debugging, in case you want to know which reactions are being scheduled:
+			// log_reactions(source);
+			mark_reactions(source, DIRTY, updated_during_traversal);
+
+			// It's possible that the current reaction might not have up-to-date dependencies
+			// whilst it's actively running. So in the case of ensuring it registers the reaction
+			// properly for itself, we need to ensure the current effect actually gets
+			// scheduled. i.e: `$effect(() => x++)`
+			if (
+				is_runes() &&
+				active_effect !== null &&
+				(active_effect.f & CLEAN) !== 0 &&
+				(active_effect.f & (BRANCH_EFFECT | ROOT_EFFECT)) === 0
+			) {
+				if (untracked_writes === null) {
+					set_untracked_writes([source]);
+				} else {
+					untracked_writes.push(source);
+				}
+			}
+
+			if (!batch.is_fork && eager_effects.size > 0 && !eager_effects_deferred) {
+				flush_eager_effects();
+			}
+		}
+
+		return value;
+	}
+
+	function flush_eager_effects() {
+		eager_effects_deferred = false;
+
+		for (const effect of eager_effects) {
+			// Mark clean inspect-effects as maybe dirty and then check their dirtiness
+			// instead of just updating the effects - this way we avoid overfiring.
+			if ((effect.f & CLEAN) !== 0) {
+				set_signal_status(effect, MAYBE_DIRTY);
+			}
+
+			let dirty;
+
+			try {
+				dirty = is_dirty(effect);
+			} catch {
+				// Dirty-checking can evaluate derived dependencies and throw in cases where
+				// parent effects are about to destroy this eager effect. Run the effect so
+				// its own error handling can deal with transient failures.
+				dirty = true;
+			}
+
+			if (dirty) {
+				update_effect(effect);
+			}
+		}
+
+		eager_effects.clear();
+	}
+
+	/**
+	 * Silently (without using `get`) increment a source
+	 * @param {Source<number>} source
+	 */
+	function increment(source) {
+		set(source, source.v + 1);
+	}
+
+	/**
+	 * @param {Value} signal
+	 * @param {number} status should be DIRTY or MAYBE_DIRTY
+	 * @param {Effect[] | null} updated_during_traversal
+	 * @returns {void}
+	 */
+	function mark_reactions(signal, status, updated_during_traversal) {
+		var reactions = signal.reactions;
+		if (reactions === null) return;
+
+		var runes = is_runes();
+		var length = reactions.length;
+
+		for (var i = 0; i < length; i++) {
+			var reaction = reactions[i];
+			var flags = reaction.f;
+
+			// In legacy mode, skip the current effect to prevent infinite loops
+			if (!runes && reaction === active_effect) continue;
+
+			var not_dirty = (flags & DIRTY) === 0;
+
+			// don't set a DIRTY reaction to MAYBE_DIRTY
+			if (not_dirty) {
+				set_signal_status(reaction, status);
+			}
+
+			if ((flags & EAGER_EFFECT) !== 0) {
+				// Eager effects need to run immediately:
+				// - for $inspect so that the stack trace makes sense
+				// - for $state.eager because they might be without an effect parent
+				eager_effects.add(/** @type {Effect} */ (reaction));
+			} else if ((flags & DERIVED) !== 0) {
+				var derived = /** @type {Derived} */ (reaction);
+
+				batch_values?.delete(derived);
+
+				if ((flags & WAS_MARKED) === 0) {
+					// Only connected deriveds being executed outside the update cycle can be reliably unmarked right away
+					if (
+						flags & CONNECTED &&
+						(active_effect === null || (active_effect.f & REACTION_IS_UPDATING) === 0)
+					) {
+						reaction.f |= WAS_MARKED;
+					}
+
+					mark_reactions(derived, MAYBE_DIRTY, updated_during_traversal);
+				}
+			} else if (not_dirty) {
+				var effect = /** @type {Effect} */ (reaction);
+
+				if ((flags & BLOCK_EFFECT) !== 0 && eager_block_effects !== null) {
+					eager_block_effects.add(effect);
+				}
+
+				if (updated_during_traversal !== null) {
+					updated_during_traversal.push(effect);
+				} else {
+					schedule_effect(effect);
+				}
+			}
+		}
+	}
+
+	/** @import { Source } from '#client' */
+
+	// TODO move all regexes into shared module?
+	const regex_is_valid_identifier = /^[a-zA-Z_$][a-zA-Z_$0-9]*$/;
+
+	/**
+	 * @template T
+	 * @param {T} value
+	 * @returns {T}
+	 */
+	function proxy(value) {
+		// if non-proxyable, or is already a proxy, return `value`
+		if (typeof value !== 'object' || value === null || STATE_SYMBOL in value) {
+			return value;
+		}
+
+		const prototype = get_prototype_of(value);
+
+		if (prototype !== object_prototype && prototype !== array_prototype) {
+			return value;
+		}
+
+		/** @type {Map<any, Source<any>>} */
+		var sources = new Map();
+		var is_proxied_array = is_array(value);
+		var version = state(0);
+		var parent_version = update_version;
+
+		/**
+		 * Executes the proxy in the context of the reaction it was originally created in, if any
+		 * @template T
+		 * @param {() => T} fn
+		 */
+		var with_parent = (fn) => {
+			if (update_version === parent_version) {
+				return fn();
+			}
+
+			// child source is being created after the initial proxy —
+			// prevent it from being associated with the current reaction
+			var reaction = active_reaction;
+			var version = update_version;
+
+			set_active_reaction(null);
+			set_update_version(parent_version);
+
+			var result = fn();
+
+			set_active_reaction(reaction);
+			set_update_version(version);
+
+			return result;
+		};
+
+		if (is_proxied_array) {
+			// We need to create the length source eagerly to ensure that
+			// mutations to the array are properly synced with our proxy
+			sources.set('length', state(/** @type {any[]} */ (value).length));
+			{
+				value = /** @type {any} */ (inspectable_array(/** @type {any[]} */ (value)));
+			}
+		}
+
+		/** Used in dev for $inspect.trace() */
+		var path = '';
+		let updating = false;
+		/** @param {string} new_path */
+		function update_path(new_path) {
+			if (updating) return;
+			updating = true;
+			path = new_path;
+
+			tag(version, `${path} version`);
+
+			// rename all child sources and child proxies
+			for (const [prop, source] of sources) {
+				tag(source, get_label(path, prop));
+			}
+			updating = false;
+		}
+
+		return new Proxy(/** @type {any} */ (value), {
+			defineProperty(_, prop, descriptor) {
+				if (
+					!('value' in descriptor) ||
+					descriptor.configurable === false ||
+					descriptor.enumerable === false ||
+					descriptor.writable === false
+				) {
+					// we disallow non-basic descriptors, because unless they are applied to the
+					// target object — which we avoid, so that state can be forked — we will run
+					// afoul of the various invariants
+					// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/getOwnPropertyDescriptor#invariants
+					state_descriptors_fixed();
+				}
+				var s = sources.get(prop);
+				if (s === undefined) {
+					with_parent(() => {
+						var s = state(descriptor.value);
+						sources.set(prop, s);
+						if (typeof prop === 'string') {
+							tag(s, get_label(path, prop));
+						}
+						return s;
+					});
+				} else {
+					set(s, descriptor.value, true);
+				}
+
+				return true;
+			},
+
+			deleteProperty(target, prop) {
+				var s = sources.get(prop);
+
+				if (s === undefined) {
+					if (prop in target) {
+						const s = with_parent(() => state(UNINITIALIZED));
+						sources.set(prop, s);
+						increment(version);
+
+						{
+							tag(s, get_label(path, prop));
+						}
+					}
+				} else {
+					set(s, UNINITIALIZED);
+					increment(version);
+				}
+
+				return true;
+			},
+
+			get(target, prop, receiver) {
+				if (prop === STATE_SYMBOL) {
+					return value;
+				}
+
+				if (prop === PROXY_PATH_SYMBOL) {
+					return update_path;
+				}
+
+				var s = sources.get(prop);
+				var exists = prop in target;
+
+				// create a source, but only if it's an own property and not a prototype property
+				if (s === undefined && (!exists || get_descriptor(target, prop)?.writable)) {
+					s = with_parent(() => {
+						var p = proxy(exists ? target[prop] : UNINITIALIZED);
+						var s = state(p);
+
+						{
+							tag(s, get_label(path, prop));
+						}
+
+						return s;
+					});
+
+					sources.set(prop, s);
+				}
+
+				if (s !== undefined) {
+					var v = get(s);
+					return v === UNINITIALIZED ? undefined : v;
+				}
+
+				return Reflect.get(target, prop, receiver);
+			},
+
+			getOwnPropertyDescriptor(target, prop) {
+				var descriptor = Reflect.getOwnPropertyDescriptor(target, prop);
+
+				if (descriptor && 'value' in descriptor) {
+					var s = sources.get(prop);
+					if (s) descriptor.value = get(s);
+				} else if (descriptor === undefined) {
+					var source = sources.get(prop);
+					var value = source?.v;
+
+					if (source !== undefined && value !== UNINITIALIZED) {
+						return {
+							enumerable: true,
+							configurable: true,
+							value,
+							writable: true
+						};
+					}
+				}
+
+				return descriptor;
+			},
+
+			has(target, prop) {
+				if (prop === STATE_SYMBOL) {
+					return true;
+				}
+
+				var s = sources.get(prop);
+				var has = (s !== undefined && s.v !== UNINITIALIZED) || Reflect.has(target, prop);
+
+				if (
+					s !== undefined ||
+					(active_effect !== null && (!has || get_descriptor(target, prop)?.writable))
+				) {
+					if (s === undefined) {
+						s = with_parent(() => {
+							var p = has ? proxy(target[prop]) : UNINITIALIZED;
+							var s = state(p);
+
+							{
+								tag(s, get_label(path, prop));
+							}
+
+							return s;
+						});
+
+						sources.set(prop, s);
+					}
+
+					var value = get(s);
+					if (value === UNINITIALIZED) {
+						return false;
+					}
+				}
+
+				return has;
+			},
+
+			set(target, prop, value, receiver) {
+				var s = sources.get(prop);
+				var has = prop in target;
+
+				// variable.length = value -> clear all signals with index >= value
+				if (is_proxied_array && prop === 'length') {
+					for (var i = value; i < /** @type {Source<number>} */ (s).v; i += 1) {
+						var other_s = sources.get(i + '');
+						if (other_s !== undefined) {
+							set(other_s, UNINITIALIZED);
+						} else if (i in target) {
+							// If the item exists in the original, we need to create an uninitialized source,
+							// else a later read of the property would result in a source being created with
+							// the value of the original item at that index.
+							other_s = with_parent(() => state(UNINITIALIZED));
+							sources.set(i + '', other_s);
+
+							{
+								tag(other_s, get_label(path, i));
+							}
+						}
+					}
+				}
+
+				// If we haven't yet created a source for this property, we need to ensure
+				// we do so otherwise if we read it later, then the write won't be tracked and
+				// the heuristics of effects will be different vs if we had read the proxied
+				// object property before writing to that property.
+				if (s === undefined) {
+					if (!has || get_descriptor(target, prop)?.writable) {
+						s = with_parent(() => state(undefined));
+
+						{
+							tag(s, get_label(path, prop));
+						}
+						set(s, proxy(value));
+
+						sources.set(prop, s);
+					}
+				} else {
+					has = s.v !== UNINITIALIZED;
+
+					var p = with_parent(() => proxy(value));
+					set(s, p);
+				}
+
+				var descriptor = Reflect.getOwnPropertyDescriptor(target, prop);
+
+				// Set the new value before updating any signals so that any listeners get the new value
+				if (descriptor?.set) {
+					descriptor.set.call(receiver, value);
+				}
+
+				if (!has) {
+					// If we have mutated an array directly, we might need to
+					// signal that length has also changed. Do it before updating metadata
+					// to ensure that iterating over the array as a result of a metadata update
+					// will not cause the length to be out of sync.
+					if (is_proxied_array && typeof prop === 'string') {
+						var ls = /** @type {Source<number>} */ (sources.get('length'));
+						var n = Number(prop);
+
+						if (Number.isInteger(n) && n >= ls.v) {
+							set(ls, n + 1);
+						}
+					}
+
+					increment(version);
+				}
+
+				return true;
+			},
+
+			ownKeys(target) {
+				get(version);
+
+				var own_keys = Reflect.ownKeys(target).filter((key) => {
+					var source = sources.get(key);
+					return source === undefined || source.v !== UNINITIALIZED;
+				});
+
+				for (var [key, source] of sources) {
+					if (source.v !== UNINITIALIZED && !(key in target)) {
+						own_keys.push(key);
+					}
+				}
+
+				return own_keys;
+			},
+
+			setPrototypeOf() {
+				state_prototype_fixed();
+			}
+		});
+	}
+
+	/**
+	 * @param {string} path
+	 * @param {string | symbol} prop
+	 */
+	function get_label(path, prop) {
+		if (typeof prop === 'symbol') return `${path}[Symbol(${prop.description ?? ''})]`;
+		if (regex_is_valid_identifier.test(prop)) return `${path}.${prop}`;
+		return /^\d+$/.test(prop) ? `${path}[${prop}]` : `${path}['${prop}']`;
+	}
+
+	/**
+	 * @param {any} value
+	 */
+	function get_proxied_value(value) {
+		try {
+			if (value !== null && typeof value === 'object' && STATE_SYMBOL in value) {
+				return value[STATE_SYMBOL];
+			}
+		} catch {
+			// the above if check can throw an error if the value in question
+			// is the contentWindow of an iframe on another domain, in which
+			// case we want to just return the value (because it's definitely
+			// not a proxied value) so we don't break any JavaScript interacting
+			// with that iframe (such as various payment companies client side
+			// JavaScript libraries interacting with their iframes on the same
+			// domain)
+		}
+
+		return value;
+	}
+
+	/**
+	 * @param {any} a
+	 * @param {any} b
+	 */
+	function is(a, b) {
+		return Object.is(get_proxied_value(a), get_proxied_value(b));
+	}
+
+	const ARRAY_MUTATING_METHODS = new Set([
+		'copyWithin',
+		'fill',
+		'pop',
+		'push',
+		'reverse',
+		'shift',
+		'sort',
+		'splice',
+		'unshift'
+	]);
+
+	/**
+	 * Wrap array mutating methods so $inspect is triggered only once and
+	 * to prevent logging an array in intermediate state (e.g. with an empty slot)
+	 * @param {any[]} array
+	 */
+	function inspectable_array(array) {
+		return new Proxy(array, {
+			get(target, prop, receiver) {
+				var value = Reflect.get(target, prop, receiver);
+				if (!ARRAY_MUTATING_METHODS.has(/** @type {string} */ (prop))) {
+					return value;
+				}
+
+				/**
+				 * @this {any[]}
+				 * @param {any[]} args
+				 */
+				return function (...args) {
+					set_eager_effects_deferred();
+					var result = value.apply(this, args);
+					flush_eager_effects();
+					return result;
+				};
+			}
+		});
+	}
+
+	function init_array_prototype_warnings() {
+		const array_prototype = Array.prototype;
+		// The REPL ends up here over and over, and this prevents it from adding more and more patches
+		// of the same kind to the prototype, which would slow down everything over time.
+		// @ts-expect-error
+		const cleanup = Array.__svelte_cleanup;
+		if (cleanup) {
+			cleanup();
+		}
+
+		const { indexOf, lastIndexOf, includes } = array_prototype;
+
+		array_prototype.indexOf = function (item, from_index) {
+			const index = indexOf.call(this, item, from_index);
+
+			if (index === -1) {
+				for (let i = from_index ?? 0; i < this.length; i += 1) {
+					if (get_proxied_value(this[i]) === item) {
+						state_proxy_equality_mismatch('array.indexOf(...)');
+						break;
+					}
+				}
+			}
+
+			return index;
+		};
+
+		array_prototype.lastIndexOf = function (item, from_index) {
+			// we need to specify this.length - 1 because it's probably using something like
+			// `arguments` inside so passing undefined is different from not passing anything
+			const index = lastIndexOf.call(this, item, from_index ?? this.length - 1);
+
+			if (index === -1) {
+				for (let i = 0; i <= (from_index ?? this.length - 1); i += 1) {
+					if (get_proxied_value(this[i]) === item) {
+						state_proxy_equality_mismatch('array.lastIndexOf(...)');
+						break;
+					}
+				}
+			}
+
+			return index;
+		};
+
+		array_prototype.includes = function (item, from_index) {
+			const has = includes.call(this, item, from_index);
+
+			if (!has) {
+				for (let i = 0; i < this.length; i += 1) {
+					if (get_proxied_value(this[i]) === item) {
+						state_proxy_equality_mismatch('array.includes(...)');
+						break;
+					}
+				}
+			}
+
+			return has;
+		};
+
+		// @ts-expect-error
+		Array.__svelte_cleanup = () => {
+			array_prototype.indexOf = indexOf;
+			array_prototype.lastIndexOf = lastIndexOf;
+			array_prototype.includes = includes;
+		};
+	}
+
+	/**
+	 * @param {any} a
+	 * @param {any} b
+	 * @param {boolean} equal
+	 * @returns {boolean}
+	 */
+	function strict_equals(a, b, equal = true) {
+		// try-catch needed because this tries to read properties of `a` and `b`,
+		// which could be disallowed for example in a secure context
+		try {
+			if ((a === b) !== (get_proxied_value(a) === get_proxied_value(b))) {
+				state_proxy_equality_mismatch(equal ? '===' : '!==');
+			}
+		} catch {}
+
+		return (a === b) === equal;
+	}
+
+	/**
+	 * @param {any} a
+	 * @param {any} b
+	 * @param {boolean} equal
+	 * @returns {boolean}
+	 */
+	function equals(a, b, equal = true) {
+		if ((a == b) !== (get_proxied_value(a) == get_proxied_value(b))) {
+			state_proxy_equality_mismatch(equal ? '==' : '!=');
+		}
+
+		return (a == b) === equal;
+	}
+
+	/** @import { Effect, TemplateNode } from '#client' */
+
+	// export these for reference in the compiled code, making global name deduplication unnecessary
+	/** @type {Window} */
+	var $window;
+
+	/** @type {boolean} */
+	var is_firefox;
+
+	/** @type {() => Node | null} */
+	var first_child_getter;
+	/** @type {() => Node | null} */
+	var next_sibling_getter;
+
+	/**
+	 * Initialize these lazily to avoid issues when using the runtime in a server context
+	 * where these globals are not available while avoiding a separate server entry point
+	 */
+	function init_operations() {
+		if ($window !== undefined) {
+			return;
+		}
+
+		$window = window;
+		is_firefox = /Firefox/.test(navigator.userAgent);
+
+		var element_prototype = Element.prototype;
+		var node_prototype = Node.prototype;
+		var text_prototype = Text.prototype;
+
+		// @ts-ignore
+		first_child_getter = get_descriptor(node_prototype, 'firstChild').get;
+		// @ts-ignore
+		next_sibling_getter = get_descriptor(node_prototype, 'nextSibling').get;
+
+		if (is_extensible(element_prototype)) {
+			// the following assignments improve perf of lookups on DOM nodes
+			/** @type {any} */ (element_prototype)[CLASS_CACHE] = undefined;
+			/** @type {any} */ (element_prototype)[ATTRIBUTES_CACHE] = null;
+			/** @type {any} */ (element_prototype)[STYLE_CACHE] = undefined;
+			// @ts-expect-error
+			element_prototype.__e = undefined;
+		}
+
+		if (is_extensible(text_prototype)) {
+			/** @type {any} */ (text_prototype)[TEXT_CACHE] = undefined;
+		}
+
+		{
+			// @ts-expect-error
+			element_prototype.__svelte_meta = null;
+
+			init_array_prototype_warnings();
+		}
+	}
+
+	/**
+	 * @param {string} value
+	 * @returns {Text}
+	 */
+	function create_text(value = '') {
+		return document.createTextNode(value);
+	}
+
+	/**
+	 * @template {Node} N
+	 * @param {N} node
+	 */
+	/*@__NO_SIDE_EFFECTS__*/
+	function get_first_child(node) {
+		return /** @type {TemplateNode | null} */ (first_child_getter.call(node));
+	}
+
+	/**
+	 * @template {Node} N
+	 * @param {N} node
+	 */
+	/*@__NO_SIDE_EFFECTS__*/
+	function get_next_sibling(node) {
+		return /** @type {TemplateNode | null} */ (next_sibling_getter.call(node));
+	}
+
+	/**
+	 * Don't mark this as side-effect-free, hydration needs to walk all nodes
+	 * @template {Node} N
+	 * @param {N} node
+	 * @param {boolean} is_text
+	 * @returns {TemplateNode | null}
+	 */
+	function child(node, is_text) {
+		{
+			return get_first_child(node);
+		}
+	}
+
+	/**
+	 * Don't mark this as side-effect-free, hydration needs to walk all nodes
+	 * @param {TemplateNode} node
+	 * @param {boolean} [is_text]
+	 * @returns {TemplateNode | null}
+	 */
+	function first_child(node, is_text = false) {
+		{
+			var first = get_first_child(node);
+
+			// TODO prevent user comments with the empty string when preserveComments is true
+			if (first instanceof Comment && first.data === '') return get_next_sibling(first);
+
+			return first;
+		}
+	}
+
+	/**
+	 * Don't mark this as side-effect-free, hydration needs to walk all nodes
+	 * @param {TemplateNode} node
+	 * @param {number} count
+	 * @param {boolean} is_text
+	 * @returns {TemplateNode | null}
+	 */
+	function sibling(node, count = 1, is_text = false) {
+		let next_sibling = node;
+
+		while (count--) {
+			next_sibling = /** @type {TemplateNode} */ (get_next_sibling(next_sibling));
+		}
+
+		{
+			return next_sibling;
+		}
+	}
+
+	/**
+	 * @template {Node} N
+	 * @param {N} node
+	 * @returns {void}
+	 */
+	function clear_text_content(node) {
+		node.textContent = '';
+	}
+
+	/**
+	 * Returns `true` if we're updating the current block, for example `condition` in
+	 * an `{#if condition}` block just changed. In this case, the branch should be
+	 * appended (or removed) at the same time as other updates within the
+	 * current `<svelte:boundary>`
+	 */
+	function should_defer_append() {
+		return false;
+	}
+
+	/**
+	 * Branching here is intentional and load-bearing for perf. `createElement(tag)`
+	 * hits a fast path in Blink that `createElementNS(NAMESPACE_HTML, tag)` doesn't,
+	 * and passing an explicit `undefined` as the trailing options arg measurably
+	 * slows both APIs. Funnelling every case through a single `createElementNS(ns,
+	 * tag, options)` call would be smaller but slower on the HTML path.
+	 *
+	 * @template {keyof HTMLElementTagNameMap | string} T
+	 * @param {T} tag
+	 * @param {string} [namespace]
+	 * @param {string} [is]
+	 * @returns {T extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[T] : Element}
+	 */
+	function create_element(tag, namespace, is) {
+		{
+			return /** @type {T extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[T] : Element} */ (
+				is ? document.createElement(tag, { is }) : document.createElement(tag)
+			);
+		}
+	}
+
+	/** @import { Blocker, ComponentContext, ComponentContextLegacy, Derived, Effect, TemplateNode, TransitionManager } from '#client' */
+
+	/**
+	 * @param {'$effect' | '$effect.pre' | '$inspect'} rune
+	 */
+	function validate_effect(rune) {
+		if (active_effect === null) {
+			if (active_reaction === null) {
+				effect_orphan(rune);
+			}
+
+			effect_in_unowned_derived();
+		}
+
+		if (is_destroying_effect) {
+			effect_in_teardown(rune);
+		}
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @param {Effect} parent_effect
+	 */
+	function push_effect(effect, parent_effect) {
+		var parent_last = parent_effect.last;
+		if (parent_last === null) {
+			parent_effect.last = parent_effect.first = effect;
+		} else {
+			parent_last.next = effect;
+			effect.prev = parent_last;
+			parent_effect.last = effect;
+		}
+	}
+
+	/**
+	 * @param {number} type
+	 * @param {null | (() => void | (() => void))} fn
+	 * @returns {Effect}
+	 */
+	function create_effect(type, fn) {
+		var parent = active_effect;
+
+		{
+			// Ensure the parent is never an inspect effect
+			while (parent !== null && (parent.f & EAGER_EFFECT) !== 0) {
+				parent = parent.parent;
+			}
+		}
+
+		if (parent !== null && (parent.f & INERT) !== 0) {
+			type |= INERT;
+		}
+
+		/** @type {Effect} */
+		var effect = {
+			ctx: component_context,
+			deps: null,
+			nodes: null,
+			f: type | DIRTY | CONNECTED,
+			first: null,
+			fn,
+			last: null,
+			next: null,
+			parent,
+			b: parent && parent.b,
+			prev: null,
+			teardown: null,
+			wv: 0,
+			ac: null
+		};
+
+		{
+			effect.component_function = dev_current_component_function;
+		}
+
+		current_batch?.register_created_effect(effect);
+
+		/** @type {Effect | null} */
+		var e = effect;
+
+		if ((type & EFFECT) !== 0) {
+			if (collected_effects !== null) {
+				// created during traversal — collect and run afterwards
+				collected_effects.push(effect);
+			} else {
+				// schedule for later
+				Batch.ensure().schedule(effect);
+			}
+		} else if (fn !== null) {
+			try {
+				update_effect(effect);
+			} catch (e) {
+				destroy_effect(effect);
+				throw e;
+			}
+
+			// if an effect doesn't need to be kept in the tree (because it
+			// won't re-run, has no DOM, and has no teardown etc)
+			// then we skip it and go to its child (if any)
+			if (
+				e.deps === null &&
+				e.teardown === null &&
+				e.nodes === null &&
+				e.first === e.last && // either `null`, or a singular child
+				(e.f & EFFECT_PRESERVED) === 0
+			) {
+				e = e.first;
+				if ((type & BLOCK_EFFECT) !== 0 && (type & EFFECT_TRANSPARENT) !== 0 && e !== null) {
+					e.f |= EFFECT_TRANSPARENT;
+				}
+			}
+		}
+
+		if (e !== null) {
+			e.parent = parent;
+
+			if (parent !== null) {
+				push_effect(e, parent);
+			}
+
+			// if we're in a derived, add the effect there too
+			if (
+				active_reaction !== null &&
+				(active_reaction.f & DERIVED) !== 0 &&
+				(type & ROOT_EFFECT) === 0
+			) {
+				var derived = /** @type {Derived} */ (active_reaction);
+				(derived.effects ??= []).push(e);
+			}
+		}
+
+		return effect;
+	}
+
+	/**
+	 * Internal representation of `$effect.tracking()`
+	 * @returns {boolean}
+	 */
+	function effect_tracking() {
+		return active_reaction !== null && !untracking;
+	}
+
+	/**
+	 * @param {() => void} fn
+	 */
+	function teardown(fn) {
+		const effect = create_effect(RENDER_EFFECT, null);
+		set_signal_status(effect, CLEAN);
+		effect.teardown = fn;
+		return effect;
+	}
+
+	/**
+	 * Internal representation of `$effect(...)`
+	 * @param {() => void | (() => void)} fn
+	 */
+	function user_effect(fn) {
+		validate_effect('$effect');
+
+		{
+			define_property(fn, 'name', {
+				value: '$effect'
+			});
+		}
+
+		// Non-nested `$effect(...)` in a component should be deferred
+		// until the component is mounted
+		var flags = /** @type {Effect} */ (active_effect).f;
+		var defer =
+			!active_reaction &&
+			(flags & BRANCH_EFFECT) !== 0 &&
+			component_context !== null &&
+			!component_context.i;
+
+		if (defer) {
+			// Top-level `$effect(...)` in an unmounted component — defer until mount
+			var context = /** @type {ComponentContext} */ (component_context);
+			(context.e ??= []).push(fn);
+		} else {
+			// Everything else — create immediately
+			return create_user_effect(fn);
+		}
+	}
+
+	/**
+	 * @param {() => void | (() => void)} fn
+	 */
+	function create_user_effect(fn) {
+		return create_effect(EFFECT | USER_EFFECT, fn);
+	}
+
+	/**
+	 * Internal representation of `$effect.pre(...)`
+	 * @param {() => void | (() => void)} fn
+	 * @returns {Effect}
+	 */
+	function user_pre_effect(fn) {
+		validate_effect('$effect.pre');
+		{
+			define_property(fn, 'name', {
+				value: '$effect.pre'
+			});
+		}
+		return create_effect(RENDER_EFFECT | USER_EFFECT, fn);
+	}
+
+	/**
+	 * An effect root whose children can transition out
+	 * @param {() => void} fn
+	 * @returns {(options?: { outro?: boolean }) => Promise<void>}
+	 */
+	function component_root(fn) {
+		Batch.ensure();
+		const effect = create_effect(ROOT_EFFECT | EFFECT_PRESERVED, fn);
+
+		return (options = {}) => {
+			return new Promise((fulfil) => {
+				if (options.outro) {
+					pause_effect(effect, () => {
+						destroy_effect(effect);
+						fulfil(undefined);
+					});
+				} else {
+					destroy_effect(effect);
+					fulfil(undefined);
+				}
+			});
+		};
+	}
+
+	/**
+	 * @param {() => void | (() => void)} fn
+	 * @returns {Effect}
+	 */
+	function effect(fn) {
+		return create_effect(EFFECT, fn);
+	}
+
+	/**
+	 * Internal representation of `$: ..`
+	 * @param {() => any} deps
+	 * @param {() => void | (() => void)} fn
+	 */
+	function legacy_pre_effect(deps, fn) {
+		var context = /** @type {ComponentContextLegacy} */ (component_context);
+
+		/** @type {{ effect: null | Effect, ran: boolean, deps: () => any }} */
+		var token = { effect: null, ran: false, deps };
+
+		context.l.$.push(token);
+
+		token.effect = render_effect(() => {
+			deps();
+
+			// If this legacy pre effect has already run before the end of the reset, then
+			// bail out to emulate the same behavior.
+			if (token.ran) return;
+
+			token.ran = true;
+
+			var effect = /** @type {Effect} */ (active_effect);
+
+			// here, we lie: by setting `active_effect` to be the parent branch, any writes
+			// that happen inside `fn` will _not_ cause an unnecessary reschedule, because
+			// the affected effects will be children of `active_effect`. this is safe
+			// because these effects are known to run in the correct order
+			try {
+				set_active_effect(effect.parent);
+				untrack(fn);
+			} finally {
+				set_active_effect(effect);
+			}
+		});
+	}
+
+	function legacy_pre_effect_reset() {
+		var context = /** @type {ComponentContextLegacy} */ (component_context);
+
+		render_effect(() => {
+			// Run dirty `$:` statements
+			for (var token of context.l.$) {
+				token.deps();
+
+				var effect = token.effect;
+
+				// If the effect is CLEAN, then make it MAYBE_DIRTY. This ensures we traverse through
+				// the effects dependencies and correctly ensure each dependency is up-to-date.
+				if ((effect.f & CLEAN) !== 0 && effect.deps !== null) {
+					set_signal_status(effect, MAYBE_DIRTY);
+				}
+
+				if (is_dirty(effect)) {
+					update_effect(effect);
+				}
+
+				token.ran = false;
+			}
+		});
+	}
+
+	/**
+	 * @param {() => void | (() => void)} fn
+	 * @returns {Effect}
+	 */
+	function async_effect(fn) {
+		return create_effect(ASYNC | EFFECT_PRESERVED, fn);
+	}
+
+	/**
+	 * @param {() => void | (() => void)} fn
+	 * @returns {Effect}
+	 */
+	function render_effect(fn, flags = 0) {
+		return create_effect(RENDER_EFFECT | flags, fn);
+	}
+
+	/**
+	 * @param {(...expressions: any) => void | (() => void)} fn
+	 * @param {Array<() => any>} sync
+	 * @param {Array<() => Promise<any>>} async
+	 * @param {Blocker[]} blockers
+	 */
+	function template_effect(fn, sync = [], async = [], blockers = []) {
+		flatten(blockers, sync, async, (values) => {
+			create_effect(RENDER_EFFECT, () => {
+				fn(...values.map(get));
+			});
+		});
+	}
+
+	/**
+	 * @param {(() => void)} fn
+	 * @param {number} flags
+	 */
+	function block(fn, flags = 0) {
+		var effect = create_effect(BLOCK_EFFECT | flags, fn);
+		{
+			effect.dev_stack = dev_stack;
+		}
+		return effect;
+	}
+
+	/**
+	 * @param {(() => void)} fn
+	 */
+	function branch(fn) {
+		return create_effect(BRANCH_EFFECT | EFFECT_PRESERVED, fn);
+	}
+
+	/**
+	 * @param {Effect} effect
+	 */
+	function execute_effect_teardown(effect) {
+		var teardown = effect.teardown;
+		if (teardown !== null) {
+			const previously_destroying_effect = is_destroying_effect;
+			const previous_reaction = active_reaction;
+			set_is_destroying_effect(true);
+			set_active_reaction(null);
+			try {
+				teardown.call(null);
+			} finally {
+				set_is_destroying_effect(previously_destroying_effect);
+				set_active_reaction(previous_reaction);
+			}
+		}
+	}
+
+	/**
+	 * @param {Effect} signal
+	 * @param {boolean} remove_dom
+	 * @returns {void}
+	 */
+	function destroy_effect_children(signal, remove_dom = false) {
+		var effect = signal.first;
+		signal.first = signal.last = null;
+
+		while (effect !== null) {
+			const controller = effect.ac;
+
+			if (controller !== null) {
+				without_reactive_context(() => {
+					controller.abort(STALE_REACTION);
+				});
+			}
+
+			var next = effect.next;
+
+			if ((effect.f & ROOT_EFFECT) !== 0) {
+				// this is now an independent root
+				effect.parent = null;
+			} else {
+				destroy_effect(effect, remove_dom);
+			}
+
+			effect = next;
+		}
+	}
+
+	/**
+	 * @param {Effect} signal
+	 * @returns {void}
+	 */
+	function destroy_block_effect_children(signal) {
+		var effect = signal.first;
+
+		while (effect !== null) {
+			var next = effect.next;
+			if ((effect.f & BRANCH_EFFECT) === 0) {
+				destroy_effect(effect);
+			}
+			effect = next;
+		}
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @param {boolean} [remove_dom]
+	 * @returns {void}
+	 */
+	function destroy_effect(effect, remove_dom = true) {
+		var removed = false;
+
+		if (
+			(remove_dom || (effect.f & HEAD_EFFECT) !== 0) &&
+			effect.nodes !== null &&
+			effect.nodes.end !== null
+		) {
+			remove_effect_dom(effect.nodes.start, /** @type {TemplateNode} */ (effect.nodes.end));
+			removed = true;
+		}
+
+		effect.f |= DESTROYING;
+		destroy_effect_children(effect, remove_dom && !removed);
+		remove_reactions(effect, 0);
+
+		var transitions = effect.nodes && effect.nodes.t;
+
+		if (transitions !== null) {
+			for (const transition of transitions) {
+				transition.stop();
+			}
+		}
+
+		execute_effect_teardown(effect);
+
+		effect.f ^= DESTROYING;
+		effect.f |= DESTROYED;
+
+		var parent = effect.parent;
+
+		// If the parent doesn't have any children, then skip this work altogether
+		if (parent !== null && parent.first !== null) {
+			unlink_effect(effect);
+		}
+
+		{
+			effect.component_function = null;
+		}
+
+		// `first` and `child` are nulled out in destroy_effect_children
+		// we don't null out `parent` so that error propagation can work correctly
+		effect.next =
+			effect.prev =
+			effect.teardown =
+			effect.ctx =
+			effect.deps =
+			effect.fn =
+			effect.nodes =
+			effect.ac =
+			effect.b =
+				null;
+	}
+
+	/**
+	 *
+	 * @param {TemplateNode | null} node
+	 * @param {TemplateNode} end
+	 */
+	function remove_effect_dom(node, end) {
+		while (node !== null) {
+			/** @type {TemplateNode | null} */
+			var next = node === end ? null : get_next_sibling(node);
+
+			node.remove();
+			node = next;
+		}
+	}
+
+	/**
+	 * Detach an effect from the effect tree, freeing up memory and
+	 * reducing the amount of work that happens on subsequent traversals
+	 * @param {Effect} effect
+	 */
+	function unlink_effect(effect) {
+		var parent = effect.parent;
+		var prev = effect.prev;
+		var next = effect.next;
+
+		if (prev !== null) prev.next = next;
+		if (next !== null) next.prev = prev;
+
+		if (parent !== null) {
+			if (parent.first === effect) parent.first = next;
+			if (parent.last === effect) parent.last = prev;
+		}
+	}
+
+	/**
+	 * When a block effect is removed, we don't immediately destroy it or yank it
+	 * out of the DOM, because it might have transitions. Instead, we 'pause' it.
+	 * It stays around (in memory, and in the DOM) until outro transitions have
+	 * completed, and if the state change is reversed then we _resume_ it.
+	 * A paused effect does not update, and the DOM subtree becomes inert.
+	 * @param {Effect} effect
+	 * @param {() => void} [callback]
+	 * @param {boolean} [destroy]
+	 */
+	function pause_effect(effect, callback, destroy = true) {
+		/** @type {TransitionManager[]} */
+		var transitions = [];
+
+		pause_children(effect, transitions, true);
+
+		var fn = () => {
+			if (destroy) destroy_effect(effect);
+			if (callback) callback();
+		};
+
+		var remaining = transitions.length;
+		if (remaining > 0) {
+			var check = () => --remaining || fn();
+			for (var transition of transitions) {
+				transition.out(check);
+			}
+		} else {
+			fn();
+		}
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @param {TransitionManager[]} transitions
+	 * @param {boolean} local
+	 */
+	function pause_children(effect, transitions, local) {
+		if ((effect.f & INERT) !== 0) return;
+		effect.f ^= INERT;
+
+		var t = effect.nodes && effect.nodes.t;
+
+		if (t !== null) {
+			for (const transition of t) {
+				if (transition.is_global || local) {
+					transitions.push(transition);
+				}
+			}
+		}
+
+		var child = effect.first;
+
+		while (child !== null) {
+			var sibling = child.next;
+
+			// If this child is a root effect, then it will become an independent root when its parent
+			// is destroyed, it should therefore not become inert nor partake in transitions.
+			if ((child.f & ROOT_EFFECT) === 0) {
+				var transparent =
+					(child.f & EFFECT_TRANSPARENT) !== 0 ||
+					// If this is a branch effect without a block effect parent,
+					// it means the parent block effect was pruned. In that case,
+					// transparency information was transferred to the branch effect.
+					((child.f & BRANCH_EFFECT) !== 0 && (effect.f & BLOCK_EFFECT) !== 0);
+				// TODO we don't need to call pause_children recursively with a linked list in place
+				// it's slightly more involved though as we have to account for `transparent` changing
+				// through the tree.
+				pause_children(child, transitions, transparent ? local : false);
+			}
+
+			child = sibling;
+		}
+	}
+
+	/**
+	 * The opposite of `pause_effect`. We call this if (for example)
+	 * `x` becomes falsy then truthy: `{#if x}...{/if}`
+	 * @param {Effect} effect
+	 */
+	function resume_effect(effect) {
+		resume_children(effect, true);
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @param {boolean} local
+	 */
+	function resume_children(effect, local) {
+		if ((effect.f & INERT) === 0) return;
+		effect.f ^= INERT;
+
+		// If a dependency of this effect changed while it was paused,
+		// schedule the effect to update. we don't use `is_dirty`
+		// here because we don't want to eagerly recompute a derived like
+		// `{#if foo}{foo.bar()}{/if}` if `foo` is now `undefined
+		if ((effect.f & CLEAN) === 0) {
+			set_signal_status(effect, DIRTY);
+			Batch.ensure().schedule(effect); // Assumption: This happens during the commit phase of the batch, causing another flush, but it's safe
+		}
+
+		var child = effect.first;
+
+		while (child !== null) {
+			var sibling = child.next;
+			var transparent = (child.f & EFFECT_TRANSPARENT) !== 0 || (child.f & BRANCH_EFFECT) !== 0;
+			// TODO we don't need to call resume_children recursively with a linked list in place
+			// it's slightly more involved though as we have to account for `transparent` changing
+			// through the tree.
+			resume_children(child, transparent ? local : false);
+			child = sibling;
+		}
+
+		var t = effect.nodes && effect.nodes.t;
+
+		if (t !== null) {
+			for (const transition of t) {
+				if (transition.is_global || local) {
+					transition.in();
+				}
+			}
+		}
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @param {DocumentFragment} fragment
+	 */
+	function move_effect(effect, fragment) {
+		if (!effect.nodes) return;
+
+		/** @type {TemplateNode | null} */
+		var node = effect.nodes.start;
+		var end = effect.nodes.end;
+
+		while (node !== null) {
+			/** @type {TemplateNode | null} */
+			var next = node === end ? null : get_next_sibling(node);
+
+			fragment.append(node);
+			node = next;
+		}
+	}
+
+	/** @import { Derived, Effect, Reaction, Source, Value } from '#client' */
+
+	/**
+	 * True if updating in an effect context that is reactive (i.e. not branch/root effects)
+	 */
+	let is_updating_effect = false;
+
+	let is_destroying_effect = false;
+
+	/** @param {boolean} value */
+	function set_is_destroying_effect(value) {
+		is_destroying_effect = value;
+	}
+
+	/** @type {null | Reaction} */
+	let active_reaction = null;
+
+	let untracking = false;
+
+	/** @param {null | Reaction} reaction */
+	function set_active_reaction(reaction) {
+		active_reaction = reaction;
+	}
+
+	/** @type {null | Effect} */
+	let active_effect = null;
+
+	/** @param {null | Effect} effect */
+	function set_active_effect(effect) {
+		active_effect = effect;
+	}
+
+	/**
+	 * When sources are created within a reaction, reading and writing
+	 * them within that reaction should not cause a re-run
+	 * @type {null | Set<Source>}
+	 */
+	let current_sources = null;
+
+	/** @param {Value} value */
+	function push_reaction_value(value) {
+		if (active_reaction !== null && (true)) {
+			(current_sources ??= new Set()).add(value);
+		}
+	}
+
+	/**
+	 * The dependencies of the reaction that is currently being executed. In many cases,
+	 * the dependencies are unchanged between runs, and so this will be `null` unless
+	 * and until a new dependency is accessed — we track this via `skipped_deps`
+	 * @type {null | Value[]}
+	 */
+	let new_deps = null;
+
+	let skipped_deps = 0;
+
+	/**
+	 * Tracks writes that the effect it's executed in doesn't listen to yet,
+	 * so that the dependency can be added to the effect later on if it then reads it
+	 * @type {null | Source[]}
+	 */
+	let untracked_writes = null;
+
+	/** @param {null | Source[]} value */
+	function set_untracked_writes(value) {
+		untracked_writes = value;
+	}
+
+	/**
+	 * @type {number} Used by sources and deriveds for handling updates.
+	 * Version starts from 1 so that unowned deriveds differentiate between a created effect and a run one for tracing
+	 **/
+	let write_version = 1;
+
+	/** @type {number} Used to version each read of a source of derived to avoid duplicating depedencies inside a reaction */
+	let read_version = 0;
+
+	let update_version = read_version;
+
+	/** @param {number} value */
+	function set_update_version(value) {
+		update_version = value;
+	}
+
+	function increment_write_version() {
+		return ++write_version;
+	}
+
+	/**
+	 * Determines whether a derived or effect is dirty.
+	 * If it is MAYBE_DIRTY, will set the status to CLEAN
+	 * @param {Reaction} reaction
+	 * @returns {boolean}
+	 */
+	function is_dirty(reaction) {
+		var flags = reaction.f;
+
+		if ((flags & DIRTY) !== 0) {
+			return true;
+		}
+
+		if (flags & DERIVED) {
+			reaction.f &= ~WAS_MARKED;
+		}
+
+		if ((flags & MAYBE_DIRTY) !== 0) {
+			var dependencies = /** @type {Value[]} */ (reaction.deps);
+			var length = dependencies.length;
+
+			for (var i = 0; i < length; i++) {
+				var dependency = dependencies[i];
+
+				if (is_dirty(/** @type {Derived} */ (dependency))) {
+					update_derived(/** @type {Derived} */ (dependency));
+				}
+
+				if (dependency.wv > reaction.wv) {
+					return true;
+				}
+			}
+
+			if (
+				(flags & CONNECTED) !== 0 &&
+				// During time traveling we don't want to reset the status so that
+				// traversal of the graph in the other batches still happens
+				batch_values === null
+			) {
+				set_signal_status(reaction, CLEAN);
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @param {Value} signal
+	 * @param {Effect} effect
+	 * @param {boolean} [root]
+	 */
+	function schedule_possible_effect_self_invalidation(signal, effect, root = true) {
+		var reactions = signal.reactions;
+		if (reactions === null) return;
+
+		if (current_sources !== null && current_sources.has(signal)) {
+			return;
+		}
+
+		for (var i = 0; i < reactions.length; i++) {
+			var reaction = reactions[i];
+
+			if ((reaction.f & DERIVED) !== 0) {
+				schedule_possible_effect_self_invalidation(/** @type {Derived} */ (reaction), effect, false);
+			} else if (effect === reaction) {
+				if (root) {
+					set_signal_status(reaction, DIRTY);
+				} else if ((reaction.f & CLEAN) !== 0) {
+					set_signal_status(reaction, MAYBE_DIRTY);
+				}
+				schedule_effect(/** @type {Effect} */ (reaction));
+			}
+		}
+	}
+
+	/** @param {Reaction} reaction */
+	function update_reaction(reaction) {
+		var previous_deps = new_deps;
+		var previous_skipped_deps = skipped_deps;
+		var previous_untracked_writes = untracked_writes;
+		var previous_reaction = active_reaction;
+		var previous_sources = current_sources;
+		var previous_component_context = component_context;
+		var previous_untracking = untracking;
+		var previous_update_version = update_version;
+
+		var flags = reaction.f;
+
+		new_deps = /** @type {null | Value[]} */ (null);
+		skipped_deps = 0;
+		untracked_writes = null;
+		active_reaction = (flags & (BRANCH_EFFECT | ROOT_EFFECT)) === 0 ? reaction : null;
+
+		current_sources = null;
+		set_component_context(reaction.ctx);
+		untracking = false;
+		update_version = ++read_version;
+
+		if (reaction.ac !== null) {
+			without_reactive_context(() => {
+				/** @type {AbortController} */ (reaction.ac).abort(STALE_REACTION);
+			});
+
+			reaction.ac = null;
+		}
+
+		try {
+			reaction.f |= REACTION_IS_UPDATING;
+			var fn = /** @type {Function} */ (reaction.fn);
+			var result = fn();
+			reaction.f |= REACTION_RAN;
+			var deps = reaction.deps;
+
+			// Don't remove reactions during fork;
+			// they must remain for when fork is discarded
+			var is_fork = current_batch?.is_fork;
+
+			if (new_deps !== null) {
+				var i;
+
+				if (!is_fork) {
+					remove_reactions(reaction, skipped_deps);
+				}
+
+				if (deps !== null && skipped_deps > 0) {
+					deps.length = skipped_deps + new_deps.length;
+					for (i = 0; i < new_deps.length; i++) {
+						deps[skipped_deps + i] = new_deps[i];
+					}
+				} else {
+					reaction.deps = deps = new_deps;
+				}
+
+				if (effect_tracking() && (reaction.f & CONNECTED) !== 0) {
+					for (i = skipped_deps; i < deps.length; i++) {
+						(deps[i].reactions ??= []).push(reaction);
+					}
+				}
+			} else if (!is_fork && deps !== null && skipped_deps < deps.length) {
+				remove_reactions(reaction, skipped_deps);
+				deps.length = skipped_deps;
+			}
+
+			// If we're inside an effect and we have untracked writes, then we need to
+			// ensure that if any of those untracked writes result in re-invalidation
+			// of the current effect, then that happens accordingly
+			if (
+				is_runes() &&
+				untracked_writes !== null &&
+				!untracking &&
+				deps !== null &&
+				(reaction.f & (DERIVED | MAYBE_DIRTY | DIRTY)) === 0
+			) {
+				for (i = 0; i < /** @type {Source[]} */ (untracked_writes).length; i++) {
+					schedule_possible_effect_self_invalidation(
+						untracked_writes[i],
+						/** @type {Effect} */ (reaction)
+					);
+				}
+			}
+
+			// If we are returning to an previous reaction then
+			// we need to increment the read version to ensure that
+			// any dependencies in this reaction aren't marked with
+			// the same version
+			if (previous_reaction !== null && previous_reaction !== reaction) {
+				read_version++;
+
+				// update the `rv` of the previous reaction's deps — both existing and new —
+				// so that they are not added again
+				if (previous_reaction.deps !== null) {
+					for (let i = 0; i < previous_skipped_deps; i += 1) {
+						previous_reaction.deps[i].rv = read_version;
+					}
+				}
+
+				if (previous_deps !== null) {
+					for (const dep of previous_deps) {
+						dep.rv = read_version;
+					}
+				}
+
+				if (untracked_writes !== null) {
+					if (previous_untracked_writes === null) {
+						previous_untracked_writes = untracked_writes;
+					} else {
+						previous_untracked_writes.push(.../** @type {Source[]} */ (untracked_writes));
+					}
+				}
+			}
+
+			if ((reaction.f & ERROR_VALUE) !== 0) {
+				reaction.f ^= ERROR_VALUE;
+			}
+
+			return result;
+		} catch (error) {
+			return handle_error(error);
+		} finally {
+			reaction.f ^= REACTION_IS_UPDATING;
+			new_deps = previous_deps;
+			skipped_deps = previous_skipped_deps;
+			untracked_writes = previous_untracked_writes;
+			active_reaction = previous_reaction;
+			current_sources = previous_sources;
+			set_component_context(previous_component_context);
+			untracking = previous_untracking;
+			update_version = previous_update_version;
+		}
+	}
+
+	/**
+	 * @template V
+	 * @param {Reaction} signal
+	 * @param {Value<V>} dependency
+	 * @returns {void}
+	 */
+	function remove_reaction(signal, dependency) {
+		let reactions = dependency.reactions;
+		if (reactions !== null) {
+			var index = index_of.call(reactions, signal);
+			if (index !== -1) {
+				var new_length = reactions.length - 1;
+				if (new_length === 0) {
+					reactions = dependency.reactions = null;
+				} else {
+					// Swap with last element and then remove.
+					reactions[index] = reactions[new_length];
+					reactions.pop();
+				}
+			}
+		}
+
+		// If the derived has no reactions, then we can disconnect it from the graph,
+		// allowing it to either reconnect in the future, or be GC'd by the VM.
+		if (
+			reactions === null &&
+			(dependency.f & DERIVED) !== 0 &&
+			// Destroying a child effect while updating a parent effect can cause a dependency to appear
+			// to be unused, when in fact it is used by the currently-updating parent. Checking `new_deps`
+			// allows us to skip the expensive work of disconnecting and immediately reconnecting it
+			(new_deps === null || !includes.call(new_deps, dependency))
+		) {
+			var derived = /** @type {Derived} */ (dependency);
+
+			// If we are working with a derived that is owned by an effect, then mark it as being
+			// disconnected and remove the mark flag, as it cannot be reliably removed otherwise
+			if ((derived.f & CONNECTED) !== 0) {
+				derived.f ^= CONNECTED;
+				derived.f &= ~WAS_MARKED;
+			}
+
+			// In a fork it's possible that a derived is executed and gets reactions, then commits, but is
+			// never re-executed. This is possible when the derived is only executed once in the context
+			// of a new branch which happens before fork.commit() runs. In this case, the derived still has
+			// UNINITIALIZED as its value, and then when it's loosing its reactions we need to ensure it stays
+			// DIRTY so it is reexecuted once someone wants its value again.
+			if (derived.v !== UNINITIALIZED) {
+				update_derived_status(derived);
+			}
+
+			// Call abort controller, noone's listening to this derived anymore
+			if (derived.ac !== null) {
+				without_reactive_context(() => {
+					/** @type {AbortController} */ (derived.ac).abort(STALE_REACTION);
+					derived.ac = null;
+					// ensure it reruns right away next time instead of potentially returning a rejected promise as its value
+					set_signal_status(derived, DIRTY);
+				});
+			}
+
+			// freeze any effects inside this derived
+			freeze_derived_effects(derived);
+
+			// Disconnect any reactions owned by this reaction
+			remove_reactions(derived, 0);
+		}
+	}
+
+	/**
+	 * @param {Reaction} signal
+	 * @param {number} start_index
+	 * @returns {void}
+	 */
+	function remove_reactions(signal, start_index) {
+		var dependencies = signal.deps;
+		if (dependencies === null) return;
+
+		for (var i = start_index; i < dependencies.length; i++) {
+			remove_reaction(signal, dependencies[i]);
+		}
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @returns {void}
+	 */
+	function update_effect(effect) {
+		var flags = effect.f;
+
+		if ((flags & DESTROYED) !== 0) {
+			return;
+		}
+
+		set_signal_status(effect, CLEAN);
+
+		var previous_effect = active_effect;
+		var was_updating_effect = is_updating_effect;
+
+		active_effect = effect;
+		is_updating_effect = (flags & (BRANCH_EFFECT | ROOT_EFFECT)) === 0; // Branch/root effects are not reactive contexts
+
+		{
+			var previous_component_fn = dev_current_component_function;
+			set_dev_current_component_function(effect.component_function);
+			var previous_stack = /** @type {any} */ (dev_stack);
+			// only block effects have a dev stack, keep the current one otherwise
+			set_dev_stack(effect.dev_stack ?? dev_stack);
+		}
+
+		try {
+			if ((flags & (BLOCK_EFFECT | MANAGED_EFFECT)) !== 0) {
+				destroy_block_effect_children(effect);
+			} else {
+				destroy_effect_children(effect);
+			}
+
+			execute_effect_teardown(effect);
+			var teardown = update_reaction(effect);
+			effect.teardown = typeof teardown === 'function' ? teardown : null;
+			effect.wv = write_version;
+
+			// In DEV, increment versions of any sources that were written to during the effect,
+			// so that they are correctly marked as dirty when the effect re-runs
+			var dep; if (DEV && tracing_mode_flag && (effect.f & DIRTY) !== 0 && effect.deps !== null) ;
+		} finally {
+			is_updating_effect = was_updating_effect;
+			active_effect = previous_effect;
+
+			{
+				set_dev_current_component_function(previous_component_fn);
+				set_dev_stack(previous_stack);
+			}
+		}
+	}
+
+	/**
+	 * Returns a promise that resolves once any pending state changes have been applied.
+	 * @returns {Promise<void>}
+	 */
+	async function tick() {
+
+		await Promise.resolve();
+
+		// By calling flushSync we guarantee that any pending state changes are applied after one tick.
+		// TODO look into whether we can make flushing subsequent updates synchronously in the future.
+		flushSync();
+	}
+
+	/**
+	 * @template V
+	 * @param {Value<V>} signal
+	 * @returns {V}
+	 */
+	function get(signal) {
+		var flags = signal.f;
+		var is_derived = (flags & DERIVED) !== 0;
+
+		// Register the dependency on the current reaction signal.
+		if (active_reaction !== null && !untracking) {
+			// if we're in a derived that is being read inside an _async_ derived,
+			// it's possible that the effect was already destroyed. In this case,
+			// we don't add the dependency, because that would create a memory leak
+			var destroyed = active_effect !== null && (active_effect.f & DESTROYED) !== 0;
+
+			if (!destroyed && (current_sources === null || !current_sources.has(signal))) {
+				var deps = active_reaction.deps;
+
+				if ((active_reaction.f & REACTION_IS_UPDATING) !== 0) {
+					// we're in the effect init/update cycle
+					if (signal.rv < read_version) {
+						signal.rv = read_version;
+
+						// If the signal is accessing the same dependencies in the same
+						// order as it did last time, increment `skipped_deps`
+						// rather than updating `new_deps`, which creates GC cost
+						if (new_deps === null && deps !== null && deps[skipped_deps] === signal) {
+							skipped_deps++;
+						} else if (new_deps === null) {
+							new_deps = [signal];
+						} else {
+							new_deps.push(signal);
+						}
+					}
+				} else {
+					// We're adding a dependency outside the init/update cycle (i.e. after an `await`).
+					// We have to deduplicate deps/reactions in this case or remove_reactions could
+					// disconnect deps/reactions that are actually still in use (if skip_deps says
+					// "disconnect all after this index" and some of the signals are also present in
+					// list prior to the cutoff index, i.e. that should be kept).
+					active_reaction.deps ??= [];
+					if (!includes.call(active_reaction.deps, signal)) {
+						active_reaction.deps.push(signal);
+					}
+
+					var reactions = signal.reactions;
+
+					if (reactions === null) {
+						signal.reactions = [active_reaction];
+					} else if (!includes.call(reactions, active_reaction)) {
+						reactions.push(active_reaction);
+					}
+				}
+			}
+		}
+
+		{
+			if (
+				!untracking &&
+				reactivity_loss_tracker &&
+				// By checking that current/previous batch are null we filter out false positives.
+				// reactivity_loss_tracker is only reset after a microtask, so if a flush happens
+				// before that, we get warnings for things we shouldn't warn on.
+				current_batch === null &&
+				previous_batch === null &&
+				!reactivity_loss_tracker.warned &&
+				(reactivity_loss_tracker.effect.f & REACTION_IS_UPDATING) === 0 &&
+				!reactivity_loss_tracker.effect_deps.has(signal)
+			) {
+				reactivity_loss_tracker.warned = true;
+
+				await_reactivity_loss(/** @type {string} */ (signal.label));
+
+				var trace = get_error('traced at');
+				// eslint-disable-next-line no-console
+				if (trace) console.warn(trace);
+			}
+
+			recent_async_deriveds.delete(signal);
+		}
+
+		if (is_destroying_effect && old_values.has(signal)) {
+			return old_values.get(signal);
+		}
+
+		if (is_derived) {
+			var derived = /** @type {Derived} */ (signal);
+
+			if (is_destroying_effect) {
+				var value = derived.v;
+
+				// if the derived is dirty and has reactions, or depends on the values that just changed, re-execute
+				// (a derived can be maybe_dirty due to the effect destroy removing its last reaction)
+				if (
+					((derived.f & CLEAN) === 0 && derived.reactions !== null) ||
+					depends_on_old_values(derived)
+				) {
+					value = execute_derived(derived);
+				}
+
+				old_values.set(derived, value);
+
+				return value;
+			}
+
+			// connect disconnected deriveds if we are reading them inside an effect,
+			// or inside another derived that is already connected
+			var should_connect =
+				(derived.f & CONNECTED) === 0 &&
+				!untracking &&
+				active_reaction !== null &&
+				(is_updating_effect || (active_reaction.f & CONNECTED) !== 0);
+
+			var is_new = (derived.f & REACTION_RAN) === 0;
+
+			if (is_dirty(derived)) {
+				if (should_connect) {
+					// set the flag before `update_derived`, so that the derived
+					// is added as a reaction to its dependencies
+					derived.f |= CONNECTED;
+				}
+
+				update_derived(derived);
+			}
+
+			if (should_connect && !is_new) {
+				unfreeze_derived_effects(derived);
+				reconnect(derived);
+			}
+		}
+
+		if (batch_values?.has(signal)) {
+			return batch_values.get(signal);
+		}
+
+		if ((signal.f & ERROR_VALUE) !== 0) {
+			throw signal.v;
+		}
+
+		return signal.v;
+	}
+
+	/**
+	 * (Re)connect a disconnected derived, so that it is notified
+	 * of changes in `mark_reactions`
+	 * @param {Derived} derived
+	 */
+	function reconnect(derived) {
+		derived.f |= CONNECTED;
+
+		if (derived.deps === null) return;
+
+		for (const dep of derived.deps) {
+			(dep.reactions ??= []).push(derived);
+
+			if ((dep.f & DERIVED) !== 0 && (dep.f & CONNECTED) === 0) {
+				unfreeze_derived_effects(/** @type {Derived} */ (dep));
+				reconnect(/** @type {Derived} */ (dep));
+			}
+		}
+	}
+
+	/** @param {Derived} derived */
+	function depends_on_old_values(derived) {
+		if (derived.v === UNINITIALIZED) return true; // we don't know, so assume the worst
+		if (derived.deps === null) return false;
+
+		for (const dep of derived.deps) {
+			if (old_values.has(dep)) {
+				return true;
+			}
+
+			if ((dep.f & DERIVED) !== 0 && depends_on_old_values(/** @type {Derived} */ (dep))) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * When used inside a [`$derived`](https://svelte.dev/docs/svelte/$derived) or [`$effect`](https://svelte.dev/docs/svelte/$effect),
+	 * any state read inside `fn` will not be treated as a dependency.
+	 *
+	 * ```ts
+	 * $effect(() => {
+	 *   // this will run when `data` changes, but not when `time` changes
+	 *   save(data, {
+	 *     timestamp: untrack(() => time)
+	 *   });
+	 * });
+	 * ```
+	 * @template T
+	 * @param {() => T} fn
+	 * @returns {T}
+	 */
+	function untrack(fn) {
+		var previous_untracking = untracking;
+		try {
+			untracking = true;
+			return fn();
+		} finally {
+			untracking = previous_untracking;
+		}
+	}
+
+	/**
+	 * Possibly traverse an object and read all its properties so that they're all reactive in case this is `$state`.
+	 * Does only check first level of an object for performance reasons (heuristic should be good for 99% of all cases).
+	 * @param {any} value
+	 * @returns {void}
+	 */
+	function deep_read_state(value) {
+		if (typeof value !== 'object' || !value || value instanceof EventTarget) {
+			return;
+		}
+
+		if (STATE_SYMBOL in value) {
+			deep_read(value);
+		} else if (!Array.isArray(value)) {
+			for (let key in value) {
+				const prop = value[key];
+				if (typeof prop === 'object' && prop && STATE_SYMBOL in prop) {
+					deep_read(prop);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Deeply traverse an object and read all its properties
+	 * so that they're all reactive in case this is `$state`
+	 * @param {any} value
+	 * @param {Set<any>} visited
+	 * @returns {void}
+	 */
+	function deep_read(value, visited = new Set()) {
+		if (
+			typeof value === 'object' &&
+			value !== null &&
+			// We don't want to traverse DOM elements
+			!(value instanceof EventTarget) &&
+			!visited.has(value)
+		) {
+			visited.add(value);
+			// When working with a possible SvelteDate, this
+			// will ensure we capture changes to it.
+			if (value instanceof Date) {
+				value.getTime();
+			}
+			for (let key in value) {
+				try {
+					deep_read(value[key], visited);
+				} catch (e) {
+					// continue
+				}
+			}
+			const proto = get_prototype_of(value);
+			if (
+				proto !== Object.prototype &&
+				proto !== Array.prototype &&
+				proto !== Map.prototype &&
+				proto !== Set.prototype &&
+				proto !== Date.prototype
+			) {
+				const descriptors = get_descriptors(proto);
+				for (let key in descriptors) {
+					const get = descriptors[key].get;
+					if (get) {
+						try {
+							get.call(value);
+						} catch (e) {
+							// continue
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Subset of delegated events which should be passive by default.
+	 * These two are already passive via browser defaults on window, document and body.
+	 * But since
+	 * - we're delegating them
+	 * - they happen often
+	 * - they apply to mobile which is generally less performant
+	 * we're marking them as passive by default for other elements, too.
+	 */
+	const PASSIVE_EVENTS = ['touchstart', 'touchmove'];
+
+	/**
+	 * Returns `true` if `name` is a passive event
+	 * @param {string} name
+	 */
+	function is_passive_event(name) {
+		return PASSIVE_EVENTS.includes(name);
+	}
+
+	/** @import { SourceLocation } from '#client' */
+
+	/**
+	 * @param {any} fn
+	 * @param {string} filename
+	 * @param {SourceLocation[]} locations
+	 * @returns {any}
+	 */
+	function add_locations(fn, filename, locations) {
+		return (/** @type {any[]} */ ...args) => {
+			const dom = fn(...args);
+
+			var node = dom.nodeType === DOCUMENT_FRAGMENT_NODE ? dom.firstChild : dom;
+			assign_locations(node, filename, locations);
+
+			return dom;
+		};
+	}
+
+	/**
+	 * @param {Element} element
+	 * @param {string} filename
+	 * @param {SourceLocation} location
+	 */
+	function assign_location(element, filename, location) {
+		// @ts-expect-error
+		element.__svelte_meta = {
+			parent: dev_stack,
+			loc: { file: filename, line: location[0], column: location[1] }
+		};
+
+		if (location[2]) {
+			assign_locations(element.firstChild, filename, location[2]);
+		}
+	}
+
+	/**
+	 * @param {Node | null} node
+	 * @param {string} filename
+	 * @param {SourceLocation[]} locations
+	 */
+	function assign_locations(node, filename, locations) {
+		var i = 0;
+
+		while (node && i < locations.length) {
+
+			if (node.nodeType === ELEMENT_NODE) {
+				assign_location(/** @type {Element} */ (node), filename, locations[i++]);
+			}
+
+			node = node.nextSibling;
+		}
+	}
+
+	/**
+	 * Used on elements, as a map of event type -> event handler,
+	 * and on events themselves to track which element handled an event
+	 */
+	const event_symbol = Symbol('events');
+
+	/** @type {Set<string>} */
+	const all_registered_events = new Set();
+
+	/** @type {Set<(events: Array<string>) => void>} */
+	const root_event_handles = new Set();
+
+	/**
+	 * @param {string} event_name
+	 * @param {EventTarget} dom
+	 * @param {EventListener} [handler]
+	 * @param {AddEventListenerOptions} [options]
+	 */
+	function create_event(event_name, dom, handler, options = {}) {
+		/**
+		 * @this {EventTarget}
+		 */
+		function target_handler(/** @type {Event} */ event) {
+			if (!options.capture) {
+				// Only call in the bubble phase, else delegated events would be called before the capturing events
+				handle_event_propagation.call(dom, event);
+			}
+			if (!event.cancelBubble) {
+				return without_reactive_context(() => {
+					return handler?.call(this, event);
+				});
+			}
+		}
+
+		// Chrome has a bug where pointer events don't work when attached to a DOM element that has been cloned
+		// with cloneNode() and the DOM element is disconnected from the document. To ensure the event works, we
+		// defer the attachment till after it's been appended to the document. TODO: remove this once Chrome fixes
+		// this bug. The same applies to wheel events and touch events.
+		if (
+			event_name.startsWith('pointer') ||
+			event_name.startsWith('touch') ||
+			event_name === 'wheel'
+		) {
+			queue_micro_task(() => {
+				dom.addEventListener(event_name, target_handler, options);
+			});
+		} else {
+			dom.addEventListener(event_name, target_handler, options);
+		}
+
+		return target_handler;
+	}
+
+	/**
+	 * @param {string} event_name
+	 * @param {Element} dom
+	 * @param {EventListener} [handler]
+	 * @param {boolean} [capture]
+	 * @param {boolean} [passive]
+	 * @returns {void}
+	 */
+	function event(event_name, dom, handler, capture, passive) {
+		var options = { capture, passive };
+		var target_handler = create_event(event_name, dom, handler, options);
+
+		if (
+			dom === document.body ||
+			// @ts-ignore
+			dom === window ||
+			// @ts-ignore
+			dom === document ||
+			// Firefox has quirky behavior, it can happen that we still get "canplay" events when the element is already removed
+			dom instanceof HTMLMediaElement
+		) {
+			teardown(() => {
+				dom.removeEventListener(event_name, target_handler, options);
+			});
+		}
+	}
+
+	// used to store the reference to the currently propagated event
+	// to prevent garbage collection between microtasks in Firefox
+	// If the event object is GCed too early, the expando __root property
+	// set on the event object is lost, causing the event delegation
+	// to process the event twice
+	let last_propagated_event = null;
+
+	/**
+	 * @this {EventTarget}
+	 * @param {Event} event
+	 * @returns {void}
+	 */
+	function handle_event_propagation(event) {
+		var handler_element = this;
+		var owner_document = /** @type {Node} */ (handler_element).ownerDocument;
+		var event_name = event.type;
+		var path = event.composedPath?.() || [];
+		var current_target = /** @type {null | Element} */ (path[0] || event.target);
+
+		last_propagated_event = event;
+
+		// composedPath contains list of nodes the event has propagated through.
+		// We check `event_symbol` to skip all nodes below it in case this is a
+		// parent of the `event_symbol` node, which indicates that there's nested
+		// mounted apps. In this case we don't want to trigger events multiple times.
+		var path_idx = 0;
+
+		// the `last_propagated_event === event` check is redundant, but
+		// without it the variable will be DCE'd and things will
+		// fail mysteriously in Firefox
+		// @ts-expect-error is added below
+		var handled_at = last_propagated_event === event && event[event_symbol];
+
+		if (handled_at) {
+			var at_idx = path.indexOf(handled_at);
+			if (
+				at_idx !== -1 &&
+				(handler_element === document || handler_element === /** @type {any} */ (window))
+			) {
+				// This is the fallback document listener or a window listener, but the event was already handled
+				// -> ignore, but set handle_at to document/window so that we're resetting the event
+				// chain in case someone manually dispatches the same event object again.
+				// @ts-expect-error
+				event[event_symbol] = handler_element;
+				return;
+			}
+
+			// We're deliberately not skipping if the index is higher, because
+			// someone could create an event programmatically and emit it multiple times,
+			// in which case we want to handle the whole propagation chain properly each time.
+			// (this will only be a false negative if the event is dispatched multiple times and
+			// the fallback document listener isn't reached in between, but that's super rare)
+			var handler_idx = path.indexOf(handler_element);
+			if (handler_idx === -1) {
+				// handle_idx can theoretically be -1 (happened in some JSDOM testing scenarios with an event listener on the window object)
+				// so guard against that, too, and assume that everything was handled at this point.
+				return;
+			}
+
+			if (at_idx <= handler_idx) {
+				path_idx = at_idx;
+			}
+		}
+
+		current_target = /** @type {Element} */ (path[path_idx] || event.target);
+		// there can only be one delegated event per element, and we either already handled the current target,
+		// or this is the very first target in the chain which has a non-delegated listener, in which case it's safe
+		// to handle a possible delegated event on it later (through the root delegation listener for example).
+		if (current_target === handler_element) return;
+
+		// Proxy currentTarget to correct target
+		define_property(event, 'currentTarget', {
+			configurable: true,
+			get() {
+				return current_target || owner_document;
+			}
+		});
+
+		// This started because of Chromium issue https://chromestatus.com/feature/5128696823545856,
+		// where removal or moving of the DOM can cause sync `blur` events to fire, which can cause logic
+		// to run inside the current `active_reaction`, which isn't what we want at all. However, on reflection,
+		// it's probably best that all events handled by Svelte have this behaviour, as we don't really want
+		// an event handler to run in the context of another reaction or effect.
+		var previous_reaction = active_reaction;
+		var previous_effect = active_effect;
+		set_active_reaction(null);
+		set_active_effect(null);
+
+		try {
+			/**
+			 * @type {unknown}
+			 */
+			var throw_error;
+			/**
+			 * @type {unknown[]}
+			 */
+			var other_errors = [];
+
+			while (current_target !== null) {
+				if (current_target === handler_element) break;
+
+				try {
+					// @ts-expect-error
+					var delegated = current_target[event_symbol]?.[event_name];
+
+					if (
+						delegated != null &&
+						(!(/** @type {any} */ (current_target).disabled) ||
+							// DOM could've been updated already by the time this is reached, so we check this as well
+							// -> the target could not have been disabled because it emits the event in the first place
+							event.target === current_target)
+					) {
+						delegated.call(current_target, event);
+					}
+				} catch (error) {
+					if (throw_error) {
+						other_errors.push(error);
+					} else {
+						throw_error = error;
+					}
+				}
+				if (event.cancelBubble) break;
+
+				path_idx++;
+				current_target = path_idx < path.length ? /** @type {Element} */ (path[path_idx]) : null;
+			}
+
+			if (throw_error) {
+				for (let error of other_errors) {
+					// Throw the rest of the errors, one-by-one on a microtask
+					queueMicrotask(() => {
+						throw error;
+					});
+				}
+				throw throw_error;
+			}
+		} finally {
+			// @ts-expect-error is used above
+			event[event_symbol] = handler_element;
+			// @ts-ignore remove proxy on currentTarget
+			delete event.currentTarget;
+			set_active_reaction(previous_reaction);
+			set_active_effect(previous_effect);
+		}
+	}
+
+	const policy =
+		// We gotta write it like this because after downleveling the pure comment may end up in the wrong location
+		globalThis?.window?.trustedTypes &&
+		/* @__PURE__ */ globalThis.window.trustedTypes.createPolicy('svelte-trusted-html', {
+			/** @param {string} html */
+			createHTML: (html) => {
+				return html;
+			}
+		});
+
+	/** @param {string} html */
+	function create_trusted_html(html) {
+		return /** @type {string} */ (policy?.createHTML(html) ?? html);
+	}
+
+	/**
+	 * @param {string} html
+	 */
+	function create_fragment_from_html(html) {
+		var elem = create_element('template');
+		elem.innerHTML = create_trusted_html(html.replaceAll('<!>', '<!---->')); // XHTML compliance
+		return elem.content;
+	}
+
+	/** @import { Effect, EffectNodes, TemplateNode } from '#client' */
+	/** @import { TemplateStructure } from './types' */
+
+	/**
+	 * @param {TemplateNode} start
+	 * @param {TemplateNode | null} end
+	 */
+	function assign_nodes(start, end) {
+		var effect = /** @type {Effect} */ (active_effect);
+		if (effect.nodes === null) {
+			effect.nodes = { start, end, a: null, t: null };
+		}
+	}
+
+	/**
+	 * @param {string} content
+	 * @param {number} flags
+	 * @returns {() => Node | Node[]}
+	 */
+	/*#__NO_SIDE_EFFECTS__*/
+	function from_html(content, flags) {
+		var is_fragment = (flags & TEMPLATE_FRAGMENT) !== 0;
+		var use_import_node = (flags & TEMPLATE_USE_IMPORT_NODE) !== 0;
+
+		/** @type {Node} */
+		var node;
+
+		/**
+		 * Whether or not the first item is a text/element node. If not, we need to
+		 * create an additional comment node to act as `effect.nodes.start`
+		 */
+		var has_start = !content.startsWith('<!>');
+
+		return () => {
+
+			if (node === undefined) {
+				node = create_fragment_from_html(has_start ? content : '<!>' + content);
+				if (!is_fragment) node = /** @type {TemplateNode} */ (get_first_child(node));
+			}
+
+			var clone = /** @type {TemplateNode} */ (
+				use_import_node || is_firefox ? document.importNode(node, true) : node.cloneNode(true)
+			);
+
+			if (is_fragment) {
+				var start = /** @type {TemplateNode} */ (get_first_child(clone));
+				var end = /** @type {TemplateNode} */ (clone.lastChild);
+
+				assign_nodes(start, end);
+			} else {
+				assign_nodes(clone, clone);
+			}
+
+			return clone;
+		};
+	}
+
+	/**
+	 * @returns {TemplateNode | DocumentFragment}
+	 */
+	function comment() {
+
+		var frag = document.createDocumentFragment();
+		var start = document.createComment('');
+		var anchor = create_text();
+		frag.append(start, anchor);
+
+		assign_nodes(start, anchor);
+
+		return frag;
+	}
+
+	/**
+	 * Assign the created (or in hydration mode, traversed) dom elements to the current block
+	 * and insert the elements into the dom (in client mode).
+	 * @param {Text | Comment | Element} anchor
+	 * @param {DocumentFragment | Element} dom
+	 */
+	function append(anchor, dom) {
+
+		if (anchor === null) {
+			// edge case — void `<svelte:element>` with content
+			return;
+		}
+
+		anchor.before(/** @type {Node} */ (dom));
+	}
+
+	/** @import { ComponentContext, Effect, EffectNodes, TemplateNode } from '#client' */
+	/** @import { Component, ComponentType, SvelteComponent, MountOptions } from '../../index.js' */
+
+	/**
+	 * This is normally true — block effects should run their intro transitions —
+	 * but is false during hydration (unless `options.intro` is `true`) and
+	 * when creating the children of a `<svelte:element>` that just changed tag
+	 */
+	let should_intro = true;
+
+	/**
+	 * @param {Element} text
+	 * @param {string} value
+	 * @returns {void}
+	 */
+	function set_text(text, value) {
+		// For objects, we apply string coercion (which might make things like $state array references in the template reactive) before diffing
+		var str = value == null ? '' : typeof value === 'object' ? `${value}` : value;
+		// prettier-ignore
+		if (str !== (/** @type {any} */ (text)[TEXT_CACHE] ??= text.nodeValue)) {
+			/** @type {any} */ (text)[TEXT_CACHE] = str;
+			text.nodeValue = `${str}`;
+		}
+	}
+
+	/**
+	 * Mounts a component to the given target and returns the exports and potentially the props (if compiled with `accessors: true`) of the component.
+	 * Transitions will play during the initial render unless the `intro` option is set to `false`.
+	 *
+	 * @template {Record<string, any>} Props
+	 * @template {Record<string, any>} Exports
+	 * @param {ComponentType<SvelteComponent<Props>> | Component<Props, Exports, any>} component
+	 * @param {MountOptions<Props>} options
+	 * @returns {Exports}
+	 */
+	function mount(component, options) {
+		return _mount(component, options);
+	}
+
+	/** @type {Map<EventTarget, Map<string, number>>} */
+	const listeners = new Map();
+
+	/**
+	 * @template {Record<string, any>} Exports
+	 * @param {ComponentType<SvelteComponent<any>> | Component<any>} Component
+	 * @param {MountOptions} options
+	 * @returns {Exports}
+	 */
+	function _mount(
+		Component,
+		{ target, anchor, props = {}, events, context, intro = true, transformError }
+	) {
+		init_operations();
+
+		/** @type {Exports} */
+		// @ts-expect-error will be defined because the render effect runs synchronously
+		var component = undefined;
+
+		var unmount = component_root(() => {
+			var anchor_node = anchor ?? target.appendChild(create_text());
+
+			boundary(
+				/** @type {TemplateNode} */ (anchor_node),
+				{
+					pending: () => {}
+				},
+				(anchor_node) => {
+					push({});
+					var ctx = /** @type {ComponentContext} */ (component_context);
+					if (context) ctx.c = context;
+
+					if (events) {
+						// We can't spread the object or else we'd lose the state proxy stuff, if it is one
+						/** @type {any} */ (props).$$events = events;
+					}
+
+					should_intro = intro;
+					// @ts-expect-error the public typings are not what the actual function looks like
+					component = Component(anchor_node, props) || {};
+					should_intro = true;
+
+					pop();
+				},
+				transformError
+			);
+
+			// Setup event delegation _after_ component is mounted - if an error would happen during mount, it would otherwise not be cleaned up
+			/** @type {Set<string>} */
+			var registered_events = new Set();
+
+			/** @param {Array<string>} events */
+			var event_handle = (events) => {
+				for (var i = 0; i < events.length; i++) {
+					var event_name = events[i];
+
+					if (registered_events.has(event_name)) continue;
+					registered_events.add(event_name);
+
+					var passive = is_passive_event(event_name);
+
+					// Add the event listener to both the container and the document.
+					// The container listener ensures we catch events from within in case
+					// the outer content stops propagation of the event.
+					//
+					// The document listener ensures we catch events that originate from elements that were
+					// manually moved outside of the container (e.g. via manual portals).
+					for (const node of [target, document]) {
+						var counts = listeners.get(node);
+
+						if (counts === undefined) {
+							counts = new Map();
+							listeners.set(node, counts);
+						}
+
+						var count = counts.get(event_name);
+
+						if (count === undefined) {
+							node.addEventListener(event_name, handle_event_propagation, { passive });
+							counts.set(event_name, 1);
+						} else {
+							counts.set(event_name, count + 1);
+						}
+					}
+				}
+			};
+
+			event_handle(array_from(all_registered_events));
+			root_event_handles.add(event_handle);
+
+			return () => {
+				for (var event_name of registered_events) {
+					for (const node of [target, document]) {
+						var counts = /** @type {Map<string, number>} */ (listeners.get(node));
+						var count = /** @type {number} */ (counts.get(event_name));
+
+						if (--count == 0) {
+							node.removeEventListener(event_name, handle_event_propagation);
+							counts.delete(event_name);
+
+							if (counts.size === 0) {
+								listeners.delete(node);
+							}
+						} else {
+							counts.set(event_name, count);
+						}
+					}
+				}
+
+				root_event_handles.delete(event_handle);
+
+				if (anchor_node !== anchor) {
+					anchor_node.parentNode?.removeChild(anchor_node);
+				}
+			};
+		});
+
+		mounted_components.set(component, unmount);
+		return component;
+	}
+
+	/**
+	 * References of the components that were mounted or hydrated.
+	 * Uses a `WeakMap` to avoid memory leaks.
+	 */
+	let mounted_components = new WeakMap();
+
+	/** @param {Function & { [FILENAME]: string }} target */
+	function check_target(target) {
+		if (target) {
+			component_api_invalid_new(target[FILENAME] ?? 'a component', target.name);
+		}
+	}
+
+	function legacy_api() {
+		const component = component_context?.function;
+
+		/** @param {string} method */
+		function error(method) {
+			component_api_changed(method, component[FILENAME]);
+		}
+
+		return {
+			$destroy: () => error('$destroy()'),
+			$on: () => error('$on(...)'),
+			$set: () => error('$set(...)')
+		};
+	}
+
+	/** @import { Effect, TemplateNode } from '#client' */
+
+	/**
+	 * @typedef {{ effect: Effect, fragment: DocumentFragment }} Branch
+	 */
+
+	/**
+	 * @template Key
+	 */
+	class BranchManager {
+		/** @type {TemplateNode} */
+		anchor;
+
+		/** @type {Map<Batch, Key>} */
+		#batches = new Map();
+
+		/**
+		 * Map of keys to effects that are currently rendered in the DOM.
+		 * These effects are visible and actively part of the document tree.
+		 * Example:
+		 * ```
+		 * {#if condition}
+		 * 	foo
+		 * {:else}
+		 * 	bar
+		 * {/if}
+		 * ```
+		 * Can result in the entries `true->Effect` and `false->Effect`
+		 * @type {Map<Key, Effect>}
+		 */
+		#onscreen = new Map();
+
+		/**
+		 * Similar to #onscreen with respect to the keys, but contains branches that are not yet
+		 * in the DOM, because their insertion is deferred.
+		 * @type {Map<Key, Branch>}
+		 */
+		#offscreen = new Map();
+
+		/**
+		 * Keys of effects that are currently outroing
+		 * @type {Set<Key>}
+		 */
+		#outroing = new Set();
+
+		/**
+		 * Whether to pause (i.e. outro) on change, or destroy immediately.
+		 * This is necessary for `<svelte:element>`
+		 */
+		#transition = true;
+
+		/**
+		 * @param {TemplateNode} anchor
+		 * @param {boolean} transition
+		 */
+		constructor(anchor, transition = true) {
+			this.anchor = anchor;
+			this.#transition = transition;
+		}
+
+		/**
+		 * @param {Batch} batch
+		 */
+		#commit = (batch) => {
+			// if this batch was made obsolete, bail
+			if (!this.#batches.has(batch)) return;
+
+			var key = /** @type {Key} */ (this.#batches.get(batch));
+
+			var onscreen = this.#onscreen.get(key);
+
+			if (onscreen) {
+				// effect is already in the DOM — abort any current outro
+				resume_effect(onscreen);
+				this.#outroing.delete(key);
+			} else {
+				// effect is currently offscreen. put it in the DOM
+				var offscreen = this.#offscreen.get(key);
+
+				if (offscreen) {
+					// effect could have been outro'ed before through a prior batch — resume if necessary
+					resume_effect(offscreen.effect);
+					this.#onscreen.set(key, offscreen.effect);
+					this.#offscreen.delete(key);
+
+					{
+						// Tell hmr.js about the anchor it should use for updates,
+						// since the initial one will be removed
+						/** @type {any} */ (offscreen.fragment.lastChild)[HMR_ANCHOR] = this.anchor;
+					}
+
+					// remove the anchor...
+					/** @type {TemplateNode} */ (offscreen.fragment.lastChild).remove();
+
+					// ...and append the fragment
+					this.anchor.before(offscreen.fragment);
+					onscreen = offscreen.effect;
+				}
+			}
+
+			for (const [b, k] of this.#batches) {
+				this.#batches.delete(b);
+
+				if (b === batch) {
+					// keep values for newer batches
+					break;
+				}
+
+				const offscreen = this.#offscreen.get(k);
+
+				if (offscreen) {
+					// for older batches, destroy offscreen effects
+					// as they will never be committed
+					destroy_effect(offscreen.effect);
+					this.#offscreen.delete(k);
+				}
+			}
+
+			// outro/destroy all onscreen effects...
+			for (const [k, effect] of this.#onscreen) {
+				// ...except the one that was just committed
+				//    or those that are already outroing (else the transition is aborted and the effect destroyed right away)
+				if (k === key || this.#outroing.has(k)) continue;
+
+				const on_destroy = () => {
+					const keys = Array.from(this.#batches.values());
+
+					if (keys.includes(k)) {
+						// keep the effect offscreen, as another batch will need it
+						var fragment = document.createDocumentFragment();
+						move_effect(effect, fragment);
+
+						fragment.append(create_text()); // TODO can we avoid this?
+
+						this.#offscreen.set(k, { effect, fragment });
+					} else {
+						destroy_effect(effect);
+					}
+
+					this.#outroing.delete(k);
+					this.#onscreen.delete(k);
+				};
+
+				if (this.#transition || !onscreen) {
+					this.#outroing.add(k);
+					pause_effect(effect, on_destroy, false);
+				} else {
+					on_destroy();
+				}
+			}
+		};
+
+		/**
+		 * @param {Batch} batch
+		 */
+		#discard = (batch) => {
+			this.#batches.delete(batch);
+
+			const keys = Array.from(this.#batches.values());
+
+			for (const [k, branch] of this.#offscreen) {
+				if (!keys.includes(k)) {
+					destroy_effect(branch.effect);
+					this.#offscreen.delete(k);
+				}
+			}
+		};
+
+		/**
+		 *
+		 * @param {any} key
+		 * @param {null | ((target: TemplateNode) => void)} fn
+		 */
+		ensure(key, fn) {
+			var batch = /** @type {Batch} */ (current_batch);
+			var defer = should_defer_append();
+
+			if (fn && !this.#onscreen.has(key) && !this.#offscreen.has(key)) {
+				if (defer) {
+					var fragment = document.createDocumentFragment();
+					var target = create_text();
+
+					fragment.append(target);
+
+					this.#offscreen.set(key, {
+						effect: branch(() => fn(target)),
+						fragment
+					});
+				} else {
+					this.#onscreen.set(
+						key,
+						branch(() => fn(this.anchor))
+					);
+				}
+			}
+
+			this.#batches.set(batch, key);
+
+			if (defer) {
+				for (const [k, effect] of this.#onscreen) {
+					if (k === key) {
+						batch.unskip_effect(effect);
+					} else {
+						batch.skip_effect(effect);
+					}
+				}
+
+				for (const [k, branch] of this.#offscreen) {
+					if (k === key) {
+						batch.unskip_effect(branch.effect);
+					} else {
+						batch.skip_effect(branch.effect);
+					}
+				}
+
+				batch.oncommit(this.#commit);
+				batch.ondiscard(this.#discard);
+			} else {
+
+				this.#commit(batch);
+			}
+		}
+	}
+
+	/** @import { TemplateNode } from '#client' */
+
+	/**
+	 * @param {TemplateNode} node
+	 * @param {(branch: (fn: (anchor: Node) => void, key?: number | false) => void) => void} fn
+	 * @param {boolean} [elseif] True if this is an `{:else if ...}` block rather than an `{#if ...}`, as that affects which transitions are considered 'local'
+	 * @returns {void}
+	 */
+	function if_block(node, fn, elseif = false) {
+
+		var branches = new BranchManager(node);
+		var flags = elseif ? EFFECT_TRANSPARENT : 0;
+
+		/**
+		 * @param {number | false} key
+		 * @param {null | ((anchor: Node) => void)} fn
+		 */
+		function update_branch(key, fn) {
+
+			branches.ensure(key, fn);
+		}
+
+		block(() => {
+			var has_branch = false;
+
+			fn((fn, key = 0) => {
+				has_branch = true;
+				update_branch(key, fn);
+			});
+
+			if (!has_branch) {
+				update_branch(-1, null);
+			}
+		}, flags);
+	}
+
+	/** @import { EachItem, EachOutroGroup, EachState, Effect, EffectNodes, MaybeSource, Source, TemplateNode, TransitionManager, Value } from '#client' */
+	/** @import { Batch } from '../../reactivity/batch.js'; */
+
+	// When making substantive changes to this file, validate them with the each block stress test:
+	// https://svelte.dev/playground/1972b2cf46564476ad8c8c6405b23b7b
+	// This test also exists in this repo, as `packages/svelte/tests/manual/each-stress-test`
+
+	/**
+	 * @param {any} _
+	 * @param {number} i
+	 */
+	function index(_, i) {
+		return i;
+	}
+
+	/**
+	 * Pause multiple effects simultaneously, and coordinate their
+	 * subsequent destruction. Used in each blocks
+	 * @param {EachState} state
+	 * @param {Effect[]} to_destroy
+	 * @param {null | Node} controlled_anchor
+	 */
+	function pause_effects(state, to_destroy, controlled_anchor) {
+		/** @type {TransitionManager[]} */
+		var transitions = [];
+		var length = to_destroy.length;
+
+		/** @type {EachOutroGroup} */
+		var group;
+		var remaining = to_destroy.length;
+
+		for (var i = 0; i < length; i++) {
+			let effect = to_destroy[i];
+
+			pause_effect(
+				effect,
+				() => {
+					if (group) {
+						group.pending.delete(effect);
+						group.done.add(effect);
+
+						if (group.pending.size === 0) {
+							var groups = /** @type {Set<EachOutroGroup>} */ (state.outrogroups);
+
+							destroy_effects(state, array_from(group.done));
+							groups.delete(group);
+
+							if (groups.size === 0) {
+								state.outrogroups = null;
+							}
+						}
+					} else {
+						remaining -= 1;
+					}
+				},
+				false
+			);
+		}
+
+		if (remaining === 0) {
+			// If we're in a controlled each block (i.e. the block is the only child of an
+			// element), and we are removing all items, _and_ there are no out transitions,
+			// we can use the fast path — emptying the element and replacing the anchor
+			var fast_path = transitions.length === 0 && controlled_anchor !== null;
+
+			if (fast_path) {
+				var anchor = /** @type {Element} */ (controlled_anchor);
+				var parent_node = /** @type {Element} */ (anchor.parentNode);
+
+				clear_text_content(parent_node);
+				parent_node.append(anchor);
+
+				state.items.clear();
+			}
+
+			destroy_effects(state, to_destroy, !fast_path);
+		} else {
+			group = {
+				pending: new Set(to_destroy),
+				done: new Set()
+			};
+
+			(state.outrogroups ??= new Set()).add(group);
+		}
+	}
+
+	/**
+	 * @param {EachState} state
+	 * @param {Effect[]} to_destroy
+	 * @param {boolean} remove_dom
+	 */
+	function destroy_effects(state, to_destroy, remove_dom = true) {
+		/** @type {Set<Effect> | undefined} */
+		var preserved_effects;
+
+		// The loop-in-a-loop isn't ideal, but we should only hit this in relatively rare cases
+		if (state.pending.size > 0) {
+			preserved_effects = new Set();
+
+			for (const keys of state.pending.values()) {
+				for (const key of keys) {
+					preserved_effects.add(/** @type {EachItem} */ (state.items.get(key)).e);
+				}
+			}
+		}
+
+		for (var i = 0; i < to_destroy.length; i++) {
+			var e = to_destroy[i];
+
+			if (preserved_effects?.has(e)) {
+				e.f |= EFFECT_OFFSCREEN;
+
+				const fragment = document.createDocumentFragment();
+				move_effect(e, fragment);
+			} else {
+				destroy_effect(to_destroy[i], remove_dom);
+			}
+		}
+	}
+
+	/** @type {TemplateNode} */
+	var offscreen_anchor;
+
+	/**
+	 * @template V
+	 * @param {Element | Comment} node The next sibling node, or the parent node if this is a 'controlled' block
+	 * @param {number} flags
+	 * @param {() => V[]} get_collection
+	 * @param {(value: V, index: number) => any} get_key
+	 * @param {(anchor: Node, item: MaybeSource<V>, index: MaybeSource<number>) => void} render_fn
+	 * @param {null | ((anchor: Node) => void)} fallback_fn
+	 * @returns {void}
+	 */
+	function each(node, flags, get_collection, get_key, render_fn, fallback_fn = null) {
+		var anchor = node;
+
+		/** @type {Map<any, EachItem>} */
+		var items = new Map();
+
+		var is_controlled = (flags & EACH_IS_CONTROLLED) !== 0;
+
+		if (is_controlled) {
+			var parent_node = /** @type {Element} */ (node);
+
+			anchor = parent_node.appendChild(create_text());
+		}
+
+		/** @type {Effect | null} */
+		var fallback = null;
+
+		// TODO: ideally we could use derived for runes mode but because of the ability
+		// to use a store which can be mutated, we can't do that here as mutating a store
+		// will still result in the collection array being the same from the store
+		var each_array = derived_safe_equal(() => {
+			var collection = get_collection();
+
+			return /** @type {V[]} */ (
+				is_array(collection) ? collection : collection == null ? [] : array_from(collection)
+			);
+		});
+
+		{
+			tag(each_array, '{#each ...}');
+		}
+
+		/** @type {V[]} */
+		var array;
+
+		/** @type {Map<Batch, Set<any>>} */
+		var pending = new Map();
+
+		var first_run = true;
+
+		/**
+		 * @param {Batch} batch
+		 */
+		function commit(batch) {
+			if ((state.effect.f & DESTROYED) !== 0) {
+				return;
+			}
+
+			state.pending.delete(batch);
+
+			state.fallback = fallback;
+			reconcile(state, array, anchor, flags, get_key);
+
+			if (fallback !== null) {
+				if (array.length === 0) {
+					if ((fallback.f & EFFECT_OFFSCREEN) === 0) {
+						resume_effect(fallback);
+					} else {
+						fallback.f ^= EFFECT_OFFSCREEN;
+						move(fallback, null, anchor);
+					}
+				} else {
+					pause_effect(fallback, () => {
+						// TODO only null out if no pending batch needs it,
+						// otherwise re-add `fallback.fragment` and move the
+						// effect into it
+						fallback = null;
+					});
+				}
+			}
+		}
+
+		/**
+		 * @param {Batch} batch
+		 */
+		function discard(batch) {
+			state.pending.delete(batch);
+		}
+
+		var effect = block(() => {
+			array = /** @type {V[]} */ (get(each_array));
+			var length = array.length;
+
+			var keys = new Set();
+			var batch = /** @type {Batch} */ (current_batch);
+			var defer = should_defer_append();
+
+			for (var index = 0; index < length; index += 1) {
+
+				var value = array[index];
+				var key = get_key(value, index);
+
+				{
+					// Check that the key function is idempotent (returns the same value when called twice)
+					var key_again = get_key(value, index);
+					if (key !== key_again) {
+						each_key_volatile(String(index), String(key), String(key_again));
+					}
+				}
+
+				var item = first_run ? null : items.get(key);
+
+				if (item) {
+					// update before reconciliation, to trigger any async updates
+					if (item.v) internal_set(item.v, value);
+					if (item.i) internal_set(item.i, index);
+
+					if (defer) {
+						batch.unskip_effect(item.e);
+					}
+				} else {
+					item = create_item(
+						items,
+						first_run ? anchor : (offscreen_anchor ??= create_text()),
+						value,
+						key,
+						index,
+						render_fn,
+						flags,
+						get_collection
+					);
+
+					if (!first_run) {
+						item.e.f |= EFFECT_OFFSCREEN;
+					}
+
+					items.set(key, item);
+				}
+
+				keys.add(key);
+			}
+
+			if (length === 0 && fallback_fn && !fallback) {
+				if (first_run) {
+					fallback = branch(() => fallback_fn(anchor));
+				} else {
+					fallback = branch(() => fallback_fn((offscreen_anchor ??= create_text())));
+					fallback.f |= EFFECT_OFFSCREEN;
+				}
+			}
+
+			if (length > keys.size) {
+				{
+					validate_each_keys(array, get_key);
+				}
+			}
+
+			if (!first_run) {
+				pending.set(batch, keys);
+
+				if (defer) {
+					for (const [key, item] of items) {
+						if (!keys.has(key)) {
+							batch.skip_effect(item.e);
+						}
+					}
+
+					batch.oncommit(commit);
+					batch.ondiscard(discard);
+				} else {
+					commit(batch);
+				}
+			}
+
+			// When we mount the each block for the first time, the collection won't be
+			// connected to this effect as the effect hasn't finished running yet and its deps
+			// won't be assigned. However, it's possible that when reconciling the each block
+			// that a mutation occurred and it's made the collection MAYBE_DIRTY, so reading the
+			// collection again can provide consistency to the reactive graph again as the deriveds
+			// will now be `CLEAN`.
+			get(each_array);
+		});
+
+		/** @type {EachState} */
+		var state = { effect, items, pending, outrogroups: null, fallback };
+
+		first_run = false;
+	}
+
+	/**
+	 * Skip past any non-branch effects (which could be created with `createSubscriber`, for example) to find the next branch effect
+	 * @param {Effect | null} effect
+	 * @returns {Effect | null}
+	 */
+	function skip_to_branch(effect) {
+		while (effect !== null && (effect.f & BRANCH_EFFECT) === 0) {
+			effect = effect.next;
+		}
+		return effect;
+	}
+
+	/**
+	 * Add, remove, or reorder items output by an each block as its input changes
+	 * @template V
+	 * @param {EachState} state
+	 * @param {Array<V>} array
+	 * @param {Element | Comment | Text} anchor
+	 * @param {number} flags
+	 * @param {(value: V, index: number) => any} get_key
+	 * @returns {void}
+	 */
+	function reconcile(state, array, anchor, flags, get_key) {
+		var is_animated = (flags & EACH_IS_ANIMATED) !== 0;
+
+		var length = array.length;
+		var items = state.items;
+		var current = skip_to_branch(state.effect.first);
+
+		/** @type {undefined | Set<Effect>} */
+		var seen;
+
+		/** @type {Effect | null} */
+		var prev = null;
+
+		/** @type {undefined | Set<Effect>} */
+		var to_animate;
+
+		/** @type {Effect[]} */
+		var matched = [];
+
+		/** @type {Effect[]} */
+		var stashed = [];
+
+		/** @type {V} */
+		var value;
+
+		/** @type {any} */
+		var key;
+
+		/** @type {Effect | undefined} */
+		var effect;
+
+		/** @type {number} */
+		var i;
+
+		if (is_animated) {
+			for (i = 0; i < length; i += 1) {
+				value = array[i];
+				key = get_key(value, i);
+				effect = /** @type {EachItem} */ (items.get(key)).e;
+
+				// offscreen == coming in now, no animation in that case,
+				// else this would happen https://github.com/sveltejs/svelte/issues/17181
+				if ((effect.f & EFFECT_OFFSCREEN) === 0) {
+					effect.nodes?.a?.measure();
+					(to_animate ??= new Set()).add(effect);
+				}
+			}
+		}
+
+		for (i = 0; i < length; i += 1) {
+			value = array[i];
+			key = get_key(value, i);
+
+			effect = /** @type {EachItem} */ (items.get(key)).e;
+
+			if (state.outrogroups !== null) {
+				for (const group of state.outrogroups) {
+					group.pending.delete(effect);
+					group.done.delete(effect);
+				}
+			}
+
+			if ((effect.f & INERT) !== 0) {
+				resume_effect(effect);
+				if (is_animated) {
+					effect.nodes?.a?.unfix();
+					(to_animate ??= new Set()).delete(effect);
+				}
+			}
+
+			if ((effect.f & EFFECT_OFFSCREEN) !== 0) {
+				effect.f ^= EFFECT_OFFSCREEN;
+
+				if (effect === current) {
+					move(effect, null, anchor);
+				} else {
+					var next = prev ? prev.next : current;
+
+					if (effect === state.effect.last) {
+						state.effect.last = effect.prev;
+					}
+
+					if (effect.prev) effect.prev.next = effect.next;
+					if (effect.next) effect.next.prev = effect.prev;
+					link(state, prev, effect);
+					link(state, effect, next);
+
+					move(effect, next, anchor);
+					prev = effect;
+
+					matched = [];
+					stashed = [];
+
+					current = skip_to_branch(prev.next);
+					continue;
+				}
+			}
+
+			if (effect !== current) {
+				if (seen !== undefined && seen.has(effect)) {
+					if (matched.length < stashed.length) {
+						// more efficient to move later items to the front
+						var start = stashed[0];
+						var j;
+
+						prev = start.prev;
+
+						var a = matched[0];
+						var b = matched[matched.length - 1];
+
+						for (j = 0; j < matched.length; j += 1) {
+							move(matched[j], start, anchor);
+						}
+
+						for (j = 0; j < stashed.length; j += 1) {
+							seen.delete(stashed[j]);
+						}
+
+						link(state, a.prev, b.next);
+						link(state, prev, a);
+						link(state, b, start);
+
+						current = start;
+						prev = b;
+						i -= 1;
+
+						matched = [];
+						stashed = [];
+					} else {
+						// more efficient to move earlier items to the back
+						seen.delete(effect);
+						move(effect, current, anchor);
+
+						link(state, effect.prev, effect.next);
+						link(state, effect, prev === null ? state.effect.first : prev.next);
+						link(state, prev, effect);
+
+						prev = effect;
+					}
+
+					continue;
+				}
+
+				matched = [];
+				stashed = [];
+
+				while (current !== null && current !== effect) {
+					(seen ??= new Set()).add(current);
+					stashed.push(current);
+					current = skip_to_branch(current.next);
+				}
+
+				if (current === null) {
+					continue;
+				}
+			}
+
+			if ((effect.f & EFFECT_OFFSCREEN) === 0) {
+				matched.push(effect);
+			}
+
+			prev = effect;
+			current = skip_to_branch(effect.next);
+		}
+
+		if (state.outrogroups !== null) {
+			for (const group of state.outrogroups) {
+				if (group.pending.size === 0) {
+					destroy_effects(state, array_from(group.done));
+					state.outrogroups?.delete(group);
+				}
+			}
+
+			if (state.outrogroups.size === 0) {
+				state.outrogroups = null;
+			}
+		}
+
+		if (current !== null || seen !== undefined) {
+			/** @type {Effect[]} */
+			var to_destroy = [];
+
+			if (seen !== undefined) {
+				for (effect of seen) {
+					if ((effect.f & INERT) === 0) {
+						to_destroy.push(effect);
+					}
+				}
+			}
+
+			while (current !== null) {
+				// If the each block isn't inert, then inert effects are currently outroing and will be removed once the transition is finished
+				if ((current.f & INERT) === 0 && current !== state.fallback) {
+					to_destroy.push(current);
+				}
+
+				current = skip_to_branch(current.next);
+			}
+
+			var destroy_length = to_destroy.length;
+
+			if (destroy_length > 0) {
+				var controlled_anchor = (flags & EACH_IS_CONTROLLED) !== 0 && length === 0 ? anchor : null;
+
+				if (is_animated) {
+					for (i = 0; i < destroy_length; i += 1) {
+						to_destroy[i].nodes?.a?.measure();
+					}
+
+					for (i = 0; i < destroy_length; i += 1) {
+						to_destroy[i].nodes?.a?.fix();
+					}
+				}
+
+				pause_effects(state, to_destroy, controlled_anchor);
+			}
+		}
+
+		if (is_animated) {
+			queue_micro_task(() => {
+				if (to_animate === undefined) return;
+				for (effect of to_animate) {
+					effect.nodes?.a?.apply();
+				}
+			});
+		}
+	}
+
+	/**
+	 * @template V
+	 * @param {Map<any, EachItem>} items
+	 * @param {Node} anchor
+	 * @param {V} value
+	 * @param {unknown} key
+	 * @param {number} index
+	 * @param {(anchor: Node, item: V | Source<V>, index: number | Value<number>, collection: () => V[]) => void} render_fn
+	 * @param {number} flags
+	 * @param {() => V[]} get_collection
+	 * @returns {EachItem}
+	 */
+	function create_item(items, anchor, value, key, index, render_fn, flags, get_collection) {
+		var v =
+			(flags & EACH_ITEM_REACTIVE) !== 0
+				? (flags & EACH_ITEM_IMMUTABLE) === 0
+					? mutable_source(value, false, false)
+					: source(value)
+				: null;
+
+		var i = (flags & EACH_INDEX_REACTIVE) !== 0 ? source(index) : null;
+
+		if (v) {
+			// For tracing purposes, we need to link the source signal we create with the
+			// collection + index so that tracing works as intended
+			v.trace = () => {
+				// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+				get_collection()[i?.v ?? index];
+			};
+		}
+
+		return {
+			v,
+			i,
+			e: branch(() => {
+				render_fn(anchor, v ?? value, i ?? index, get_collection);
+
+				return () => {
+					items.delete(key);
+				};
+			})
+		};
+	}
+
+	/**
+	 * @param {Effect} effect
+	 * @param {Effect | null} next
+	 * @param {Text | Element | Comment} anchor
+	 */
+	function move(effect, next, anchor) {
+		if (!effect.nodes) return;
+
+		var node = effect.nodes.start;
+		var end = effect.nodes.end;
+
+		var dest =
+			next && (next.f & EFFECT_OFFSCREEN) === 0
+				? /** @type {EffectNodes} */ (next.nodes).start
+				: anchor;
+
+		while (node !== null) {
+			var next_node = /** @type {TemplateNode} */ (get_next_sibling(node));
+			dest.before(node);
+
+			if (node === end) {
+				return;
+			}
+
+			node = next_node;
+		}
+	}
+
+	/**
+	 * @param {EachState} state
+	 * @param {Effect | null} prev
+	 * @param {Effect | null} next
+	 */
+	function link(state, prev, next) {
+		if (prev === null) {
+			state.effect.first = next;
+		} else {
+			prev.next = next;
+		}
+
+		if (next === null) {
+			state.effect.last = prev;
+		} else {
+			next.prev = prev;
+		}
+	}
+
+	/**
+	 * @param {Array<any>} array
+	 * @param {(item: any, index: number) => string} key_fn
+	 * @returns {void}
+	 */
+	function validate_each_keys(array, key_fn) {
+		const keys = new Map();
+		const length = array.length;
+
+		for (let i = 0; i < length; i++) {
+			const key = key_fn(array[i], i);
+
+			if (keys.has(key)) {
+				const a = String(keys.get(key));
+				const b = String(i);
+
+				/** @type {string | null} */
+				let k = String(key);
+				if (k.startsWith('[object ')) k = null;
+
+				each_key_duplicate(a, b, k);
+			}
+
+			keys.set(key, i);
+		}
+	}
+
+	/**
+	 * @param {Comment} anchor
+	 * @param {Record<string, any>} $$props
+	 * @param {string} name
+	 * @param {Record<string, unknown>} slot_props
+	 * @param {null | ((anchor: Comment) => void)} fallback_fn
+	 */
+	function slot(anchor, $$props, name, slot_props, fallback_fn) {
+
+		var slot_fn = $$props.$$slots?.[name];
+		// Interop: Can use snippets to fill slots
+		var is_interop = false;
+		if (slot_fn === true) {
+			slot_fn = $$props['children' ];
+			is_interop = true;
+		}
+
+		if (slot_fn === undefined) ; else {
+			slot_fn(anchor, is_interop ? () => slot_props : slot_props);
+		}
+	}
+
+	/**
+	 * @template {(...args: any[]) => unknown} T
+	 * @param {T} fn
+	 */
+	function prevent_snippet_stringification(fn) {
+		fn.toString = () => {
+			snippet_without_render_tag();
+			return '';
+		};
+		return fn;
+	}
+
+	/** @import { Snippet } from 'svelte' */
+	/** @import { TemplateNode } from '#client' */
+	/** @import { Getters } from '#shared' */
+
+	/**
+	 * In development, wrap the snippet function so that it passes validation, and so that the
+	 * correct component context is set for ownership checks
+	 * @param {any} component
+	 * @param {(node: TemplateNode, ...args: any[]) => void} fn
+	 */
+	function wrap_snippet(component, fn) {
+		const snippet = (/** @type {TemplateNode} */ node, /** @type {any[]} */ ...args) => {
+			var previous_component_function = dev_current_component_function;
+			set_dev_current_component_function(component);
+
+			try {
+				return fn(node, ...args);
+			} finally {
+				set_dev_current_component_function(previous_component_function);
+			}
+		};
+
+		prevent_snippet_stringification(snippet);
+
+		return snippet;
+	}
+
+	/** @import { Raf } from '#client' */
+
+	const now = () => performance.now() ;
+
+	/** @type {Raf} */
+	const raf = {
+		// don't access requestAnimationFrame eagerly outside method
+		// this allows basic testing of user code without JSDOM
+		// bunder will eval and remove ternary when the user's app is built
+		tick: /** @param {any} _ */ (_) => (requestAnimationFrame )(_),
+		now: () => now(),
+		tasks: new Set()
+	};
+
+	/** @import { TaskCallback, Task, TaskEntry } from '#client' */
+
+	// TODO move this into timing.js where it probably belongs
+
+	/**
+	 * @returns {void}
+	 */
+	function run_tasks() {
+		// use `raf.now()` instead of the `requestAnimationFrame` callback argument, because
+		// otherwise things can get wonky https://github.com/sveltejs/svelte/pull/14541
+		const now = raf.now();
+
+		raf.tasks.forEach((task) => {
+			if (!task.c(now)) {
+				raf.tasks.delete(task);
+				task.f();
+			}
+		});
+
+		if (raf.tasks.size !== 0) {
+			raf.tick(run_tasks);
+		}
+	}
+
+	/**
+	 * Creates a new task that runs on each raf frame
+	 * until it returns a falsy value or is aborted
+	 * @param {TaskCallback} callback
+	 * @returns {Task}
+	 */
+	function loop(callback) {
+		/** @type {TaskEntry} */
+		let task;
+
+		if (raf.tasks.size === 0) {
+			raf.tick(run_tasks);
+		}
+
+		return {
+			promise: new Promise((fulfill) => {
+				raf.tasks.add((task = { c: callback, f: fulfill }));
+			}),
+			abort() {
+				raf.tasks.delete(task);
+			}
+		};
+	}
+
+	/** @import { AnimateFn, Animation, AnimationConfig, EachItem, Effect, EffectNodes, TransitionFn, TransitionManager } from '#client' */
+
+	/**
+	 * @param {Element} element
+	 * @param {'introstart' | 'introend' | 'outrostart' | 'outroend'} type
+	 * @returns {void}
+	 */
+	function dispatch_event(element, type) {
+		without_reactive_context(() => {
+			element.dispatchEvent(new CustomEvent(type));
+		});
+	}
+
+	/**
+	 * Converts a property to the camel-case format expected by Element.animate(), KeyframeEffect(), and KeyframeEffect.setKeyframes().
+	 * @param {string} style
+	 * @returns {string}
+	 */
+	function css_property_to_camelcase(style) {
+		// in compliance with spec
+		if (style === 'float') return 'cssFloat';
+		if (style === 'offset') return 'cssOffset';
+
+		// do not rename custom @properties
+		if (style.startsWith('--')) return style;
+
+		const parts = style.split('-');
+		if (parts.length === 1) return parts[0];
+		return (
+			parts[0] +
+			parts
+				.slice(1)
+				.map(/** @param {any} word */ (word) => word[0].toUpperCase() + word.slice(1))
+				.join('')
+		);
+	}
+
+	/**
+	 * @param {string} css
+	 * @returns {Keyframe}
+	 */
+	function css_to_keyframe(css) {
+		/** @type {Keyframe} */
+		const keyframe = {};
+		const parts = css.split(';');
+		for (const part of parts) {
+			const [property, value] = part.split(':');
+			if (!property || value === undefined) break;
+
+			const formatted_property = css_property_to_camelcase(property.trim());
+			keyframe[formatted_property] = value.trim();
+		}
+		return keyframe;
+	}
+
+	/** @param {number} t */
+	const linear = (t) => t;
+
+	/**
+	 * Called inside block effects as `$.transition(...)`. This creates a transition manager and
+	 * attaches it to the current effect — later, inside `pause_effect` and `resume_effect`, we
+	 * use this to create `intro` and `outro` transitions.
+	 * @template P
+	 * @param {number} flags
+	 * @param {HTMLElement} element
+	 * @param {() => TransitionFn<P | undefined>} get_fn
+	 * @param {(() => P) | null} get_params
+	 * @returns {void}
+	 */
+	function transition(flags, element, get_fn, get_params) {
+		var is_global = (flags & TRANSITION_GLOBAL) !== 0;
+
+		/** @type {'in' | 'out' | 'both'} */
+		var direction = 'both' ;
+
+		/** @type {AnimationConfig | ((opts: { direction: 'in' | 'out' }) => AnimationConfig) | undefined} */
+		var current_options;
+
+		var inert = element.inert;
+
+		/**
+		 * The default overflow style, stashed so we can revert changes during the transition
+		 * that are necessary to work around a Safari <18 bug
+		 * TODO 6.0 remove this, if older versions of Safari have died out enough
+		 */
+		var overflow = element.style.overflow;
+
+		/** @type {Animation | undefined} */
+		var intro;
+
+		/** @type {Animation | undefined} */
+		var outro;
+
+		function get_options() {
+			return without_reactive_context(() => {
+				// If a transition is still ongoing, we use the existing options rather than generating
+				// new ones. This ensures that reversible transitions reverse smoothly, rather than
+				// jumping to a new spot because (for example) a different `duration` was used
+				return (current_options ??= get_fn()(element, get_params?.() ?? /** @type {P} */ ({}), {
+					direction
+				}));
+			});
+		}
+
+		/** @type {TransitionManager} */
+		var transition = {
+			is_global,
+			in() {
+				element.inert = inert;
+
+				intro = animate(
+					element,
+					get_options(),
+					outro,
+					1,
+					() => {
+						dispatch_event(element, 'introstart');
+					},
+					() => {
+						dispatch_event(element, 'introend');
+
+						// Ensure we cancel the animation to prevent leaking
+						intro?.abort();
+						intro = current_options = undefined;
+
+						element.style.overflow = overflow;
+					}
+				);
+			},
+			out(fn) {
+
+				element.inert = true;
+
+				outro = animate(
+					element,
+					get_options(),
+					intro,
+					0,
+					() => {
+						dispatch_event(element, 'outrostart');
+					},
+					() => {
+						dispatch_event(element, 'outroend');
+						fn?.();
+					}
+				);
+			},
+			stop: () => {
+				intro?.abort();
+				outro?.abort();
+			}
+		};
+
+		var e = /** @type {Effect & { nodes: EffectNodes }} */ (active_effect);
+
+		(e.nodes.t ??= []).push(transition);
+
+		// if this is a local transition, we only want to run it if the parent (branch) effect's
+		// parent (block) effect is where the state change happened. we can determine that by
+		// looking at whether the block effect is currently initializing
+		if (should_intro) {
+			var run = is_global;
+
+			if (!run) {
+				var block = /** @type {Effect | null} */ (e.parent);
+
+				// skip over transparent blocks (e.g. snippets, else-if blocks)
+				while (block && (block.f & EFFECT_TRANSPARENT) !== 0) {
+					while ((block = block.parent)) {
+						if ((block.f & BLOCK_EFFECT) !== 0) break;
+					}
+				}
+
+				run = !block || (block.f & REACTION_RAN) !== 0;
+			}
+
+			if (run) {
+				effect(() => {
+					untrack(() => transition.in());
+				});
+			}
+		}
+	}
+
+	/**
+	 * Animates an element, according to the provided configuration
+	 * @param {Element} element
+	 * @param {AnimationConfig | ((opts: { direction: 'in' | 'out' }) => AnimationConfig)} options
+	 * @param {Animation | undefined} counterpart The corresponding intro/outro to this outro/intro
+	 * @param {number} t2 The target `t` value — `1` for intro, `0` for outro
+	 * @param {(() => void)} on_begin Called just before beginning the animation
+	 * @param {(() => void)} on_finish Called after successfully completing the animation
+	 * @returns {Animation}
+	 */
+	function animate(element, options, counterpart, t2, on_begin, on_finish) {
+		var is_intro = t2 === 1;
+
+		if (is_function(options)) {
+			// In the case of a deferred transition (such as `crossfade`), `option` will be
+			// a function rather than an `AnimationConfig`. We need to call this function
+			// once the DOM has been updated...
+			/** @type {Animation} */
+			var a;
+			var aborted = false;
+
+			queue_micro_task(() => {
+				if (aborted) return;
+				var o = options({ direction: is_intro ? 'in' : 'out' });
+				a = animate(element, o, counterpart, t2, on_begin, on_finish);
+			});
+
+			// ...but we want to do so without using `async`/`await` everywhere, so
+			// we return a facade that allows everything to remain synchronous
+			return {
+				abort: () => {
+					aborted = true;
+					a?.abort();
+				},
+				deactivate: () => a.deactivate(),
+				reset: () => a.reset(),
+				t: () => a.t()
+			};
+		}
+
+		counterpart?.deactivate();
+
+		if (!options?.duration && !options?.delay) {
+			on_begin();
+			on_finish();
+
+			return {
+				abort: noop$1,
+				deactivate: noop$1,
+				reset: noop$1,
+				t: () => t2
+			};
+		}
+
+		const { delay = 0, css, tick, easing = linear } = options;
+
+		var keyframes = [];
+
+		if (is_intro && counterpart === undefined) {
+			if (tick) {
+				tick(0, 1); // TODO put in nested effect, to avoid interleaved reads/writes?
+			}
+
+			if (css) {
+				var styles = css_to_keyframe(css(0, 1));
+				keyframes.push(styles, styles);
+			}
+		}
+
+		var get_t = () => 1 - t2;
+
+		// create a dummy animation that lasts as long as the delay (but with whatever devtools
+		// multiplier is in effect). in the common case that it is `0`, we keep it anyway so that
+		// the CSS keyframes aren't created until the DOM is updated
+		//
+		// fill forwards to prevent the element from rendering without styles applied
+		// see https://github.com/sveltejs/svelte/issues/14732
+		var animation = element.animate(keyframes, { duration: delay, fill: 'forwards' });
+
+		animation.onfinish = () => {
+			// remove dummy animation from the stack to prevent conflict with main animation
+			animation.cancel();
+
+			on_begin();
+
+			// for bidirectional transitions, we start from the current position,
+			// rather than doing a full intro/outro
+			var t1 = counterpart?.t() ?? 1 - t2;
+			counterpart?.abort();
+
+			var delta = t2 - t1;
+			var duration = /** @type {number} */ (options.duration) * Math.abs(delta);
+			var keyframes = [];
+
+			if (duration > 0) {
+				/**
+				 * Whether or not the CSS includes `overflow: hidden`, in which case we need to
+				 * add it as an inline style to work around a Safari <18 bug
+				 * TODO 6.0 remove this, if possible
+				 */
+				var needs_overflow_hidden = false;
+
+				if (css) {
+					var n = Math.ceil(duration / (1000 / 60)); // `n` must be an integer, or we risk missing the `t2` value
+
+					for (var i = 0; i <= n; i += 1) {
+						var t = t1 + delta * easing(i / n);
+						var styles = css_to_keyframe(css(t, 1 - t));
+						keyframes.push(styles);
+
+						needs_overflow_hidden ||= styles.overflow === 'hidden';
+					}
+				}
+
+				if (needs_overflow_hidden) {
+					/** @type {HTMLElement} */ (element).style.overflow = 'hidden';
+				}
+
+				get_t = () => {
+					var time = /** @type {number} */ (
+						/** @type {globalThis.Animation} */ (animation).currentTime
+					);
+
+					return t1 + delta * easing(time / duration);
+				};
+
+				if (tick) {
+					loop(() => {
+						if (animation.playState !== 'running') return false;
+
+						var t = get_t();
+						tick(t, 1 - t);
+
+						return true;
+					});
+				}
+			}
+
+			animation = element.animate(keyframes, { duration, fill: 'forwards' });
+
+			animation.onfinish = () => {
+				get_t = () => t2;
+				tick?.(t2, 1 - t2);
+				on_finish();
+			};
+		};
+
+		return {
+			abort: () => {
+				if (animation) {
+					animation.cancel();
+					// This prevents memory leaks in Chromium
+					animation.effect = null;
+					// This prevents onfinish to be launched after cancel(),
+					// which can happen in some rare cases
+					// see https://github.com/sveltejs/svelte/issues/13681
+					animation.onfinish = noop$1;
+				}
+			},
+			deactivate: () => {
+				on_finish = noop$1;
+			},
+			reset: () => {
+				if (t2 === 0) {
+					tick?.(1, 0);
+				}
+			},
+			t: () => get_t()
+		};
+	}
+
+	/** @import { ActionPayload } from '#client' */
+
+	/**
+	 * @template P
+	 * @param {Element} dom
+	 * @param {(dom: Element, value?: P) => ActionPayload<P>} action
+	 * @param {() => P} [get_value]
+	 * @returns {void}
+	 */
+	function action(dom, action, get_value) {
+		effect(() => {
+			var payload = untrack(() => action(dom, get_value?.()) || {});
+
+			if (payload?.destroy) {
+				return () => /** @type {Function} */ (payload.destroy)();
+			}
+		});
+	}
+
+	const whitespace = [...' \t\n\r\f\u00a0\u000b\ufeff'];
+
+	/**
+	 * @param {any} value
+	 * @param {string | null} [hash]
+	 * @param {Record<string, boolean>} [directives]
+	 * @returns {string | null}
+	 */
+	function to_class(value, hash, directives) {
+		var classname = value == null ? '' : '' + value;
+
+		if (directives) {
+			for (var key of Object.keys(directives)) {
+				if (directives[key]) {
+					classname = classname ? classname + ' ' + key : key;
+				} else if (classname.length) {
+					var len = key.length;
+					var a = 0;
+
+					while ((a = classname.indexOf(key, a)) >= 0) {
+						var b = a + len;
+
+						if (
+							(a === 0 || whitespace.includes(classname[a - 1])) &&
+							(b === classname.length || whitespace.includes(classname[b]))
+						) {
+							classname = (a === 0 ? '' : classname.substring(0, a)) + classname.substring(b + 1);
+						} else {
+							a = b;
+						}
+					}
+				}
+			}
+		}
+
+		return classname === '' ? null : classname;
+	}
+
+	/**
+	 * @param {any} value
+	 * @param {Record<string, any> | [Record<string, any>, Record<string, any>]} [styles]
+	 * @returns {string | null}
+	 */
+	function to_style(value, styles) {
+
+		return value == null ? null : String(value);
+	}
+
+	/**
+	 * @param {Element} dom
+	 * @param {boolean | number} is_html
+	 * @param {string | null} value
+	 * @param {string} [hash]
+	 * @param {Record<string, any>} [prev_classes]
+	 * @param {Record<string, any>} [next_classes]
+	 * @returns {Record<string, boolean> | undefined}
+	 */
+	function set_class(dom, is_html, value, hash, prev_classes, next_classes) {
+		var prev = /** @type {any} */ (dom)[CLASS_CACHE];
+
+		if (
+			prev !== value ||
+			prev === undefined // for edge case of `class={undefined}`
+		) {
+			var next_class_name = to_class(value, hash, next_classes);
+
+			{
+				// Removing the attribute when the value is only an empty string causes
+				// performance issues vs simply making the className an empty string. So
+				// we should only remove the class if the value is nullish
+				// and there no hash/directives :
+				if (next_class_name == null) {
+					dom.removeAttribute('class');
+				} else {
+					dom.className = next_class_name;
+				}
+			}
+
+			/** @type {any} */ (dom)[CLASS_CACHE] = value;
+		} else if (next_classes && prev_classes !== next_classes) {
+			for (var key in next_classes) {
+				var is_present = !!next_classes[key];
+
+				if (prev_classes == null || is_present !== !!prev_classes[key]) {
+					dom.classList.toggle(key, is_present);
+				}
+			}
+		}
+
+		return next_classes;
+	}
+
+	/**
+	 * @param {Element & ElementCSSInlineStyle} dom
+	 * @param {string | null} value
+	 * @param {Record<string, any> | [Record<string, any>, Record<string, any>]} [prev_styles]
+	 * @param {Record<string, any> | [Record<string, any>, Record<string, any>]} [next_styles]
+	 */
+	function set_style(dom, value, prev_styles, next_styles) {
+		var prev = /** @type {any} */ (dom)[STYLE_CACHE];
+
+		if (prev !== value) {
+			var next_style_attr = to_style(value);
+
+			{
+				if (next_style_attr == null) {
+					dom.removeAttribute('style');
+				} else {
+					dom.style.cssText = next_style_attr;
+				}
+			}
+
+			/** @type {any} */ (dom)[STYLE_CACHE] = value;
+		}
+
+		return next_styles;
+	}
+
+	/**
+	 * Selects the correct option(s) (depending on whether this is a multiple select)
+	 * @template V
+	 * @param {HTMLSelectElement} select
+	 * @param {V} value
+	 * @param {boolean} mounting
+	 */
+	function select_option(select, value, mounting = false) {
+		if (select.multiple) {
+			// If value is null or undefined, keep the selection as is
+			if (value == undefined) {
+				return;
+			}
+
+			// If not an array, warn and keep the selection as is
+			if (!is_array(value)) {
+				return select_multiple_invalid_value();
+			}
+
+			// Otherwise, update the selection
+			for (var option of select.options) {
+				option.selected = value.includes(get_option_value(option));
+			}
+
+			return;
+		}
+
+		for (option of select.options) {
+			var option_value = get_option_value(option);
+			if (is(option_value, value)) {
+				option.selected = true;
+				return;
+			}
+		}
+
+		if (!mounting || value !== undefined) {
+			select.selectedIndex = -1; // no option should be selected
+		}
+	}
+
+	/**
+	 * Selects the correct option(s) if `value` is given,
+	 * and then sets up a mutation observer to sync the
+	 * current selection to the dom when it changes. Such
+	 * changes could for example occur when options are
+	 * inside an `#each` block.
+	 * @param {HTMLSelectElement} select
+	 */
+	function init_select(select) {
+		var observer = new MutationObserver(() => {
+			if ('__value' in select) {
+				// @ts-ignore
+				select_option(select, select.__value);
+			}
+			// Deliberately don't update the potential binding value,
+			// the model should be preserved unless explicitly changed
+		});
+
+		observer.observe(select, {
+			// Listen to option element changes
+			childList: true,
+			subtree: true, // because of <optgroup>
+			// Listen to option element value attribute changes
+			// (doesn't get notified of select value changes,
+			// because that property is not reflected as an attribute)
+			attributes: true,
+			attributeFilter: ['value']
+		});
+
+		teardown(() => {
+			observer.disconnect();
+		});
+	}
+
+	/**
+	 * @param {HTMLSelectElement} select
+	 * @param {() => unknown} get
+	 * @param {(value: unknown) => void} set
+	 * @returns {void}
+	 */
+	function bind_select_value(select, get, set = get) {
+		var batches = new WeakSet();
+		var mounting = true;
+
+		listen_to_event_and_reset_event(select, 'change', (is_reset) => {
+			var query = is_reset ? '[selected]' : ':checked';
+			/** @type {unknown} */
+			var value;
+
+			if (select.multiple) {
+				value = [].map.call(select.querySelectorAll(query), get_option_value);
+			} else {
+				/** @type {HTMLOptionElement | null} */
+				var selected_option =
+					select.querySelector(query) ??
+					// will fall back to first non-disabled option if no option is selected
+					select.querySelector('option:not([disabled])');
+				value = selected_option && get_option_value(selected_option);
+			}
+
+			set(value);
+
+			// @ts-ignore
+			select.__value = value;
+
+			if (current_batch !== null) {
+				batches.add(current_batch);
+			}
+		});
+
+		// Needs to be an effect, not a render_effect, so that in case of each loops the logic runs after the each block has updated
+		effect(() => {
+			var value = get();
+
+			if (select === document.activeElement) {
+				// In sync mode render effects are executed during tree traversal -> needs current_batch
+				// In async mode render effects are flushed once batch resolved, at which point current_batch is null -> needs previous_batch
+				var batch = /** @type {Batch} */ (current_batch);
+
+				// Don't update the <select> if it is focused. We can get here if, for example,
+				// an update is deferred because of async work depending on the select:
+				//
+				// <select bind:value={selected}>...</select>
+				// <p>{await find(selected)}</p>
+				if (batches.has(batch)) {
+					return;
+				}
+			}
+
+			select_option(select, value, mounting);
+
+			// Mounting and value undefined -> take selection from dom
+			if (mounting && value === undefined) {
+				/** @type {HTMLOptionElement | null} */
+				var selected_option = select.querySelector(':checked');
+				if (selected_option !== null) {
+					value = get_option_value(selected_option);
+					set(value);
+				}
+			}
+
+			// @ts-ignore
+			select.__value = value;
+			mounting = false;
+		});
+
+		init_select(select);
+	}
+
+	/** @param {HTMLOptionElement} option */
+	function get_option_value(option) {
+		// __value only exists if the <option> has a value attribute
+		if ('__value' in option) {
+			return option.__value;
+		} else {
+			return option.value;
+		}
+	}
+
+	/** @import { Blocker, Effect } from '#client' */
+
+	const IS_CUSTOM_ELEMENT = Symbol('is custom element');
+	const IS_HTML = Symbol('is html');
+
+	/**
+	 * The value/checked attribute in the template actually corresponds to the defaultValue property, so we need
+	 * to remove it upon hydration to avoid a bug when someone resets the form value.
+	 * @param {HTMLInputElement} input
+	 * @returns {void}
+	 */
+	function remove_input_defaults(input) {
+		return;
+	}
+
+	/**
+	 * @param {Element} element
+	 * @param {string} attribute
+	 * @param {string | null} value
+	 * @param {boolean} [skip_warning]
+	 */
+	function set_attribute(element, attribute, value, skip_warning) {
+		var attributes = get_attributes(element);
+
+		if (attributes[attribute] === (attributes[attribute] = value)) return;
+
+		if (attribute === 'loading') {
+			// @ts-expect-error
+			element[LOADING_ATTR_SYMBOL] = value;
+		}
+
+		if (value == null) {
+			element.removeAttribute(attribute);
+		} else if (typeof value !== 'string' && get_setters(element).includes(attribute)) {
+			// @ts-ignore
+			element[attribute] = value;
+		} else {
+			element.setAttribute(attribute, value);
+		}
+	}
+
+	/**
+	 *
+	 * @param {Element} element
+	 */
+	function get_attributes(element) {
+		return /** @type {Record<string | symbol, unknown>} **/ (
+			/** @type {any} */ (element)[ATTRIBUTES_CACHE] ??= {
+				[IS_CUSTOM_ELEMENT]: element.nodeName.includes('-'),
+				[IS_HTML]: element.namespaceURI === NAMESPACE_HTML
+			}
+		);
+	}
+
+	/** @type {Map<string, string[]>} */
+	var setters_cache = new Map();
+
+	/** @param {Element} element */
+	function get_setters(element) {
+		var cache_key = element.getAttribute('is') || element.nodeName;
+		var setters = setters_cache.get(cache_key);
+		if (setters) return setters;
+		setters_cache.set(cache_key, (setters = []));
+
+		var descriptors;
+		var proto = element; // In the case of custom elements there might be setters on the instance
+		var element_proto = Element.prototype;
+
+		// Stop at Element, from there on there's only unnecessary (and dangerous, like innerHTML) setters we're not interested in
+		// Do not use constructor.name here as that's unreliable in some browser environments
+		while (element_proto !== proto) {
+			descriptors = get_descriptors(proto);
+
+			for (var key in descriptors) {
+				if (
+					descriptors[key].set &&
+					// better safe than sorry, we don't want spread attributes to mess with HTML content
+					key !== 'innerHTML' &&
+					key !== 'textContent' &&
+					key !== 'innerText'
+				) {
+					setters.push(key);
+				}
+			}
+
+			proto = get_prototype_of(proto);
+		}
+
+		return setters;
+	}
+
+	/** @import { Batch } from '../../../reactivity/batch.js' */
+
+	/**
+	 * @param {HTMLInputElement} input
+	 * @param {() => unknown} get
+	 * @param {(value: unknown) => void} set
+	 * @returns {void}
+	 */
+	function bind_value(input, get, set = get) {
+		var batches = new WeakSet();
+
+		listen_to_event_and_reset_event(input, 'input', async (is_reset) => {
+			if (input.type === 'checkbox') {
+				// TODO should this happen in prod too?
+				bind_invalid_checkbox_value();
+			}
+
+			/** @type {any} */
+			var value = is_reset ? input.defaultValue : input.value;
+			value = is_numberlike_input(input) ? to_number(value) : value;
+			set(value);
+
+			if (current_batch !== null) {
+				batches.add(current_batch);
+			}
+
+			// Because `{#each ...}` blocks work by updating sources inside the flush,
+			// we need to wait a tick before checking to see if we should forcibly
+			// update the input and reset the selection state
+			await tick();
+
+			// Respect any validation in accessors
+			if (value !== (value = get())) {
+				var start = input.selectionStart;
+				var end = input.selectionEnd;
+				var length = input.value.length;
+
+				// the value is coerced on assignment
+				input.value = value ?? '';
+
+				// Restore selection
+				if (end !== null) {
+					var new_length = input.value.length;
+					// If cursor was at end and new input is longer, move cursor to new end
+					if (start === end && end === length && new_length > length) {
+						input.selectionStart = new_length;
+						input.selectionEnd = new_length;
+					} else {
+						input.selectionStart = start;
+						input.selectionEnd = Math.min(end, new_length);
+					}
+				}
+			}
+		});
+
+		if (
+			// If we are hydrating and the value has since changed,
+			// then use the updated value from the input instead.
+			// If defaultValue is set, then value == defaultValue
+			// TODO Svelte 6: remove input.value check and set to empty string?
+			(untrack(get) == null && input.value)
+		) {
+			set(is_numberlike_input(input) ? to_number(input.value) : input.value);
+
+			if (current_batch !== null) {
+				batches.add(current_batch);
+			}
+		}
+
+		render_effect(() => {
+			if (input.type === 'checkbox') {
+				// TODO should this happen in prod too?
+				bind_invalid_checkbox_value();
+			}
+
+			var value = get();
+
+			if (input === document.activeElement) {
+				// In sync mode render effects are executed during tree traversal -> needs current_batch
+				// In async mode render effects are flushed once batch resolved, at which point current_batch is null -> needs previous_batch
+				var batch = /** @type {Batch} */ (current_batch);
+
+				// Never rewrite the contents of a focused input. We can get here if, for example,
+				// an update is deferred because of async work depending on the input:
+				//
+				// <input bind:value={query}>
+				// <p>{await find(query)}</p>
+				if (batches.has(batch)) {
+					return;
+				}
+			}
+
+			if (is_numberlike_input(input) && value === to_number(input.value)) {
+				// handles 0 vs 00 case (see https://github.com/sveltejs/svelte/issues/9959)
+				return;
+			}
+
+			if (input.type === 'date' && !value && !input.value) {
+				// Handles the case where a temporarily invalid date is set (while typing, for example with a leading 0 for the day)
+				// and prevents this state from clearing the other parts of the date input (see https://github.com/sveltejs/svelte/issues/7897)
+				return;
+			}
+
+			// don't set the value of the input if it's the same to allow
+			// minlength to work properly
+			if (value !== input.value) {
+				// @ts-expect-error the value is coerced on assignment
+				input.value = value ?? '';
+			}
+		});
+	}
+
+	/**
+	 * @param {HTMLInputElement} input
+	 */
+	function is_numberlike_input(input) {
+		var type = input.type;
+		return type === 'number' || type === 'range';
+	}
+
+	/**
+	 * @param {string} value
+	 */
+	function to_number(value) {
+		return value === '' ? null : +value;
+	}
+
+	/** @import { ComponentContext, Effect } from '#client' */
+
+	/**
+	 * @param {any} bound_value
+	 * @param {Element} element_or_component
+	 * @returns {boolean}
+	 */
+	function is_bound_this(bound_value, element_or_component) {
+		return (
+			bound_value === element_or_component || bound_value?.[STATE_SYMBOL] === element_or_component
+		);
+	}
+
+	/**
+	 * @param {any} element_or_component
+	 * @param {(value: unknown, ...parts: unknown[]) => void} update
+	 * @param {(...parts: unknown[]) => unknown} get_value
+	 * @param {() => unknown[]} [get_parts] Set if the this binding is used inside an each block,
+	 * 										returns all the parts of the each block context that are used in the expression
+	 * @returns {void}
+	 */
+	function bind_this(element_or_component = {}, update, get_value, get_parts) {
+		var component_effect = /** @type {ComponentContext} */ (component_context).r;
+		var parent = /** @type {Effect} */ (active_effect);
+
+		effect(() => {
+			/** @type {unknown[]} */
+			var old_parts;
+
+			/** @type {unknown[]} */
+			var parts;
+
+			render_effect(() => {
+				old_parts = parts;
+				// We only track changes to the parts, not the value itself to avoid unnecessary reruns.
+				parts = [];
+
+				untrack(() => {
+					if (!is_bound_this(get_value(...parts), element_or_component)) {
+						update(element_or_component, ...parts);
+						// If this is an effect rerun (cause: each block context changes), then nullify the binding at
+						// the previous position if it isn't already taken over by a different effect.
+						if (old_parts && is_bound_this(get_value(...old_parts), element_or_component)) {
+							update(null, ...old_parts);
+						}
+					}
+				});
+			});
+
+			return () => {
+				// When the bind:this effect is destroyed, we go up the effect parent chain until we find the last parent effect that is destroyed,
+				// or the effect containing the component bind:this is in (whichever comes first). That way we can time the nulling of the binding
+				// as close to user/developer expectation as possible.
+				// TODO Svelte 6: Decide if we want to keep this logic or just always null the binding in the component effect's teardown
+				// (which would be simpler, but less intuitive in some cases, and breaks the `ondestroy-before-cleanup` test)
+				let p = parent;
+				while (p !== component_effect && p.parent !== null && p.parent.f & DESTROYING) {
+					p = p.parent;
+				}
+				const teardown = () => {
+					if (parts && is_bound_this(get_value(...parts), element_or_component)) {
+						update(null, ...parts);
+					}
+				};
+				const original_teardown = p.teardown;
+				p.teardown = () => {
+					teardown();
+					original_teardown?.();
+				};
+			};
+		});
+
+		return element_or_component;
+	}
+
+	/**
+	 * Substitute for the `preventDefault` event modifier
+	 * @deprecated
+	 * @param {(event: Event, ...args: Array<unknown>) => void} fn
+	 * @returns {(event: Event, ...args: unknown[]) => void}
+	 */
+	function preventDefault(fn) {
+		return function (...args) {
+			var event = /** @type {Event} */ (args[0]);
+			event.preventDefault();
+			// @ts-ignore
+			return fn?.apply(this, args);
+		};
+	}
+
+	/** @import { ComponentContextLegacy } from '#client' */
+
+	/**
+	 * Legacy-mode only: Call `onMount` callbacks and set up `beforeUpdate`/`afterUpdate` effects
+	 * @param {boolean} [immutable]
+	 */
+	function init(immutable = false) {
+		const context = /** @type {ComponentContextLegacy} */ (component_context);
+
+		const callbacks = context.l.u;
+		if (!callbacks) return;
+
+		let props = () => deep_read_state(context.s);
+
+		if (immutable) {
+			let version = 0;
+			let prev = /** @type {Record<string, any>} */ ({});
+
+			// In legacy immutable mode, before/afterUpdate only fire if the object identity of a prop changes
+			const d = derived(() => {
+				let changed = false;
+				const props = context.s;
+				for (const key in props) {
+					if (props[key] !== prev[key]) {
+						prev[key] = props[key];
+						changed = true;
+					}
+				}
+				if (changed) version++;
+				return version;
+			});
+
+			props = () => get(d);
+		}
+
+		// beforeUpdate
+		if (callbacks.b.length) {
+			user_pre_effect(() => {
+				observe_all(context, props);
+				run_all(callbacks.b);
+			});
+		}
+
+		// onMount (must run before afterUpdate)
+		user_effect(() => {
+			const fns = untrack(() => callbacks.m.map(run));
+			return () => {
+				for (const fn of fns) {
+					if (typeof fn === 'function') {
+						fn();
+					}
+				}
+			};
+		});
+
+		// afterUpdate
+		if (callbacks.a.length) {
+			user_effect(() => {
+				observe_all(context, props);
+				run_all(callbacks.a);
+			});
+		}
+	}
+
+	/**
+	 * Invoke the getter of all signals associated with a component
+	 * so they can be registered to the effect this function is called in.
+	 * @param {ComponentContextLegacy} context
+	 * @param {(() => void)} props
+	 */
+	function observe_all(context, props) {
+		if (context.l.s) {
+			for (const signal of context.l.s) get(signal);
+		}
+
+		props();
+	}
+
+	/**
+	 * @this {any}
+	 * @param {Record<string, unknown>} $$props
+	 * @param {Event} event
+	 * @returns {void}
+	 */
+	function bubble_event($$props, event) {
+		var events = /** @type {Record<string, Function[] | Function>} */ ($$props.$$events)?.[
+			event.type
+		];
+
+		var callbacks = is_array(events) ? events.slice() : events == null ? [] : [events];
+
+		for (var fn of callbacks) {
+			// Preserve "this" context
+			fn.call(this, event);
+		}
+	}
+
+	/** @import { Derived, Effect, Source } from './types.js' */
+
+	/**
+	 * This function is responsible for synchronizing a possibly bound prop with the inner component state.
+	 * It is used whenever the compiler sees that the component writes to the prop, or when it has a default prop_value.
+	 * @template V
+	 * @param {Record<string, unknown>} props
+	 * @param {string} key
+	 * @param {number} flags
+	 * @param {V | (() => V)} [fallback]
+	 * @returns {(() => V | ((arg: V) => V) | ((arg: V, mutation: boolean) => V))}
+	 */
+	function prop(props, key, flags, fallback) {
+		var runes = !legacy_mode_flag || (flags & PROPS_IS_RUNES) !== 0;
+		var bindable = (flags & PROPS_IS_BINDABLE) !== 0;
+		var lazy = (flags & PROPS_IS_LAZY_INITIAL) !== 0;
+
+		var fallback_value = /** @type {V} */ (fallback);
+		var fallback_dirty = true;
+		var fallback_signal = /** @type {Derived<V> | undefined} */ (undefined);
+
+		var get_fallback = () => {
+			if (lazy && runes) {
+				fallback_signal ??= derived(/** @type {() => V} */ (fallback));
+				return get(fallback_signal);
+			}
+
+			if (fallback_dirty) {
+				fallback_dirty = false;
+
+				fallback_value = lazy
+					? untrack(/** @type {() => V} */ (fallback))
+					: /** @type {V} */ (fallback);
+			}
+
+			return fallback_value;
+		};
+
+		/** @type {((v: V) => void) | undefined} */
+		let setter;
+
+		if (bindable) {
+			// Can be the case when someone does `mount(Component, props)` with `let props = $state({...})`
+			// or `createClassComponent(Component, props)`
+			var is_entry_props = STATE_SYMBOL in props || LEGACY_PROPS in props;
+
+			setter =
+				get_descriptor(props, key)?.set ??
+				(is_entry_props && key in props ? (v) => (props[key] = v) : undefined);
+		}
+
+		/** @type {V} */
+		var initial_value;
+		var is_store_sub = false;
+
+		if (bindable) {
+			[initial_value, is_store_sub] = capture_store_binding(() => /** @type {V} */ (props[key]));
+		} else {
+			initial_value = /** @type {V} */ (props[key]);
+		}
+
+		if (initial_value === undefined && fallback !== undefined) {
+			initial_value = get_fallback();
+
+			if (setter) {
+				if (runes) props_invalid_value(key);
+				setter(initial_value);
+			}
+		}
+
+		/** @type {() => V} */
+		var getter;
+
+		if (runes) {
+			getter = () => {
+				var value = /** @type {V} */ (props[key]);
+				if (value === undefined) return get_fallback();
+				fallback_dirty = true;
+				return value;
+			};
+		} else {
+			getter = () => {
+				var value = /** @type {V} */ (props[key]);
+
+				if (value !== undefined) {
+					// in legacy mode, we don't revert to the fallback value
+					// if the prop goes from defined to undefined. The easiest
+					// way to model this is to make the fallback undefined
+					// as soon as the prop has a value
+					fallback_value = /** @type {V} */ (undefined);
+				}
+
+				return value === undefined ? fallback_value : value;
+			};
+		}
+
+		// prop is never written to — we only need a getter
+		if (runes && (flags & PROPS_IS_UPDATED) === 0) {
+			return getter;
+		}
+
+		// prop is written to, but the parent component had `bind:foo` which
+		// means we can just call `$$props.foo = value` directly
+		if (setter) {
+			var legacy_parent = props.$$legacy;
+			return /** @type {() => V} */ (
+				function (/** @type {V} */ value, /** @type {boolean} */ mutation) {
+					if (arguments.length > 0) {
+						// We don't want to notify if the value was mutated and the parent is in runes mode.
+						// In that case the state proxy (if it exists) should take care of the notification.
+						// If the parent is not in runes mode, we need to notify on mutation, too, that the prop
+						// has changed because the parent will not be able to detect the change otherwise.
+						if (!runes || !mutation || legacy_parent || is_store_sub) {
+							/** @type {Function} */ (setter)(mutation ? getter() : value);
+						}
+
+						return value;
+					}
+
+					return getter();
+				}
+			);
+		}
+
+		// Either prop is written to, but there's no binding, which means we
+		// create a derived that we can write to locally.
+		// Or we are in legacy mode where we always create a derived to replicate that
+		// Svelte 4 did not trigger updates when a primitive value was updated to the same value.
+		var overridden = false;
+
+		var d = ((flags & PROPS_IS_IMMUTABLE) !== 0 ? derived : derived_safe_equal)(() => {
+			overridden = false;
+			return getter();
+		});
+
+		{
+			d.label = key;
+		}
+
+		// Capture the initial value if it's bindable
+		if (bindable) get(d);
+
+		var parent_effect = /** @type {Effect} */ (active_effect);
+
+		return /** @type {() => V} */ (
+			function (/** @type {any} */ value, /** @type {boolean} */ mutation) {
+				if (arguments.length > 0) {
+					const new_value = mutation ? get(d) : runes && bindable ? proxy(value) : value;
+
+					set(d, new_value);
+					overridden = true;
+
+					if (fallback_value !== undefined) {
+						fallback_value = new_value;
+					}
+
+					return value;
+				}
+
+				// special case — avoid recalculating the derived if we're in a
+				// teardown function and the prop was overridden locally, or the
+				// component was already destroyed (people could access props in a timeout)
+				if ((is_destroying_effect && overridden) || (parent_effect.f & DESTROYED) !== 0) {
+					return d.v;
+				}
+
+				return get(d);
+			}
+		);
+	}
+
+	/**
+	 * @param {string} method
+	 * @param  {...any} objects
+	 */
+	function log_if_contains_state(method, ...objects) {
+		untrack(() => {
+			try {
+				let has_state = false;
+				const transformed = [];
+
+				for (const obj of objects) {
+					if (obj && typeof obj === 'object' && STATE_SYMBOL in obj) {
+						transformed.push(snapshot(obj, true));
+						has_state = true;
+					} else {
+						transformed.push(obj);
+					}
+				}
+
+				if (has_state) {
+					console_log_state(method);
+
+					// eslint-disable-next-line no-console
+					console.log('%c[snapshot]', 'color: grey', ...transformed);
+				}
+			} catch {
+				// Errors can occur when trying to snapshot objects with getters that throw or non-enumerable properties.
+			}
+		});
+
+		return objects;
+	}
+
+	/** @import { ComponentContext, ComponentContextLegacy } from '#client' */
+	/** @import { EventDispatcher } from './index.js' */
+	/** @import { NotFunction } from './internal/types.js' */
+
+	{
+		/**
+		 * @param {string} rune
+		 */
+		function throw_rune_error(rune) {
+			if (!(rune in globalThis)) {
+				// TODO if people start adjusting the "this can contain runes" config through v-p-s more, adjust this message
+				/** @type {any} */
+				let value; // let's hope noone modifies this global, but belts and braces
+				Object.defineProperty(globalThis, rune, {
+					configurable: true,
+					// eslint-disable-next-line getter-return
+					get: () => {
+						if (value !== undefined) {
+							return value;
+						}
+
+						rune_outside_svelte(rune);
+					},
+					set: (v) => {
+						value = v;
+					}
+				});
+			}
+		}
+
+		throw_rune_error('$state');
+		throw_rune_error('$effect');
+		throw_rune_error('$derived');
+		throw_rune_error('$inspect');
+		throw_rune_error('$props');
+		throw_rune_error('$bindable');
+	}
+
+	/**
+	 * `onMount`, like [`$effect`](https://svelte.dev/docs/svelte/$effect), schedules a function to run as soon as the component has been mounted to the DOM.
+	 * Unlike `$effect`, the provided function only runs once.
+	 *
+	 * It must be called during the component's initialisation (but doesn't need to live _inside_ the component;
+	 * it can be called from an external module). If a function is returned _synchronously_ from `onMount`,
+	 * it will be called when the component is unmounted.
+	 *
+	 * `onMount` functions do not run during [server-side rendering](https://svelte.dev/docs/svelte/svelte-server#render).
+	 *
+	 * @template T
+	 * @param {() => NotFunction<T> | Promise<NotFunction<T>> | (() => any)} fn
+	 * @returns {void}
+	 */
+	function onMount(fn) {
+		if (component_context === null) {
+			lifecycle_outside_component('onMount');
+		}
+
+		if (legacy_mode_flag && component_context.l !== null) {
+			init_update_callbacks(component_context).m.push(fn);
+		} else {
+			user_effect(() => {
+				const cleanup = untrack(fn);
+				if (typeof cleanup === 'function') return /** @type {() => void} */ (cleanup);
+			});
+		}
+	}
+
+	/**
+	 * Schedules a callback to run immediately before the component is unmounted.
+	 *
+	 * Out of `onMount`, `beforeUpdate`, `afterUpdate` and `onDestroy`, this is the
+	 * only one that runs inside a server-side component.
+	 *
+	 * @param {() => any} fn
+	 * @returns {void}
+	 */
+	function onDestroy(fn) {
+		if (component_context === null) {
+			lifecycle_outside_component('onDestroy');
+		}
+
+		onMount(() => () => untrack(fn));
+	}
+
+	/**
+	 * @template [T=any]
+	 * @param {string} type
+	 * @param {T} [detail]
+	 * @param {any}params_0
+	 * @returns {CustomEvent<T>}
+	 */
+	function create_custom_event(type, detail, { bubbles = false, cancelable = false } = {}) {
+		return new CustomEvent(type, { detail, bubbles, cancelable });
+	}
+
+	/**
+	 * Creates an event dispatcher that can be used to dispatch [component events](https://svelte.dev/docs/svelte/legacy-on#Component-events).
+	 * Event dispatchers are functions that can take two arguments: `name` and `detail`.
+	 *
+	 * Component events created with `createEventDispatcher` create a
+	 * [CustomEvent](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent).
+	 * These events do not [bubble](https://developer.mozilla.org/en-US/docs/Learn/JavaScript/Building_blocks/Events#Event_bubbling_and_capture).
+	 * The `detail` argument corresponds to the [CustomEvent.detail](https://developer.mozilla.org/en-US/docs/Web/API/CustomEvent/detail)
+	 * property and can contain any type of data.
+	 *
+	 * The event dispatcher can be typed to narrow the allowed event names and the type of the `detail` argument:
+	 * ```ts
+	 * const dispatch = createEventDispatcher<{
+	 *  loaded: null; // does not take a detail argument
+	 *  change: string; // takes a detail argument of type string, which is required
+	 *  optional: number | null; // takes an optional detail argument of type number
+	 * }>();
+	 * ```
+	 *
+	 * @deprecated Use callback props and/or the `$host()` rune instead — see [migration guide](https://svelte.dev/docs/svelte/v5-migration-guide#Event-changes-Component-events)
+	 * @template {Record<string, any>} [EventMap = any]
+	 * @returns {EventDispatcher<EventMap>}
+	 */
+	function createEventDispatcher() {
+		const active_component_context = component_context;
+		if (active_component_context === null) {
+			lifecycle_outside_component('createEventDispatcher');
+		}
+
+		/**
+		 * @param [detail]
+		 * @param [options]
+		 */
+		return (type, detail, options) => {
+			const events = /** @type {Record<string, Function | Function[]>} */ (
+				active_component_context.s.$$events
+			)?.[/** @type {string} */ (type)];
+
+			if (events) {
+				const callbacks = is_array(events) ? events.slice() : [events];
+				// TODO are there situations where events could be dispatched
+				// in a server (non-DOM) environment?
+				const event = create_custom_event(/** @type {string} */ (type), detail, options);
+				for (const fn of callbacks) {
+					fn.call(active_component_context.x, event);
+				}
+				return !event.defaultPrevented;
+			}
+
+			return true;
+		};
+	}
+
+	/**
+	 * Legacy-mode: Init callbacks object for onMount/beforeUpdate/afterUpdate
+	 * @param {ComponentContext} context
+	 */
+	function init_update_callbacks(context) {
+		var l = /** @type {ComponentContextLegacy} */ (context).l;
+		return (l.u ??= { a: [], b: [], m: [] });
+	}
+
+	// generated during release, do not modify
+
+	const PUBLIC_VERSION = '5';
+
+	if (typeof window !== 'undefined') {
+		// @ts-expect-error
+		((window.__svelte ??= {}).v ??= new Set()).add(PUBLIC_VERSION);
+	}
+
+	enable_legacy_mode_flag();
+
+	/** @import { BlurParams, CrossfadeParams, DrawParams, FadeParams, FlyParams, ScaleParams, SlideParams, TransitionConfig } from './public' */
+
+
+	/** @param {number} t */
+	function cubic_out(t) {
+		const f = t - 1.0;
+		return f * f * f + 1.0;
+	}
+
+	/** @param {number | string} value
+	 * @returns {[number, string]}
+	 */
+	function split_css_unit(value) {
+		const split = typeof value === 'string' && value.match(/^\s*(-?[\d.]+)([^\s]*)\s*$/);
+		return split ? [parseFloat(split[1]), split[2] || 'px'] : [/** @type {number} */ (value), 'px'];
+	}
+
+	/**
+	 * Animates the x and y positions and the opacity of an element. `in` transitions animate from the provided values, passed as parameters to the element's default values. `out` transitions animate from the element's default values to the provided values.
+	 *
+	 * @param {Element} node
+	 * @param {FlyParams} [params]
+	 * @returns {TransitionConfig}
+	 */
+	function fly(
+		node,
+		{ delay = 0, duration = 400, easing = cubic_out, x = 0, y = 0, opacity = 0 } = {}
+	) {
+		const style = getComputedStyle(node);
+		const target_opacity = +style.opacity;
+		const transform = style.transform === 'none' ? '' : style.transform;
+		const od = target_opacity * (1 - opacity);
+		const [x_value, x_unit] = split_css_unit(x);
+		const [y_value, y_unit] = split_css_unit(y);
+		return {
+			delay,
+			duration,
+			easing,
+			css: (t, u) => `
+			transform: ${transform} translate(${(1 - t) * x_value}${x_unit}, ${(1 - t) * y_value}${y_unit});
+			opacity: ${target_opacity - od * u}`
+		};
+	}
+
+	Tailwind[FILENAME] = 'src/Tailwind.svelte';
+
+	function Tailwind($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, Tailwind);
+
+		var $$exports = { ...legacy_api() };
+
+		return pop($$exports);
+	}
+
+	PDFPage[FILENAME] = 'src/PDFPage.svelte';
+
+	var root$7 = add_locations(from_html(`<div><canvas class="max-w-full"></canvas></div>`), PDFPage[FILENAME], [[34, 0, [[35, 2]]]]);
+
+	function PDFPage($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, PDFPage);
+
+		let page = prop($$props, 'page', 8);
+		const dispatch = createEventDispatcher();
+		let canvas = tag(mutable_source(), 'canvas');
+		let width = tag(mutable_source(), 'width');
+		let height = tag(mutable_source(), 'height');
+
+		function measure() {
+			dispatch("measure", { scale: get(canvas).clientWidth / get(width) });
+		}
+
+		async function render() {
+			const _page = (await track_reactivity_loss(page()))();
+			const context = get(canvas).getContext("2d");
+			const viewport = _page.getViewport({ scale: 1, rotation: 0 });
+
+			set(width, viewport.width);
+			set(height, viewport.height);
+			(await track_reactivity_loss(_page.render({ canvasContext: context, viewport }).promise))();
+			measure();
+			window.addEventListener("resize", measure);
+		}
+
+		onMount(render);
+
+		onDestroy(() => {
+			window.removeEventListener("resize", measure);
+		});
+
+		var $$exports = { ...legacy_api() };
+
+		init();
+
+		var div = root$7();
+		var canvas_1 = child(div);
+
+		bind_this(canvas_1, ($$value) => set(canvas, $$value), () => get(canvas));
+
+		template_effect(() => {
+			set_style(canvas_1, `width: ${get(width) ?? ''}px;`);
+			set_attribute(canvas_1, 'width', get(width));
+			set_attribute(canvas_1, 'height', get(height));
+		});
+
+		append($$anchor, div);
+
+		return pop($$exports);
+	}
+
+	function pannable(node) {
+	  let x;
+	  let y;
+
+	  function handleMousedown(event) {
+	    x = event.clientX;
+	    y = event.clientY;
+	    const target = event.target;
+
+	    node.dispatchEvent(
+	      new CustomEvent('panstart', {
+	        detail: { x, y, target },
+	      })
+	    );
+
+	    window.addEventListener('mousemove', handleMousemove);
+	    window.addEventListener('mouseup', handleMouseup);
+	  }
+
+	  function handleMousemove(event) {
+	    const dx = event.clientX - x;
+	    const dy = event.clientY - y;
+	    x = event.clientX;
+	    y = event.clientY;
+
+	    node.dispatchEvent(
+	      new CustomEvent('panmove', {
+	        detail: { x, y, dx, dy },
+	      })
+	    );
+	  }
+
+	  function handleMouseup(event) {
+	    x = event.clientX;
+	    y = event.clientY;
+
+	    node.dispatchEvent(
+	      new CustomEvent('panend', {
+	        detail: { x, y },
+	      })
+	    );
+	    window.removeEventListener('mousemove', handleMousemove);
+	    window.removeEventListener('mouseup', handleMouseup);
+	  }
+	  function handleTouchStart(event) {
+	    if (event.touches.length > 1) return;
+	    const touch = event.touches[0];
+	    x = touch.clientX;
+	    y = touch.clientY;
+	    const target = touch.target;
+
+	    node.dispatchEvent(
+	      new CustomEvent('panstart', {
+	        detail: { x, y, target },
+	      })
+	    );
+
+	    window.addEventListener('touchmove', handleTouchmove, { passive: false });
+	    window.addEventListener('touchend', handleTouchend);
+	  }
+	  function handleTouchmove(event) {
+	    event.preventDefault();
+	    if (event.touches.length > 1) return;
+	    const touch = event.touches[0];
+	    const dx = touch.clientX - x;
+	    const dy = touch.clientY - y;
+	    x = touch.clientX;
+	    y = touch.clientY;
+
+	    node.dispatchEvent(
+	      new CustomEvent('panmove', {
+	        detail: { x, y, dx, dy },
+	      })
+	    );
+	  }
+	  function handleTouchend(event) {
+	    const touch = event.changedTouches[0];
+	    x = touch.clientX;
+	    y = touch.clientY;
+
+	    node.dispatchEvent(
+	      new CustomEvent('panend', {
+	        detail: { x, y },
+	      })
+	    );
+	    window.removeEventListener('touchmove', handleTouchmove);
+	    window.removeEventListener('touchend', handleTouchend);
+	  }
+	  node.addEventListener('mousedown', handleMousedown);
+	  node.addEventListener('touchstart', handleTouchStart);
+	  return {
+	    destroy() {
+	      node.removeEventListener('mousedown', handleMousedown);
+	      node.removeEventListener('touchstart', handleTouchStart);
+	    },
+	  };
+	}
+
+	const scripts = [
+	  {
+	    name: 'pdfjsLib',
+	    src: 'https://unpkg.com/pdfjs-dist@2.3.200/build/pdf.min.js',
+	  },
+	  {
+	    name: 'PDFLib',
+	    src: 'https://unpkg.com/pdf-lib@1.4.0/dist/pdf-lib.min.js',
+	  },
+	  {
+	    name: 'download',
+	    src: 'https://unpkg.com/downloadjs@1.4.7',
+	  },
+	  { name: 'makeTextPDF', src: '/makeTextPDF.js' },
+	];
+
+	const assets = {};
+	function getAsset(name) {
+	  if (assets[name]) return assets[name];
+	  const script = scripts.find((s) => s.name === name);
+	  if (!script) throw new Error(`Script ${name} not exists.`);
+	  return prepareAsset(script);
+	}
+
+	function prepareAsset({ name, src }) {
+	  if (assets[name]) return assets[name];
+	  assets[name] = new Promise((resolve, reject) => {
+	    const script = document.createElement('script');
+	    script.src = src;
+	    script.onload = () => {
+	      resolve(window[name]);
+	      console.log(`${name} is loaded.`);
+	    };
+	    script.onerror = () => {
+	      reject(`The script ${name} didn't load correctly.`);
+	      alert(`Some scripts did not load correctly. Please reload and try again.`);
+	    };
+	    document.body.appendChild(script);
+	  });
+	  return assets[name];
+	}
+
+	function prepareAssets() {
+	  scripts.forEach(prepareAsset);
+	}
+
+	// out of the box fonts
+	const fonts = {
+	  Courier: {
+	    correction(size, lineHeight) {
+	      return (size * lineHeight - size) / 2 + size / 6;
+	    },
+	  },
+	  Helvetica: {
+	    correction(size, lineHeight) {
+	      return (size * lineHeight - size) / 2 + size / 10;
+	    },
+	  },
+	  'Times-Roman': {
+	    correction(size, lineHeight) {
+	      return (size * lineHeight - size) / 2 + size / 7;
+	    },
+	  },
+	};
+	// Available fonts
+	const Fonts = {
+	  ...fonts,
+	  CK: {
+	    src: '/CK.ttf', // 9.9 MB
+	    correction(size, lineHeight) {
+	      return (size * lineHeight - size) / 2;
+	    },
+	  },
+	};
+
+	function fetchFont(name) {
+	  if (fonts[name]) return fonts[name];
+	  const font = Fonts[name];
+	  if (!font) throw new Error(`Font '${name}' not exists.`);
+	  fonts[name] = fetch(font.src)
+	    .then((r) => r.arrayBuffer())
+	    .then((fontBuffer) => {
+	      const fontFace = new FontFace(name, fontBuffer);
+	      fontFace.display = 'swap';
+	      fontFace.load().then(() => document.fonts.add(fontFace));
+	      return {
+	        ...font,
+	        buffer: fontBuffer,
+	      };
+	    });
+	  return fonts[name];
+	}
+
+	function readAsArrayBuffer(file) {
+	  return new Promise((resolve, reject) => {
+	    const reader = new FileReader();
+	    reader.onload = () => resolve(reader.result);
+	    reader.onerror = reject;
+	    reader.readAsArrayBuffer(file);
+	  });
+	}
+
+	function readAsImage(src) {
+	  return new Promise((resolve, reject) => {
+	    const img = new Image();
+	    img.onload = () => resolve(img);
+	    img.onerror = reject;
+	    if (src instanceof Blob) {
+	      const url = window.URL.createObjectURL(src);
+	      img.src = url;
+	    } else {
+	      img.src = src;
+	    }
+	  });
+	}
+
+	function readAsDataURL(file) {
+	  return new Promise((resolve, reject) => {
+	    const reader = new FileReader();
+	    reader.onload = () => resolve(reader.result);
+	    reader.onerror = reject;
+	    reader.readAsDataURL(file);
+	  });
+	}
+
+	async function readAsPDF(file) {
+	  const pdfjsLib = await getAsset('pdfjsLib');
+	  // Safari possibly get webkitblobresource error 1 when using origin file blob
+	  const blob = new Blob([file]);
+	  const url = window.URL.createObjectURL(blob);
+	  return pdfjsLib.getDocument(url).promise;
+	}
+
+	Image$1[FILENAME] = 'src/Image.svelte';
+
+	var root$6 = add_locations(
+		from_html(`<div class="absolute left-0 top-0 select-none"><div><div data-direction="left" class="resize-border h-full w-1 left-0 top-0 border-l cursor-ew-resize svelte-1t42vjo"></div> <div data-direction="top" class="resize-border w-full h-1 left-0 top-0 border-t cursor-ns-resize svelte-1t42vjo"></div> <div data-direction="bottom" class="resize-border w-full h-1 left-0 bottom-0 border-b cursor-ns-resize svelte-1t42vjo"></div> <div data-direction="right" class="resize-border h-full w-1 right-0 top-0 border-r cursor-ew-resize svelte-1t42vjo"></div> <div data-direction="left-top" class="resize-corner left-0 top-0 cursor-nwse-resize transform
+      -translate-x-1/2 -translate-y-1/2 md:scale-25 svelte-1t42vjo"></div> <div data-direction="right-top" class="resize-corner right-0 top-0 cursor-nesw-resize transform
+      translate-x-1/2 -translate-y-1/2 md:scale-25 svelte-1t42vjo"></div> <div data-direction="left-bottom" class="resize-corner left-0 bottom-0 cursor-nesw-resize transform
+      -translate-x-1/2 translate-y-1/2 md:scale-25 svelte-1t42vjo"></div> <div data-direction="right-bottom" class="resize-corner right-0 bottom-0 cursor-nwse-resize transform
+      translate-x-1/2 translate-y-1/2 md:scale-25 svelte-1t42vjo"></div></div> <div class="absolute left-0 top-0 right-0 w-12 h-12 m-auto rounded-full bg-white
+    cursor-pointer transform -translate-y-1/2 md:scale-25"><img class="w-full h-full" src="/delete.svg" alt="delete object"/></div> <canvas class="w-full h-full"></canvas></div>`),
+		Image$1[FILENAME],
+		[
+			[
+				129,
+				0,
+				[
+					[
+						134,
+						2,
+						[
+							[142, 4],
+							[145, 4],
+							[148, 4],
+							[151, 4],
+							[154, 4],
+							[158, 4],
+							[162, 4],
+							[166, 4]
+						]
+					],
+					[171, 2, [[175, 4]]],
+					[177, 2]
+				]
+			]
+		]
+	);
+
+	function Image$1($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, Image$1);
+
+		let payload = prop($$props, 'payload', 9);
+		let file = prop($$props, 'file', 9);
+		let width = prop($$props, 'width', 9);
+		let height = prop($$props, 'height', 9);
+		let x = prop($$props, 'x', 9);
+		let y = prop($$props, 'y', 9);
+		let pageScale = prop($$props, 'pageScale', 9, 1);
+		const dispatch = createEventDispatcher();
+		let startX;
+		let startY;
+		let canvas = tag(mutable_source(void 0, true), 'canvas');
+		let operation = tag(mutable_source("", true), 'operation');
+		let directions = [];
+		let dx = tag(mutable_source(0, true), 'dx');
+		let dy = tag(mutable_source(0, true), 'dy');
+		let dw = tag(mutable_source(0, true), 'dw');
+		let dh = tag(mutable_source(0, true), 'dh');
+
+		async function render() {
+			// use canvas to prevent img tag's auto resize
+			mutate(canvas, get(canvas).width = width());
+
+			mutate(canvas, get(canvas).height = height());
+			get(canvas).getContext("2d").drawImage(payload(), 0, 0);
+
+			let scale = 1;
+			const limit = 500;
+
+			if (width() > limit) {
+				scale = limit / width();
+			}
+
+			if (height() > limit) {
+				scale = Math.min(scale, limit / height());
+			}
+
+			dispatch("update", { width: width() * scale, height: height() * scale });
+
+			if (!["image/jpeg", "image/png"].includes(file().type)) {
+				get(canvas).toBlob((blob) => {
+					dispatch("update", { file: blob });
+				});
+			}
+		}
+
+		function handlePanMove(event) {
+			const _dx = (event.detail.x - startX) / pageScale();
+			const _dy = (event.detail.y - startY) / pageScale();
+
+			if (strict_equals(get(operation), "move")) {
+				set(dx, _dx);
+				set(dy, _dy);
+			} else if (strict_equals(get(operation), "scale")) {
+				if (directions.includes("left")) {
+					set(dx, _dx);
+					set(dw, -_dx);
+				}
+
+				if (directions.includes("top")) {
+					set(dy, _dy);
+					set(dh, -_dy);
+				}
+
+				if (directions.includes("right")) {
+					set(dw, _dx);
+				}
+
+				if (directions.includes("bottom")) {
+					set(dh, _dy);
+				}
+			}
+		}
+
+		function handlePanEnd(event) {
+			if (strict_equals(get(operation), "move")) {
+				dispatch("update", { x: x() + get(dx), y: y() + get(dy) });
+				set(dx, 0);
+				set(dy, 0);
+			} else if (strict_equals(get(operation), "scale")) {
+				dispatch("update", {
+					x: x() + get(dx),
+					y: y() + get(dy),
+					width: width() + get(dw),
+					height: height() + get(dh)
+				});
+
+				set(dx, 0);
+				set(dy, 0);
+				set(dw, 0);
+				set(dh, 0);
+				directions = [];
+			}
+
+			set(operation, "");
+		}
+
+		function handlePanStart(event) {
+			startX = event.detail.x;
+			startY = event.detail.y;
+
+			if (strict_equals(event.detail.target, event.currentTarget)) {
+				return set(operation, "move");
+			}
+
+			set(operation, "scale");
+			directions = event.detail.target.dataset.direction.split("-");
+		}
+
+		function onDelete() {
+			dispatch("delete");
+		}
+
+		onMount(render);
+
+		var $$exports = { ...legacy_api() };
+
+		init(true);
+
+		var div = root$6();
+		var div_1 = child(div);
+		let classes;
+
+		action(div_1, ($$node) => pannable?.($$node));
+		effect(() => event('panstart', div_1, handlePanStart));
+		effect(() => event('panmove', div_1, handlePanMove));
+		effect(() => event('panend', div_1, handlePanEnd));
+
+		var div_2 = sibling(div_1, 2);
+		var canvas_1 = sibling(div_2, 2);
+
+		bind_this(canvas_1, ($$value) => set(canvas, $$value), () => get(canvas));
+
+		template_effect(() => {
+			set_style(div, `width: ${width() + get(dw)}px; height: ${height() + get(dh)}px; transform: translate(${x() + get(dx)}px,
+  ${y() + get(dy)}px);`);
+
+			classes = set_class(div_1, 1, 'absolute w-full h-full cursor-grab svelte-1t42vjo', null, classes, {
+				'cursor-grabbing': strict_equals(get(operation), 'move'),
+				operation: get(operation)
+			});
+		});
+
+		event('click', div_2, onDelete);
+		append($$anchor, div);
+
+		return pop($$exports);
+	}
+
+	Portal[FILENAME] = 'src/Portal.svelte';
+
+	var root$5 = add_locations(from_html(`<div><!></div>`), Portal[FILENAME], [[6, 0]]);
+
+	function Portal($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, Portal);
+
+		let portal = tag(mutable_source(), 'portal');
+
+		legacy_pre_effect(() => (get(portal)), () => {
+			get(portal) && document.body.appendChild(get(portal));
+		});
+
+		legacy_pre_effect_reset();
+
+		var $$exports = { ...legacy_api() };
+		var div = root$5();
+		var node = child(div);
+
+		slot(node, $$props, 'default', {});
+		bind_this(div, ($$value) => set(portal, $$value), () => get(portal));
+		append($$anchor, div);
+
+		return pop($$exports);
+	}
+
+	Toolbar[FILENAME] = 'src/Toolbar.svelte';
+
+	var root$4 = add_locations(from_html(`<div class="fixed z-10 top-0 left-0 right-0 h-12"><!></div>`), Toolbar[FILENAME], [[6, 2]]);
+
+	function Toolbar($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, Toolbar);
+
+		var $$exports = { ...legacy_api() };
+
+		add_svelte_meta(
+			() => Portal($$anchor, {
+				children: wrap_snippet(Toolbar, ($$anchor, $$slotProps) => {
+					var div = root$4();
+					var node = child(div);
+
+					slot(node, $$props, 'default', {}, null);
+					reset(div);
+					append($$anchor, div);
+				}),
+				$$slots: { default: true }
+			}),
+			'component',
+			Toolbar,
+			5,
+			0,
+			{ componentTag: 'Portal' }
+		);
+
+		return pop($$exports);
+	}
+
+	function tapout(node) {
+	  function handleTouchstart(event) {
+	    if (!Array.from(event.touches).some((touch) => node.contains(touch.target)))
+	      node.dispatchEvent(new CustomEvent('tapout'));
+	  }
+	  function handleMousedown(event) {
+	    if (!node.contains(event.target)) {
+	      node.dispatchEvent(new CustomEvent('tapout'));
+	    }
+	  }
+	  window.addEventListener('touchstart', handleTouchstart);
+	  window.addEventListener('mousedown', handleMousedown);
+	  return {
+	    destroy() {
+	      window.removeEventListener('touchstart', handleTouchstart);
+	      window.removeEventListener('mousedown', handleMousedown);
+	    },
+	  };
+	}
+
+	function ggID() {
+	  let id = 0;
+	  return function genId() {
+	    return id++;
+	  };
+	}
+	function timeout(ms) {
+	  return new Promise((res) => setTimeout(res, ms));
+	}
+	const noop = () => {};
+
+	Text$1[FILENAME] = 'src/Text.svelte';
+
+	var root$3 = add_locations(from_html(`<option class="svelte-j9t9ec"> </option>`), Text$1[FILENAME], [[230, 14]]);
+
+	var root_1$1 = add_locations(
+		from_html(`<div class="h-full flex justify-center items-center bg-gray-300 border-b
+      border-gray-400 svelte-j9t9ec"><div class="mr-2 flex items-center svelte-j9t9ec"><img src="/line_height.svg" class="w-6 mr-2 svelte-j9t9ec" alt="Line height"/> <input type="number" min="1" max="10" step="0.1" class="h-6 w-12 text-center flex-shrink-0 rounded-sm svelte-j9t9ec"/></div> <div class="mr-2 flex items-center svelte-j9t9ec"><img src="/text.svg" class="w-6 mr-2 svelte-j9t9ec" alt="Font size"/> <input type="number" min="12" max="120" step="1" class="h-6 w-12 text-center flex-shrink-0 rounded-sm svelte-j9t9ec"/></div> <div class="mr-2 flex items-center svelte-j9t9ec"><img src="/text-family.svg" class="w-4 mr-2 svelte-j9t9ec" alt="Font family"/> <div class="relative w-32 md:w-40 svelte-j9t9ec"><select class="font-family svelte-j9t9ec"></select> <div class="pointer-events-none absolute inset-y-0 right-0 flex
+            items-center px-2 text-gray-700 svelte-j9t9ec"><svg class="fill-current h-4 w-4 svelte-j9t9ec" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757
+                6.586 4.343 8z" class="svelte-j9t9ec"></path></svg></div></div></div> <div class="w-5 h-5 rounded-full bg-white cursor-pointer svelte-j9t9ec"><img class="w-full h-full svelte-j9t9ec" src="/delete.svg" alt="delete object"/></div></div>`),
+		Text$1[FILENAME],
+		[
+			[
+				195,
+				4,
+				[
+					[202, 6, [[203, 8], [204, 8]]],
+					[212, 6, [[213, 8], [214, 8]]],
+					[
+						222,
+						6,
+						[
+							[223, 8],
+							[224, 8, [[225, 10], [233, 10, [[236, 12, [[240, 14]]]]]]]
+						]
+					],
+					[247, 6, [[250, 8]]]
+				]
+			]
+		]
+	);
+
+	var root_2$1 = add_locations(from_html(`<!> <div class="absolute left-0 top-0 select-none svelte-j9t9ec"><div></div> <div contenteditable="true" spellcheck="false" class="outline-none whitespace-no-wrap svelte-j9t9ec"></div></div>`, 1), Text$1[FILENAME], [[255, 0, [[260, 2], [270, 2]]]]);
+
+	function Text$1($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, Text$1);
+
+		let size = prop($$props, 'size', 9);
+		let text = prop($$props, 'text', 9);
+		let lineHeight = prop($$props, 'lineHeight', 9);
+		let x = prop($$props, 'x', 9);
+		let y = prop($$props, 'y', 9);
+		let fontFamily = prop($$props, 'fontFamily', 9);
+		let pageScale = prop($$props, 'pageScale', 9, 1);
+		const Families = Object.keys(Fonts);
+		const dispatch = createEventDispatcher();
+		let startX;
+		let startY;
+		let editable = tag(mutable_source(void 0, true), 'editable');
+		let _size = tag(mutable_source(size(), true), '_size');
+		let _lineHeight = tag(mutable_source(lineHeight(), true), '_lineHeight');
+		let _fontFamily = tag(mutable_source(fontFamily(), true), '_fontFamily');
+		let dx = tag(mutable_source(0, true), 'dx');
+		let dy = tag(mutable_source(0, true), 'dy');
+		let operation = tag(mutable_source("", true), 'operation');
+
+		function handlePanMove(event) {
+			set(dx, (event.detail.x - startX) / pageScale());
+			set(dy, (event.detail.y - startY) / pageScale());
+		}
+
+		function handlePanEnd(event) {
+			if (strict_equals(get(dx), 0) && strict_equals(get(dy), 0)) {
+				return get(editable).focus();
+			}
+
+			dispatch("update", { x: x() + get(dx), y: y() + get(dy) });
+			set(dx, 0);
+			set(dy, 0);
+			set(operation, "");
+		}
+
+		function handlePanStart(event) {
+			startX = event.detail.x;
+			startY = event.detail.y;
+			set(operation, "move");
+		}
+
+		function onFocus() {
+			set(operation, "edit");
+		}
+
+		async function onBlur() {
+			if (strict_equals(get(operation), "edit", false) || strict_equals(get(operation), "tool")) return;
+
+			get(editable).blur();
+			sanitize();
+			dispatch("update", { lines: extractLines(), width: get(editable).clientWidth });
+			set(operation, "");
+		}
+
+		async function onPaste(e) {
+			// get text only
+			const pastedText = e.clipboardData.getData("text");
+
+			document.execCommand("insertHTML", false, pastedText);
+
+			// await tick() is not enough
+			(await track_reactivity_loss(timeout()))();
+
+			sanitize();
+		}
+
+		function onKeydown(e) {
+			const childNodes = Array.from(get(editable).childNodes);
+
+			if (strict_equals(e.keyCode, 13)) {
+				// prevent default adding div behavior
+				e.preventDefault();
+
+				const selection = window.getSelection();
+				const focusNode = selection.focusNode;
+				const focusOffset = selection.focusOffset;
+
+				// the caret is at an empty line
+				if (strict_equals(focusNode, get(editable))) {
+					get(editable).insertBefore(document.createElement("br"), childNodes[focusOffset]);
+				} else if (focusNode instanceof HTMLBRElement) {
+					get(editable).insertBefore(document.createElement("br"), focusNode);
+				} else // the caret is at a text line but not end
+				if (strict_equals(focusNode.textContent.length, focusOffset, false)) {
+					document.execCommand("insertHTML", false, "<br>");
+
+					// the carat is at the end of a text line
+				} else {
+					let br = focusNode.nextSibling;
+
+					if (br) {
+						get(editable).insertBefore(document.createElement("br"), br);
+					} else {
+						br = get(editable).appendChild(document.createElement("br"));
+						br = get(editable).appendChild(document.createElement("br"));
+					}
+
+					// set selection to new line
+					selection.collapse(br, 0);
+				}
+			}
+		}
+
+		function onFocusTool() {
+			set(operation, "tool");
+		}
+
+		async function onBlurTool() {
+			if (strict_equals(get(operation), "tool", false) || strict_equals(get(operation), "edit")) return;
+
+			dispatch("update", {
+				lines: extractLines(),
+				lineHeight: get(_lineHeight),
+				size: get(_size),
+				fontFamily: get(_fontFamily)
+			});
+
+			set(operation, "");
+		}
+
+		function sanitize() {
+			let weirdNode;
+
+			while (weirdNode = Array.from(get(editable).childNodes).find((node) => !["#text", "BR"].includes(node.nodeName))) {
+				get(editable).removeChild(weirdNode);
+			}
+		}
+
+		function onChangeFont() {
+			dispatch("selectFont", { name: get(_fontFamily) });
+		}
+
+		function render() {
+			mutate(editable, get(editable).innerHTML = text());
+			get(editable).focus();
+		}
+
+		function extractLines() {
+			const nodes = get(editable).childNodes;
+			const lines = [];
+			let lineText = "";
+
+			for (let index = 0; index < nodes.length; index++) {
+				const node = nodes[index];
+
+				if (strict_equals(node.nodeName, "BR")) {
+					lines.push(lineText);
+					lineText = "";
+				} else {
+					lineText += node.textContent;
+				}
+			}
+
+			lines.push(lineText);
+
+			return lines;
+		}
+
+		function onDelete() {
+			dispatch("delete");
+		}
+
+		onMount(render);
+
+		var $$exports = { ...legacy_api() };
+
+		init(true);
+
+		var fragment = root_2$1();
+		var node_1 = first_child(fragment);
+
+		{
+			var consequent = ($$anchor) => {
+				add_svelte_meta(
+					() => Toolbar($$anchor, {
+						children: wrap_snippet(Text$1, ($$anchor, $$slotProps) => {
+							var div = root_1$1();
+							var div_1 = child(div);
+							var input = sibling(child(div_1), 2);
+
+							remove_input_defaults(input);
+							reset(div_1);
+
+							var div_2 = sibling(div_1, 2);
+							var input_1 = sibling(child(div_2), 2);
+
+							remove_input_defaults(input_1);
+							reset(div_2);
+
+							var div_3 = sibling(div_2, 2);
+							var div_4 = sibling(child(div_3), 2);
+							var select = child(div_4);
+
+							add_svelte_meta(
+								() => each(select, 5, () => Families, index, ($$anchor, family) => {
+									var option = root$3();
+									var text_1 = child(option, true);
+
+									reset(option);
+
+									var option_value = {};
+
+									template_effect(() => {
+										set_text(text_1, get(family));
+
+										if (option_value !== (option_value = get(family))) {
+											option.value = (option.__value = get(family)) ?? '';
+										}
+									});
+
+									append($$anchor, option);
+								}),
+								'each',
+								Text$1,
+								229,
+								12
+							);
+
+							reset(select);
+							next(2);
+							reset(div_4);
+							reset(div_3);
+
+							var div_5 = sibling(div_3, 2);
+
+							reset(div);
+							action(div, ($$node) => tapout?.($$node));
+							effect(() => event('tapout', div, onBlurTool));
+							effect(() => event('mousedown', div, onFocusTool));
+							effect(() => event('touchstart', div, onFocusTool));
+
+							bind_value(
+								input,
+								function get$1() {
+									return get(_lineHeight);
+								},
+								function set$1($$value) {
+									set(_lineHeight, $$value);
+								}
+							);
+
+							bind_value(
+								input_1,
+								function get$1() {
+									return get(_size);
+								},
+								function set$1($$value) {
+									set(_size, $$value);
+								}
+							);
+
+							bind_select_value(
+								select,
+								function get$1() {
+									return get(_fontFamily);
+								},
+								function set$1($$value) {
+									set(_fontFamily, $$value);
+								}
+							);
+
+							event('change', select, onChangeFont);
+							event('click', div_5, onDelete);
+							append($$anchor, div);
+						}),
+						$$slots: { default: true }
+					}),
+					'component',
+					Text$1,
+					194,
+					2,
+					{ componentTag: 'Toolbar' }
+				);
+			};
+
+			add_svelte_meta(
+				() => if_block(node_1, ($$render) => {
+					if (get(operation)) $$render(consequent);
+				}),
+				'if',
+				Text$1,
+				193,
+				0
+			);
+		}
+
+		var div_6 = sibling(node_1, 2);
+		var div_7 = child(div_6);
+		let classes;
+
+		action(div_7, ($$node) => pannable?.($$node));
+		effect(() => event('panstart', div_7, handlePanStart));
+		effect(() => event('panmove', div_7, handlePanMove));
+		effect(() => event('panend', div_7, handlePanEnd));
+
+		var div_8 = sibling(div_7, 2);
+
+		bind_this(div_8, ($$value) => set(editable, $$value), () => get(editable));
+		action(div_6, ($$node) => tapout?.($$node));
+		effect(() => event('tapout', div_6, onBlur));
+
+		template_effect(
+			($0) => {
+				set_style(div_6, `transform: translate(${x() + get(dx)}px, ${y() + get(dy)}px);`);
+				classes = set_class(div_7, 1, 'absolute w-full h-full cursor-grab border border-dotted\n    border-gray-500 svelte-j9t9ec', null, classes, $0);
+
+				set_style(div_8, `font-size: ${get(_size) ?? ''}px; font-family: '${get(_fontFamily) ?? ''}', serif;
+    line-height: ${get(_lineHeight) ?? ''}; -webkit-user-select: text;`);
+			},
+			[
+				() => ({
+					'cursor-grab': !get(operation),
+					'cursor-grabbing': strict_equals(get(operation), 'move'),
+					editing: ['edit', 'tool'].includes(get(operation))
+				})
+			]
+		);
+
+		event('focus', div_8, onFocus);
+		event('keydown', div_8, onKeydown);
+		event('paste', div_8, preventDefault(onPaste));
+		append($$anchor, fragment);
+
+		return pop($$exports);
+	}
+
+	Drawing[FILENAME] = 'src/Drawing.svelte';
+
+	var root$2 = add_locations(
+		from_html(`<div class="absolute left-0 top-0 select-none"><div><div data-direction="left-top" class="absolute left-0 top-0 w-10 h-10 bg-green-400 rounded-full
+      cursor-nwse-resize transform -translate-x-1/2 -translate-y-1/2 md:scale-25"></div> <div data-direction="right-bottom" class="absolute right-0 bottom-0 w-10 h-10 bg-green-400 rounded-full
+      cursor-nwse-resize transform translate-x-1/2 translate-y-1/2 md:scale-25"></div></div> <div class="absolute left-0 top-0 right-0 w-12 h-12 m-auto rounded-full bg-white
+    cursor-pointer transform -translate-y-1/2 md:scale-25"><img class="w-full h-full" src="/delete.svg" alt="delete object"/></div> <svg width="100%" height="100%"><path stroke-width="5" stroke-linejoin="round" stroke-linecap="round" stroke="black" fill="none"></path></svg></div>`),
+		Drawing[FILENAME],
+		[
+			[
+				91,
+				0,
+				[
+					[95, 2, [[104, 4], [108, 4]]],
+					[113, 2, [[117, 4]]],
+					[119, 2, [[120, 4]]]
+				]
+			]
+		]
+	);
+
+	function Drawing($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, Drawing);
+
+		let originWidth = prop($$props, 'originWidth', 9);
+		let originHeight = prop($$props, 'originHeight', 9);
+		let width = prop($$props, 'width', 9);
+		let x = prop($$props, 'x', 9);
+		let y = prop($$props, 'y', 9);
+		let pageScale = prop($$props, 'pageScale', 9, 1);
+		let path = prop($$props, 'path', 9);
+		const dispatch = createEventDispatcher();
+		let startX;
+		let startY;
+		let svg = tag(mutable_source(void 0, true), 'svg');
+		let operation = tag(mutable_source("", true), 'operation');
+		let dx = tag(mutable_source(0, true), 'dx');
+		let dy = tag(mutable_source(0, true), 'dy');
+		let dw = tag(mutable_source(0, true), 'dw');
+		let direction = "";
+		const ratio = originWidth() / originHeight();
+
+		async function render() {
+			get(svg).setAttribute("viewBox", `0 0 ${originWidth()} ${originHeight()}`);
+		}
+
+		function handlePanMove(event) {
+			const _dx = (event.detail.x - startX) / pageScale();
+			const _dy = (event.detail.y - startY) / pageScale();
+
+			if (strict_equals(get(operation), "move")) {
+				set(dx, _dx);
+				set(dy, _dy);
+			} else if (strict_equals(get(operation), "scale")) {
+				if (strict_equals(direction, "left-top")) {
+					let d = Infinity;
+
+					d = Math.min(_dx, _dy * ratio);
+					set(dx, d);
+					set(dw, -d);
+					set(dy, d / ratio);
+				}
+
+				if (strict_equals(direction, "right-bottom")) {
+					let d = -Infinity;
+
+					d = Math.max(_dx, _dy * ratio);
+					set(dw, d);
+				}
+			}
+		}
+
+		function handlePanEnd(event) {
+			if (strict_equals(get(operation), "move")) {
+				dispatch("update", { x: x() + get(dx), y: y() + get(dy) });
+				set(dx, 0);
+				set(dy, 0);
+			} else if (strict_equals(get(operation), "scale")) {
+				dispatch("update", {
+					x: x() + get(dx),
+					y: y() + get(dy),
+					width: width() + get(dw),
+					scale: (width() + get(dw)) / originWidth()
+				});
+
+				set(dx, 0);
+				set(dy, 0);
+				set(dw, 0);
+				direction = "";
+			}
+
+			set(operation, "");
+		}
+
+		function handlePanStart(event) {
+			startX = event.detail.x;
+			startY = event.detail.y;
+
+			if (strict_equals(event.detail.target, event.currentTarget)) {
+				return set(operation, "move");
+			}
+
+			set(operation, "scale");
+			direction = event.detail.target.dataset.direction;
+		}
+
+		function onDelete() {
+			dispatch("delete");
+		}
+
+		onMount(render);
+
+		var $$exports = { ...legacy_api() };
+
+		init(true);
+
+		var div = root$2();
+		var div_1 = child(div);
+		let classes;
+
+		action(div_1, ($$node) => pannable?.($$node));
+		effect(() => event('panstart', div_1, handlePanStart));
+		effect(() => event('panmove', div_1, handlePanMove));
+		effect(() => event('panend', div_1, handlePanEnd));
+
+		var div_2 = sibling(div_1, 2);
+		var svg_1 = sibling(div_2, 2);
+		var path_1 = child(svg_1);
+		bind_this(svg_1, ($$value) => set(svg, $$value), () => get(svg));
+
+		template_effect(() => {
+			set_style(div, `width: ${width() + get(dw)}px; height: ${(width() + get(dw)) / ratio}px; transform:
+  translate(${x() + get(dx)}px, ${y() + get(dy)}px);`);
+
+			classes = set_class(div_1, 1, 'absolute w-full h-full cursor-grab border border-gray-400\n    border-dashed svelte-17og1k1', null, classes, {
+				'cursor-grabbing': strict_equals(get(operation), 'move'),
+				operation: get(operation)
+			});
+
+			set_attribute(path_1, 'd', path());
+		});
+
+		event('click', div_2, onDelete);
+		append($$anchor, div);
+
+		return pop($$exports);
+	}
+
+	DrawingCanvas[FILENAME] = 'src/DrawingCanvas.svelte';
+
+	var root$1 = add_locations(
+		from_html(`<div class="relative w-full h-full select-none"><div class="absolute right-0 bottom-0 mr-4 mb-4 flex"><button class=" w-24 bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-4
+      rounded mr-4">Cancel</button> <button class="w-24 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-4
+      rounded">Done</button></div> <svg class="w-full h-full pointer-events-none"><path stroke-width="5" stroke-linejoin="round" stroke-linecap="round" stroke="black" fill="none"></path></svg></div>`),
+		DrawingCanvas[FILENAME],
+		[[62, 0, [[69, 2, [[70, 4], [76, 4]]], [83, 2, [[84, 4]]]]]]
+	);
+
+	function DrawingCanvas($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, DrawingCanvas);
+
+		const dispatch = createEventDispatcher();
+		let canvas = tag(mutable_source(), 'canvas');
+		let x = 0;
+		let y = 0;
+		let path = tag(mutable_source(""), 'path');
+		let minX = Infinity;
+		let maxX = 0;
+		let minY = Infinity;
+		let maxY = 0;
+		let paths = [];
+		let drawing = false;
+
+		function handlePanStart(event) {
+			if (strict_equals(event.detail.target, get(canvas), false)) {
+				return drawing = false;
+			}
+
+			drawing = true;
+			x = event.detail.x;
+			y = event.detail.y;
+			minX = Math.min(minX, x);
+			maxX = Math.max(maxX, x);
+			minY = Math.min(minY, y);
+			maxY = Math.max(maxY, y);
+			paths.push(["M", x, y]);
+			set(path, get(path) + `M${x},${y}`);
+		}
+
+		function handlePanMove(event) {
+			if (!drawing) return;
+
+			x = event.detail.x;
+			y = event.detail.y;
+			minX = Math.min(minX, x);
+			maxX = Math.max(maxX, x);
+			minY = Math.min(minY, y);
+			maxY = Math.max(maxY, y);
+			paths.push(["L", x, y]);
+			set(path, get(path) + `L${x},${y}`);
+		}
+
+		function handlePanEnd() {
+			drawing = false;
+		}
+
+		function finish() {
+			if (!paths.length) return;
+
+			const dx = -(minX - 10);
+			const dy = -(minY - 10);
+			const width = maxX - minX + 20;
+			const height = maxY - minY + 20;
+
+			dispatch("finish", {
+				originWidth: width,
+				originHeight: height,
+				path: paths.reduce(
+					(acc, cur) => {
+						return acc + cur[0] + (cur[1] + dx) + "," + (cur[2] + dy);
+					},
+					""
+				)
+			});
+		}
+
+		function cancel() {
+			dispatch("cancel");
+		}
+
+		var $$exports = { ...legacy_api() };
+
+		init();
+
+		var div = root$1();
+		var div_1 = child(div);
+		var button = child(div_1);
+		var button_1 = sibling(button, 2);
+
+		var svg = sibling(div_1, 2);
+		var path_1 = child(svg);
+		bind_this(div, ($$value) => set(canvas, $$value), () => get(canvas));
+		action(div, ($$node) => pannable?.($$node));
+		effect(() => event('panstart', div, handlePanStart));
+		effect(() => event('panmove', div, handlePanMove));
+		effect(() => event('panend', div, handlePanEnd));
+		template_effect(() => set_attribute(path_1, 'd', get(path)));
+		event('click', button, cancel);
+		event('click', button_1, finish);
+		append($$anchor, div);
+
+		return pop($$exports);
+	}
+
+	async function save(pdfFile, objects, name) {
+	  const PDFLib = await getAsset('PDFLib');
+	  const download = await getAsset('download');
+	  const makeTextPDF = await getAsset('makeTextPDF');
+	  let pdfDoc;
+	  try {
+	    pdfDoc = await PDFLib.PDFDocument.load(await readAsArrayBuffer(pdfFile));
+	  } catch (e) {
+	    console.log('Failed to load PDF.');
+	    throw e;
+	  }
+	  const pagesProcesses = pdfDoc.getPages().map(async (page, pageIndex) => {
+	    const pageObjects = objects[pageIndex];
+	    // 'y' starts from bottom in PDFLib, use this to calculate y
+	    const pageHeight = page.getHeight();
+	    const embedProcesses = pageObjects.map(async (object) => {
+	      if (object.type === 'image') {
+	        let { file, x, y, width, height } = object;
+	        let img;
+	        try {
+	          if (file.type === 'image/jpeg') {
+	            img = await pdfDoc.embedJpg(await readAsArrayBuffer(file));
+	          } else {
+	            img = await pdfDoc.embedPng(await readAsArrayBuffer(file));
+	          }
+	          return () =>
+	            page.drawImage(img, {
+	              x,
+	              y: pageHeight - y - height,
+	              width,
+	              height,
+	            });
+	        } catch (e) {
+	          console.log('Failed to embed image.', e);
+	          return noop;
+	        }
+	      } else if (object.type === 'text') {
+	        let { x, y, lines, lineHeight, size, fontFamily, width } = object;
+	        const height = size * lineHeight * lines.length;
+	        const font = await fetchFont(fontFamily);
+	        const [textPage] = await pdfDoc.embedPdf(
+	          await makeTextPDF({
+	            lines,
+	            fontSize: size,
+	            lineHeight,
+	            width,
+	            height,
+	            font: font.buffer || fontFamily, // built-in font family
+	            dy: font.correction(size, lineHeight),
+	          }),
+	        );
+	        return () =>
+	          page.drawPage(textPage, {
+	            width,
+	            height,
+	            x,
+	            y: pageHeight - y - height,
+	          });
+	      } else if (object.type === 'drawing') {
+	        let { x, y, path, scale } = object;
+	        const {
+	          pushGraphicsState,
+	          setLineCap,
+	          popGraphicsState,
+	          setLineJoin,
+	          LineCapStyle,
+	          LineJoinStyle,
+	        } = PDFLib;
+	        return () => {
+	          page.pushOperators(
+	            pushGraphicsState(),
+	            setLineCap(LineCapStyle.Round),
+	            setLineJoin(LineJoinStyle.Round),
+	          );
+	          page.drawSvgPath(path, {
+	            borderWidth: 5,
+	            scale,
+	            x,
+	            y: pageHeight - y,
+	          });
+	          page.pushOperators(popGraphicsState());
+	        };
+	      }
+	    });
+	    // embed objects in order
+	    const drawProcesses = await Promise.all(embedProcesses);
+	    drawProcesses.forEach((p) => p());
+	  });
+	  await Promise.all(pagesProcesses);
+	  try {
+	    const pdfBytes = await pdfDoc.save();
+	    download(pdfBytes, name, 'application/pdf');
+	  } catch (e) {
+	    console.log('Failed to save PDF.');
+	    throw e;
+	  }
+	}
+
+	App[FILENAME] = 'src/App.svelte';
+
+	var root = add_locations(
+		from_html(`<div class="fixed z-10 top-0 left-0 right-0 border-b border-gray-300 bg-white
+      shadow-lg" style="height: 50%;"><!></div>`),
+		App[FILENAME],
+		[[275, 4]]
+	);
+
+	var root_1 = add_locations(from_html(`<div class="p-5 w-full flex flex-col items-center overflow-hidden"><div><!> <div class="absolute top-0 left-0 transform origin-top-left"></div></div></div>`), App[FILENAME], [[304, 8, [[308, 10, [[314, 12]]]]]]);
+	var root_2 = add_locations(from_html(`<div class="flex justify-center px-5 w-full md:hidden"><img src="/edit.svg" class="mr-2" alt="un bolígrafo, editar el nombre del pdf"/> <input placeholder="Cambie el nombre de su PDF aquí" type="text" class="flex-grow bg-transparent"/></div> <div class="w-full"></div>`, 1), App[FILENAME], [[294, 4, [[295, 6], [296, 6]]], [302, 4]]);
+	var root_3 = add_locations(from_html(`<div class="w-full flex-grow flex justify-center items-center"><span class=" font-bold text-3xl text-gray-500">Arrastre algo aquí</span></div>`), App[FILENAME], [[361, 4, [[362, 6]]]]);
+
+	var root_4 = add_locations(
+		from_html(
+			`<!> <main class="flex flex-col items-center py-16 bg-gray-100 min-h-screen"><div class="fixed z-10 top-0 left-0 right-0 h-12 flex justify-center items-center
+    bg-gray-200 border-b border-gray-300"><input type="file" name="pdf" id="pdf" accept=".pdf" class="hidden"/> <input type="file" id="image" name="image" accept=".gif,.jpg,.jpeg,.png" class="hidden"/> <label class="whitespace-no-wrap bg-blue-500 hover:bg-blue-700 text-white
+      font-bold py-1 px-3 md:px-4 rounded mr-3 cursor-pointer md:mr-4" for="pdf">Elija un PDF</label> <div class="relative mr-3 flex h-8 bg-gray-400 rounded-sm overflow-hidden
+      md:mr-4"><label for="image"><img src="image.svg" alt="Un icono para agregar imágenes."/></label> <label for="text"><img src="notes.svg" alt="Un icono para agregar texto"/></label> <label><img src="gesture.svg" alt="Un icono para agregar un dibujo"/></label></div> <div class="justify-center mr-3 md:mr-4 w-full max-w-xs hidden md:flex"><img src="/edit.svg" class="mr-2" alt="un bolígrafo, editar el nombre del pdf"/> <input placeholder="Renombra tu PDF aquí" type="text" class="flex-grow bg-transparent"/></div> <button> </button> <a href="https://github.com/erseco/pdf-editor"><img src="/GitHub-Mark-32px.png" alt="Un ícono de GitHub lleva a la página personal de GitHub"/></a></div> <!> <!></main> <footer class="footer"><div class="text-center"><small class="copyright">Designed with&nbsp;❤️&nbsp;from a remote island</small><br/><small class="copyright">2023 © Ernesto Serrano</small></div></footer>`,
+			1
+		),
+		App[FILENAME],
+		[
+			[
+				199,
+				0,
+				[
+					[
+						200,
+						2,
+						[
+							[203, 4],
+							[210, 4],
+							[217, 4],
+							[
+								223,
+								4,
+								[
+									[226, 6, [[232, 8]]],
+									[234, 6, [[241, 8]]],
+									[243, 6, [[249, 8]]]
+								]
+							],
+							[252, 4, [[253, 6], [254, 6]]],
+							[260, 4],
+							[268, 4, [[269, 6]]]
+						]
+					]
+				]
+			],
+			[366, 4, [[366, 27, [[366, 52], [366, 132], [366, 136]]]]]
+		]
+	);
+
+	function App($$anchor, $$props) {
+		check_target(new.target);
+		push($$props, false, App);
+
+		const genID = ggID();
+		let pdfFile = tag(mutable_source(), 'pdfFile');
+		let pdfName = tag(mutable_source(""), 'pdfName');
+		let pages = tag(mutable_source([]), 'pages');
+		let pagesScale = tag(mutable_source([]), 'pagesScale');
+		let allObjects = tag(mutable_source([]), 'allObjects');
+		let currentFont = "Times-Roman";
+		let selectedPageIndex = tag(mutable_source(-1), 'selectedPageIndex');
+		let saving = tag(mutable_source(false), 'saving');
+		let addingDrawing = tag(mutable_source(false), 'addingDrawing');
+
+		// for test purpose
+		onMount(async () => {
+			try {
+				const res = (await track_reactivity_loss(fetch("/test.pdf")))();
+				const pdfBlob = (await track_reactivity_loss(res.blob()))();
+
+				(await track_reactivity_loss(addPDF(pdfBlob)))();
+				set(selectedPageIndex, 0);
+
+				setTimeout(
+					() => {
+						fetchFont(currentFont);
+						prepareAssets();
+					},
+					5000
+				);
+
+				// const imgBlob = await (await fetch("/test.jpg")).blob();
+				// addImage(imgBlob);
+				// addTextField("測試!");
+				// addDrawing(200, 100, "M30,30 L100,50 L50,70", 0.5);
+			} catch(e) {
+				console.log(...log_if_contains_state('log', e));
+			}
+		});
+
+		async function onUploadPDF(e) {
+			const files = e.target.files || e.dataTransfer && e.dataTransfer.files;
+			const file = files[0];
+
+			if (!file || strict_equals(file.type, "application/pdf", false)) return;
+
+			set(selectedPageIndex, -1);
+
+			try {
+				(await track_reactivity_loss(addPDF(file)))();
+				set(selectedPageIndex, 0);
+			} catch(e) {
+				console.log(...log_if_contains_state('log', e));
+			}
+		}
+
+		async function addPDF(file) {
+			try {
+				const pdf = (await track_reactivity_loss(readAsPDF(file)))();
+
+				set(pdfName, file.name);
+				set(pdfFile, file);
+
+				const numPages = pdf.numPages;
+
+				set(pages, Array(numPages).fill().map((_, i) => pdf.getPage(i + 1)));
+				set(allObjects, get(pages).map(() => []));
+				set(pagesScale, Array(numPages).fill(1));
+			} catch(e) {
+				console.log("No se pudo agregar el pdf.");
+
+				throw e;
+			}
+		}
+
+		async function onUploadImage(e) {
+			const file = e.target.files[0];
+
+			if (file && get(selectedPageIndex) >= 0) {
+				addImage(file);
+			}
+
+			e.target.value = null;
+		}
+
+		async function addImage(file) {
+			try {
+				// get dataURL to prevent canvas from tainted
+				const url = (await track_reactivity_loss(readAsDataURL(file)))();
+
+				const img = (await track_reactivity_loss(readAsImage(url)))();
+				const id = genID();
+				const { width, height } = img;
+
+				const object = {
+					id,
+					type: "image",
+					width,
+					height,
+					x: 0,
+					y: 0,
+					payload: img,
+					file
+				};
+
+				set(allObjects, get(allObjects).map((objects, pIndex) => strict_equals(pIndex, get(selectedPageIndex)) ? [...objects, object] : objects));
+			} catch(e) {
+				console.log(...log_if_contains_state('log', `No se pudo agregar la imagen.`, e));
+			}
+		}
+
+		function onAddTextField() {
+			if (get(selectedPageIndex) >= 0) {
+				addTextField();
+			}
+		}
+
+		function addTextField(text = "Nuevo campo de texto") {
+			const id = genID();
+
+			fetchFont(currentFont);
+
+			const object = {
+				id,
+				text,
+				type: "text",
+				size: 16,
+				width: 0, // recalculate after editing
+				lineHeight: 1.4,
+				fontFamily: currentFont,
+				x: 0,
+				y: 0
+			};
+
+			set(allObjects, get(allObjects).map((objects, pIndex) => strict_equals(pIndex, get(selectedPageIndex)) ? [...objects, object] : objects));
+		}
+
+		function onAddDrawing() {
+			if (get(selectedPageIndex) >= 0) {
+				set(addingDrawing, true);
+			}
+		}
+
+		function addDrawing(originWidth, originHeight, path, scale = 1) {
+			const id = genID();
+
+			const object = {
+				id,
+				path,
+				type: "drawing",
+				x: 0,
+				y: 0,
+				originWidth,
+				originHeight,
+				width: originWidth * scale,
+				scale
+			};
+
+			set(allObjects, get(allObjects).map((objects, pIndex) => strict_equals(pIndex, get(selectedPageIndex)) ? [...objects, object] : objects));
+		}
+
+		function selectFontFamily(event) {
+			const name = event.detail.name;
+
+			fetchFont(name);
+			currentFont = name;
+		}
+
+		function selectPage(index) {
+			set(selectedPageIndex, index);
+		}
+
+		function updateObject(objectId, payload) {
+			set(allObjects, get(allObjects).map((objects, pIndex) => equals(pIndex, get(selectedPageIndex))
+				? objects.map((object) => strict_equals(object.id, objectId) ? { ...object, ...payload } : object)
+				: objects));
+		}
+
+		function deleteObject(objectId) {
+			set(allObjects, get(allObjects).map((objects, pIndex) => equals(pIndex, get(selectedPageIndex))
+				? objects.filter((object) => strict_equals(object.id, objectId, false))
+				: objects));
+		}
+
+		function onMeasure(scale, i) {
+			mutate(pagesScale, get(pagesScale)[i] = scale);
+		}
+
+		// FIXME: Should wait all objects finish their async work
+		async function savePDF() {
+			if (!get(pdfFile) || get(saving) || !get(pages).length) return;
+
+			set(saving, true);
+
+			try {
+				(await track_reactivity_loss(save(get(pdfFile), get(allObjects), get(pdfName), get(pagesScale))))();
+			} catch(e) {
+				console.log(...log_if_contains_state('log', e));
+			} finally {
+				set(saving, false);
+			}
+		}
+
+		var $$exports = { ...legacy_api() };
+
+		init();
+
+		var fragment = root_4();
+
+		event('dragenter', $window, preventDefault(function ($$arg) {
+			bubble_event.call(this, $$props, $$arg);
+		}));
+
+		event('dragover', $window, preventDefault(function ($$arg) {
+			bubble_event.call(this, $$props, $$arg);
+		}));
+
+		event('drop', $window, preventDefault(onUploadPDF));
+
+		var node = first_child(fragment);
+
+		add_svelte_meta(() => Tailwind(node, {}), 'component', App, 198, 0, { componentTag: 'Tailwind' });
+
+		var main = sibling(node, 2);
+		var div = child(main);
+		var input = child(div);
+		var input_1 = sibling(input, 2);
+		var div_1 = sibling(input_1, 4);
+		var label = child(div_1);
+		let classes;
+		var label_1 = sibling(label, 2);
+		let classes_1;
+		var label_2 = sibling(label_1, 2);
+		let classes_2;
+
+		var div_2 = sibling(div_1, 2);
+		var input_2 = sibling(child(div_2), 2);
+
+		var button = sibling(div_2, 2);
+		let classes_3;
+		var text_1 = child(button);
+
+		var node_1 = sibling(div, 2);
+
+		{
+			var consequent = ($$anchor) => {
+				var div_3 = root();
+				var node_2 = child(div_3);
+
+				add_svelte_meta(
+					() => DrawingCanvas(node_2, {
+						$$events: {
+							finish: (e) => {
+								const { originWidth, originHeight, path } = e.detail;
+								let scale = 1;
+
+								if (originWidth > 500) {
+									scale = 500 / originWidth;
+								}
+
+								addDrawing(originWidth, originHeight, path, scale);
+								set(addingDrawing, false);
+							},
+							cancel: () => set(addingDrawing, false)
+						}
+					}),
+					'component',
+					App,
+					280,
+					6,
+					{ componentTag: 'DrawingCanvas' }
+				);
+				transition(3, div_3, () => fly, () => ({ y: -200, duration: 500 }));
+				append($$anchor, div_3);
+			};
+
+			add_svelte_meta(
+				() => if_block(node_1, ($$render) => {
+					if (get(addingDrawing)) $$render(consequent);
+				}),
+				'if',
+				App,
+				274,
+				2
+			);
+		}
+
+		var node_3 = sibling(node_1, 2);
+
+		{
+			var consequent_4 = ($$anchor) => {
+				var fragment_1 = root_2();
+				var div_4 = first_child(fragment_1);
+				var input_3 = sibling(child(div_4), 2);
+
+				var div_5 = sibling(div_4, 2);
+
+				add_svelte_meta(
+					() => each(div_5, 7, () => get(pages), (page) => page, ($$anchor, page, pIndex) => {
+						var div_6 = root_1();
+						var div_7 = child(div_6);
+						let classes_4;
+						var node_4 = child(div_7);
+
+						add_svelte_meta(
+							() => PDFPage(node_4, {
+								get page() {
+									return get(page);
+								},
+								$$events: { measure: (e) => onMeasure(e.detail.scale, get(pIndex)) }
+							}),
+							'component',
+							App,
+							311,
+							12,
+							{ componentTag: 'PDFPage' }
+						);
+
+						var div_8 = sibling(node_4, 2);
+
+						add_svelte_meta(
+							() => each(div_8, 5, () => get(allObjects)[get(pIndex)], (object) => object.id, ($$anchor, object) => {
+								var fragment_2 = comment();
+								var node_5 = first_child(fragment_2);
+
+								{
+									var consequent_1 = ($$anchor) => {
+										add_svelte_meta(
+											() => Image$1($$anchor, {
+												get file() {
+													return get(object).file;
+												},
+
+												get payload() {
+													return get(object).payload;
+												},
+
+												get x() {
+													return get(object).x;
+												},
+
+												get y() {
+													return get(object).y;
+												},
+
+												get width() {
+													return get(object).width;
+												},
+
+												get height() {
+													return get(object).height;
+												},
+
+												get pageScale() {
+													return get(pagesScale)[get(pIndex)];
+												},
+
+												$$events: {
+													update: (e) => updateObject(get(object).id, e.detail),
+													delete: () => deleteObject(get(object).id)
+												}
+											}),
+											'component',
+											App,
+											319,
+											18,
+											{ componentTag: 'Image' }
+										);
+									};
+
+									var consequent_2 = ($$anchor) => {
+										add_svelte_meta(
+											() => Text$1($$anchor, {
+												get text() {
+													return get(object).text;
+												},
+
+												get x() {
+													return get(object).x;
+												},
+
+												get y() {
+													return get(object).y;
+												},
+
+												get size() {
+													return get(object).size;
+												},
+
+												get lineHeight() {
+													return get(object).lineHeight;
+												},
+
+												get fontFamily() {
+													return get(object).fontFamily;
+												},
+
+												get pageScale() {
+													return get(pagesScale)[get(pIndex)];
+												},
+
+												$$events: {
+													update: (e) => updateObject(get(object).id, e.detail),
+													delete: () => deleteObject(get(object).id),
+													selectFont: selectFontFamily
+												}
+											}),
+											'component',
+											App,
+											330,
+											18,
+											{ componentTag: 'Text' }
+										);
+									};
+
+									var consequent_3 = ($$anchor) => {
+										add_svelte_meta(
+											() => Drawing($$anchor, {
+												get path() {
+													return get(object).path;
+												},
+
+												get x() {
+													return get(object).x;
+												},
+
+												get y() {
+													return get(object).y;
+												},
+
+												get width() {
+													return get(object).width;
+												},
+
+												get originWidth() {
+													return get(object).originWidth;
+												},
+
+												get originHeight() {
+													return get(object).originHeight;
+												},
+
+												get pageScale() {
+													return get(pagesScale)[get(pIndex)];
+												},
+
+												$$events: {
+													update: (e) => updateObject(get(object).id, e.detail),
+													delete: () => deleteObject(get(object).id)
+												}
+											}),
+											'component',
+											App,
+											342,
+											18,
+											{ componentTag: 'Drawing' }
+										);
+									};
+
+									add_svelte_meta(
+										() => if_block(node_5, ($$render) => {
+											if (strict_equals(get(object).type, 'image')) $$render(consequent_1); else if (strict_equals(get(object).type, 'text')) $$render(consequent_2, 1); else if (strict_equals(get(object).type, 'drawing')) $$render(consequent_3, 2);
+										}),
+										'if',
+										App,
+										318,
+										16
+									);
+								}
+
+								append($$anchor, fragment_2);
+							}),
+							'each',
+							App,
+							317,
+							14
+						);
+
+						reset(div_8);
+						reset(div_7);
+						reset(div_6);
+
+						template_effect(() => {
+							classes_4 = set_class(div_7, 1, 'relative shadow-lg', null, classes_4, {
+								'shadow-outline': strict_equals(get(pIndex), get(selectedPageIndex))
+							});
+
+							set_style(div_8, `transform: scale(${get(pagesScale)[get(pIndex)] ?? ''}); touch-action: none;`);
+						});
+
+						event('mousedown', div_6, function mousedown() {
+							return selectPage(get(pIndex));
+						});
+
+						event('touchstart', div_6, function touchstart() {
+							return selectPage(get(pIndex));
+						});
+
+						append($$anchor, div_6);
+					}),
+					'each',
+					App,
+					303,
+					6
+				);
+
+				bind_value(
+					input_3,
+					function get$1() {
+						return get(pdfName);
+					},
+					function set$1($$value) {
+						set(pdfName, $$value);
+					}
+				);
+
+				append($$anchor, fragment_1);
+			};
+
+			var alternate = ($$anchor) => {
+				var div_9 = root_3();
+
+				append($$anchor, div_9);
+			};
+
+			add_svelte_meta(
+				() => if_block(node_3, ($$render) => {
+					if (get(pages).length) $$render(consequent_4); else $$render(alternate, -1);
+				}),
+				'if',
+				App,
+				293,
+				2
+			);
+		}
+
+		template_effect(() => {
+			classes = set_class(label, 1, 'flex items-center justify-center h-full w-8 hover:bg-gray-500\n        cursor-pointer', null, classes, {
+				'cursor-not-allowed': get(selectedPageIndex) < 0,
+				'bg-gray-500': get(selectedPageIndex) < 0
+			});
+
+			classes_1 = set_class(label_1, 1, 'flex items-center justify-center h-full w-8 hover:bg-gray-500\n        cursor-pointer', null, classes_1, {
+				'cursor-not-allowed': get(selectedPageIndex) < 0,
+				'bg-gray-500': get(selectedPageIndex) < 0
+			});
+
+			classes_2 = set_class(label_2, 1, 'flex items-center justify-center h-full w-8 hover:bg-gray-500\n        cursor-pointer', null, classes_2, {
+				'cursor-not-allowed': get(selectedPageIndex) < 0,
+				'bg-gray-500': get(selectedPageIndex) < 0
+			});
+
+			classes_3 = set_class(button, 1, 'w-22 bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3\n      md:px-4 mr-3 md:mr-4 rounded', null, classes_3, {
+				'cursor-not-allowed': strict_equals(get(pages).length, 0) || get(saving) || !get(pdfFile),
+				'bg-blue-700': strict_equals(get(pages).length, 0) || get(saving) || !get(pdfFile)
+			});
+
+			set_text(text_1, get(saving) ? 'Guardando' : 'Guardar');
+		});
+
+		event('change', input, onUploadPDF);
+		event('change', input_1, onUploadImage);
+		event('click', label_1, onAddTextField);
+		event('click', label_2, onAddDrawing);
+
+		bind_value(
+			input_2,
+			function get$1() {
+				return get(pdfName);
+			},
+			function set$1($$value) {
+				set(pdfName, $$value);
+			}
+		);
+
+		event('click', button, savePDF);
+		append($$anchor, fragment);
+
+		return pop($$exports);
+	}
+
+	getAsset('pdfjsLib');
+
+	const app = mount(App, {
+	  target: document.body,
+	});
+
+	return app;
+
+})();
+//# sourceMappingURL=bundle.js.map
