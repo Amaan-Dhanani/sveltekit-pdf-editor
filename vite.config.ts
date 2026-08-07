@@ -1,10 +1,12 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vitest/config';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
 import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
 	plugins: [
 		sveltekit(),
+		tailwindcss(),
 		topLevelAwait({
 			// The export name of top-level await promise for each chunk module
 			promiseExportName: '__tla',

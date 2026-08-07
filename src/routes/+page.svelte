@@ -1,549 +1,577 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { PdfEditor } from '$lib';
 	import {
-		ArrowRight,
-		BookOpen,
-		CheckCircle2,
-		Download,
-		Eraser,
-		ExternalLink,
+		Check,
+		ClipboardCopy,
+		Database,
 		FileText,
-		Github,
-		Hand,
-		Highlighter,
-		Layers,
-		Map,
-		MousePointer2,
-		PenLine,
-		Plug,
-		Save,
-		Settings,
+		FileUp,
 		ShieldCheck,
-		Type,
-		Zap,
-		ZoomIn
+		Trash2,
+		UploadCloud,
+		X
 	} from 'lucide-svelte';
 
-	const quickStartCode = `import { PdfEditor } from 'sveltekit-pdf-editor';
+	type SavedDocument = {
+		id: string;
+		name: string;
+		date: string;
+		pdfBlob: string;
+		pageAnnotations?: any[][];
+		allObjects?: any;
+		size?: number;
+	};
 
-let pdfBlob: Blob | null = null;
-let pageAnnotations = [];
-let fileName = 'marked-document.pdf';
+	const STORAGE_KEY = 'savedDocuments';
 
-function handleDataUpdated(event) {
-  pageAnnotations = event.detail.newData;
-  localStorage.setItem('pdf-annotations', JSON.stringify(pageAnnotations));
-}
+	let pageAnnotations: any[][] = [];
+	let pdfBlob: Blob | null = null;
+	let fileName = '';
+	let currentDocumentId = '';
+	let savedDocuments: SavedDocument[] = [];
+	let uploadError = '';
+	let isDragActive = false;
+	let isUploading = false;
+	let fileInput: HTMLInputElement;
+	let isSaveJsonModalOpen = false;
+	let saveJsonOutput = '';
+	let copyState: 'idle' | 'copied' | 'failed' = 'idle';
 
-<PdfEditor
-  {pdfBlob}
-  bind:pageAnnotations
-  {fileName}
-  ownerId="teacher-1"
-  on:dataUpdated={handleDataUpdated}
-/>`;
+	function normalizeAnnotationPages(value: any): any[][] {
+		if (!Array.isArray(value)) return [];
+		if (value.length === 0) return [];
+		if (value.every((page) => Array.isArray(page))) return value;
+		return [value];
+	}
 
-	const callbacksCode = `async function saveAnnotations(annotations) {
-  await fetch('/api/pdf-annotations', {
-    method: 'POST',
-    body: JSON.stringify({ annotations })
-  });
-}
+	function normalizeSavedDocument(doc: any, index: number): SavedDocument | null {
+		if (!doc?.pdfBlob || typeof doc.pdfBlob !== 'string') return null;
 
-<PdfEditor
-  {pdfBlob}
-  {pageAnnotations}
-  handleSave={saveAnnotations}
-  onSaveAnnotations={saveAnnotations}
-  handleComplete={saveAnnotations}
-/>`;
+		return {
+			id: String(doc.id || `${doc.name || 'pdf'}-${doc.date || index}`),
+			name: String(doc.name || 'Untitled PDF'),
+			date: String(doc.date || new Date().toISOString()),
+			pdfBlob: doc.pdfBlob,
+			pageAnnotations: normalizeAnnotationPages(doc.pageAnnotations ?? doc.allObjects),
+			size: typeof doc.size === 'number' ? doc.size : undefined
+		};
+	}
 
-	const pluginCode = `import {
-  PdfEditor,
-  defaultPdfEditorPlugins,
-  createPdfEditorPlugin,
-  penPlugin,
-  textPlugin,
-  linePlugin
-} from 'sveltekit-pdf-editor';
+	function loadSavedDocuments() {
+		try {
+			const savedDocsString = localStorage.getItem(STORAGE_KEY);
+			if (!savedDocsString) {
+				savedDocuments = [];
+				return;
+			}
 
-const reviewOnlyPlugins = [penPlugin, textPlugin, linePlugin];
-
-const customEmbedPdfPlugin = createPdfEditorPlugin({
-  id: 'my-embedpdf-extension',
-  label: 'My EmbedPDF extension',
-  embedPdfRegistration: myEmbedPdfRegistration
-});
-
-const plugins = [
-  ...defaultPdfEditorPlugins.filter((plugin) => plugin.tool !== 'pointer'),
-  customEmbedPdfPlugin
-];
-
-<PdfEditor {pdfBlob} {pageAnnotations} {plugins} />`;
-
-	const annotationCode = `type PageAnnotations = Annotation[][];
-
-// pageAnnotations[0] contains annotations for page 1
-// pageAnnotations[1] contains annotations for page 2
-const pageAnnotations = [
-  [
-    {
-      id: 'annotation-1',
-      owner: 'teacher-1',
-      type: 'drawing',
-      path: 'M 12 40 L 120 40',
-      x: 0,
-      y: 0,
-      originWidth: 595,
-      originHeight: 842,
-      width: 595,
-      scale: 1,
-      brushSize: 3,
-      brushColor: '#111827'
-    }
-  ]
-];`;
-
-	const features = [
-		{
-			icon: PenLine,
-			title: 'Natural annotation tools',
-			description: 'Pen, highlighter, text, line, pointer, selection, and eraser tools are available as built-in plugins.'
-		},
-		{
-			icon: Hand,
-			title: 'Touch-first navigation',
-			description: 'Hand panning, double-tap zoom, minimap controls, and responsive toolbar placement are built in.'
-		},
-		{
-			icon: Layers,
-			title: 'Multi-page rendering',
-			description: 'The wrapper keeps per-page annotations synchronized while the core renders adjacent page previews.'
-		},
-		{
-			icon: Download,
-			title: 'Merged PDF export',
-			description: 'Users can export a completed PDF with annotations merged into the original document.'
-		},
-		{
-			icon: Save,
-			title: 'Annotation-only saves',
-			description: 'Persist just the annotation JSON when your application wants to store edits separately from the PDF.'
-		},
-		{
-			icon: Plug,
-			title: 'Plugin-controlled tools',
-			description: 'Pass a plugin list to enable built-in tools, disable tools, or register EmbedPDF extensions.'
+			const parsed = JSON.parse(savedDocsString);
+			savedDocuments = Array.isArray(parsed)
+				? parsed
+						.map((doc, index) => normalizeSavedDocument(doc, index))
+						.filter((doc): doc is SavedDocument => Boolean(doc))
+				: [];
+		} catch (error) {
+			console.error('Failed to load saved PDF documents', error);
+			savedDocuments = [];
+			uploadError = 'Saved PDFs could not be read from this browser.';
 		}
-	];
+	}
 
-	const propRows = [
-		['pdfBlob', 'Blob | File | ArrayBuffer | Uint8Array | null', 'null', 'The PDF source. When null, the component renders its slot instead of the editor.'],
-		['pageAnnotations', 'any[][]', '[]', 'Annotation data grouped by page. Page 1 is index 0. Use this to restore or persist edits.'],
-		['fileName', 'string', "''", 'Name used when creating File input and exporting a completed PDF.'],
-		['ownerId', 'string', "'user1'", 'Default annotation owner id. Used to identify which annotations the current user can edit.'],
-		['user', 'string | undefined', 'undefined', 'Overrides ownerId when you want a different active user id.'],
-		['allowPrinting', 'boolean', 'true', 'Allows the editor UI to expose print/export actions when supported by the core.'],
-		['disabled', 'boolean', 'false', 'Disables editing interactions for the whole document.'],
-		['disabledPages', 'Array<{ from_page; to_page }>', '[]', 'Legacy prop for page ranges where editing should be disabled.'],
-		['disabled_pages', 'Array<{ from_page; to_page }>', 'undefined', 'Core-style page range prop. Takes priority over disabledPages when provided.'],
-		['currentPage', 'number', '1', 'Initial active page. The wrapper also emits pageChange when users navigate.'],
-		['savingState', "'saving' | 'saved' | 'fail'", "'saved'", 'Legacy save state for showing saving or failure state in the toolbar.'],
-		['saveState', 'SaveState | undefined', 'undefined', 'Preferred save state object. When provided, it overrides savingState.'],
-		['autoSaveEnabled', 'boolean | undefined', 'undefined', 'Optional controlled auto-save toggle. Pass false for demos that should only save on explicit user action.'],
-		['plugins', 'PdfEditorPlugin[]', 'defaultPdfEditorPlugins', 'Controls which built-in tools are enabled and which EmbedPDF registrations are installed.'],
-		['allowTeacherMark', 'boolean', 'false', 'Enables the teacher mark/stamp workflow.'],
-		['teacherMarkName', 'string', "'User'", 'Display name written into teacher mark metadata.'],
-		['homework_info', 'any', 'undefined', 'Optional metadata passed to the homework info modal.'],
-		['isPageLoading', 'boolean', 'false', 'Lets host apps tell the core to defer page-camera restore while external loading is active.'],
-		['wasmUrl', 'string', "'/vendor/embedpdf/pdfium.wasm?v=2.14.4'", 'Location of the EmbedPDF PDFium wasm file. Keep the wasm version aligned with @embedpdf packages.'],
-		['handleSave', '(annotations) => void | Promise<void>', 'undefined', 'Called when the editor save action runs. Receives all page annotations.'],
-		['handleComplete', '(annotations) => void | Promise<void>', 'undefined', 'Called after save when the user completes the editing session.'],
-		['onSaveAnnotations', '(annotations) => void | Promise<void>', 'undefined', 'Callback prop for persisting annotation-only JSON during save.'],
-		['onAnnotationChange', '(annotations) => void', 'undefined', 'Callback prop fired whenever annotations change. Mirrors annotationsChange event data.'],
-		['retryFailedSave', '() => void | Promise<void>', 'undefined', 'Called from the toolbar retry action when a save failed.']
-	];
+	function saveDocuments(docs: SavedDocument[]) {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
+		savedDocuments = docs;
+	}
 
-	const eventRows = [
-		['dataUpdated', '{ newData, annotations, currentPage }', 'Fires whenever annotation data changes. Use detail.newData as the canonical all-page annotation payload.'],
-		['annotationsChange', '{ annotations, currentPage }', 'A focused annotation-change event with the same all-page annotation payload.'],
-		['save', '{ annotations, currentPage }', 'Fires after handleSave/onSaveAnnotations complete successfully.'],
-		['done', '{ newData, annotations, currentPage }', 'Fires after completion save and handleComplete finish.'],
-		['pageChange', '{ page, annotations }', 'Fires when the active page changes. annotations contains the destination page annotations.']
-	];
+	function getDocumentName(fileName: string) {
+		return fileName.replace(/\.pdf$/i, '') || 'Untitled PDF';
+	}
 
-	const pluginRows = [
-		['select', 'Selection and object editing.'],
-		['hand', 'Hand panning and drag navigation.'],
-		['pen', 'Freehand drawing annotations.'],
-		['eraser', 'Eraser mode and preview circle.'],
-		['highlighter', 'Transparent highlight strokes.'],
-		['text', 'Text annotations with font controls.'],
-		['line', 'Line annotations with color, width, and style.'],
-		['pointer', 'Temporary pointer strokes for review/presentation flows.'],
-		['teacher-mark', 'Reserved tool id for teacher mark workflows.']
-	];
+	function makeDocumentId() {
+		if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+			return crypto.randomUUID();
+		}
 
-	const pluginFields = [
-		['id', 'Required stable plugin id.'],
-		['tool', 'Optional built-in tool id. If omitted, the plugin can still carry an EmbedPDF registration.'],
-		['enabled', 'Set to false to keep a plugin object in config while disabling it.'],
-		['label', 'Human readable label for your own plugin management UI.'],
-		['component', 'Reserved for custom UI plugins as the extension surface grows.'],
-		['embedPdfRegistration', 'Optional registration object appended to the EmbedPDF plugin list.']
-	];
+		return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+	}
 
-	const stats = [
-		['2.14.4', 'EmbedPDF/PDFium target'],
-		['8', 'default tools'],
-		['JSON', 'annotation save format']
-	];
+	function isPdfFile(file: File) {
+		return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+	}
+
+	function openDocument(doc: SavedDocument, blob: Blob, annotations = doc.pageAnnotations || []) {
+		currentDocumentId = doc.id;
+		fileName = doc.name;
+		pageAnnotations = normalizeAnnotationPages(annotations);
+		pdfBlob = blob;
+		isSaveJsonModalOpen = false;
+	}
+
+	async function saveAndOpenFile(file: File) {
+		if (!isPdfFile(file)) {
+			uploadError = 'Please choose a PDF file.';
+			return;
+		}
+
+		isUploading = true;
+		uploadError = '';
+
+		const newDoc: SavedDocument = {
+			id: makeDocumentId(),
+			name: getDocumentName(file.name),
+			date: new Date().toISOString(),
+			pdfBlob: '',
+			pageAnnotations: [],
+			size: file.size
+		};
+
+		try {
+			newDoc.pdfBlob = await blobToBase64(file);
+			saveDocuments([newDoc, ...savedDocuments]);
+			openDocument(newDoc, file, []);
+		} catch (error) {
+			console.error('Failed to save PDF locally', error);
+			currentDocumentId = '';
+			fileName = newDoc.name;
+			pageAnnotations = [];
+			pdfBlob = file;
+			uploadError =
+				'This PDF opened, but it could not be saved locally. Your browser storage may be full.';
+		} finally {
+			isUploading = false;
+			if (fileInput) fileInput.value = '';
+		}
+	}
+
+	function handleFileChange(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) void saveAndOpenFile(file);
+	}
+
+	function handleDragEnter(event: DragEvent) {
+		event.preventDefault();
+		isDragActive = true;
+	}
+
+	function handleDragOver(event: DragEvent) {
+		event.preventDefault();
+		isDragActive = true;
+	}
+
+	function handleDragLeave(event: DragEvent) {
+		const currentTarget = event.currentTarget;
+		const relatedTarget = event.relatedTarget;
+
+		if (
+			currentTarget instanceof HTMLElement &&
+			relatedTarget instanceof Node &&
+			currentTarget.contains(relatedTarget)
+		) {
+			return;
+		}
+
+		isDragActive = false;
+	}
+
+	function handleDrop(event: DragEvent) {
+		event.preventDefault();
+		isDragActive = false;
+
+		const file = event.dataTransfer?.files?.[0];
+		if (file) void saveAndOpenFile(file);
+	}
+
+	function loadDocument(doc: SavedDocument) {
+		try {
+			const blob = base64ToBlob(doc.pdfBlob, 'application/pdf');
+			openDocument(doc, blob, doc.pageAnnotations || []);
+		} catch (error) {
+			console.error('Failed to load saved PDF document', error);
+			uploadError = 'Failed to load the saved PDF.';
+		}
+	}
+
+	function deleteDocument(id: string) {
+		const updatedDocs = savedDocuments.filter((doc) => doc.id !== id);
+		saveDocuments(updatedDocs);
+
+		if (id === currentDocumentId) {
+			pdfBlob = null;
+			fileName = '';
+			currentDocumentId = '';
+			pageAnnotations = [];
+		}
+	}
+
+	function handleDataUpdate(event: { detail: { newData: any[][] } }) {
+		const updatedData = event.detail.newData;
+		pageAnnotations = updatedData;
+
+		if (fileName) {
+			updateCurrentDocumentAnnotations(updatedData);
+		}
+	}
+
+	function showSaveJsonModal(annotations: any[][]) {
+		saveJsonOutput = JSON.stringify(annotations, null, 2);
+		copyState = 'idle';
+		isSaveJsonModalOpen = true;
+	}
+
+	async function handleSaveAnnotations(annotations: any[][]) {
+		pageAnnotations = annotations;
+		if (fileName) {
+			updateCurrentDocumentAnnotations(annotations);
+		}
+		showSaveJsonModal(annotations);
+	}
+
+	async function copySaveJson() {
+		try {
+			await navigator.clipboard.writeText(saveJsonOutput);
+			copyState = 'copied';
+			setTimeout(() => {
+				if (copyState === 'copied') copyState = 'idle';
+			}, 1500);
+		} catch {
+			copyState = 'failed';
+		}
+	}
+
+	function closeSaveJsonModal() {
+		isSaveJsonModalOpen = false;
+	}
+
+	function updateCurrentDocumentAnnotations(annotations: any[][]) {
+		try {
+			const updatedDocs = savedDocuments.map((doc) => {
+				const isCurrentDocument =
+					(currentDocumentId && doc.id === currentDocumentId) ||
+					(!currentDocumentId && doc.name === fileName);
+
+				return isCurrentDocument
+					? {
+							...doc,
+							pageAnnotations: annotations
+						}
+					: doc;
+			});
+
+			saveDocuments(updatedDocs);
+		} catch (error) {
+			console.error('Failed to save annotations locally', error);
+		}
+	}
+
+	function handleDone() {
+		if (fileName) {
+			updateCurrentDocumentAnnotations(pageAnnotations);
+		}
+
+		pdfBlob = null;
+		fileName = '';
+		currentDocumentId = '';
+		pageAnnotations = [];
+		isSaveJsonModalOpen = false;
+		loadSavedDocuments();
+	}
+
+	function blobToBase64(blob: Blob): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(String(reader.result));
+			reader.onerror = reject;
+			reader.readAsDataURL(blob);
+		});
+	}
+
+	function base64ToBlob(base64: string, type: string) {
+		const byteString = atob(base64.split(',')[1] || '');
+		const arrayBuffer = new ArrayBuffer(byteString.length);
+		const int8Array = new Uint8Array(arrayBuffer);
+
+		for (let i = 0; i < byteString.length; i += 1) {
+			int8Array[i] = byteString.charCodeAt(i);
+		}
+
+		return new Blob([int8Array], { type });
+	}
+
+	function formatDate(dateString: string) {
+		const date = new Date(dateString);
+		if (Number.isNaN(date.getTime())) return 'Saved locally';
+
+		return new Intl.DateTimeFormat(undefined, {
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		}).format(date);
+	}
+
+	function formatBytes(size: number | undefined) {
+		if (!size) return '';
+		if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+		return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	function getPreviewUrl(doc: SavedDocument) {
+		return `${doc.pdfBlob}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH`;
+	}
+
+	function getAnnotationCount(doc: SavedDocument) {
+		return normalizeAnnotationPages(doc.pageAnnotations).reduce(
+			(total, pageObjects) => total + pageObjects.length,
+			0
+		);
+	}
+
+	function getAnnotationLabel(doc: SavedDocument) {
+		const count = getAnnotationCount(doc);
+		return `${count} annotation${count === 1 ? '' : 's'}`;
+	}
+
+	onMount(() => {
+		loadSavedDocuments();
+	});
 </script>
 
 <svelte:head>
-	<title>SvelteKit PDF Editor Library</title>
+	<title>Private PDF Annotation Demo | SvelteKit PDF Editor</title>
 	<meta
 		name="description"
-		content="A SvelteKit PDF annotation library with modern UI, multi-page rendering, EmbedPDF support, annotation JSON saves, and a plugin-controlled tool system."
+		content="Try a private browser-based PDF annotation demo. Upload PDFs locally, preview previous documents, and save annotation JSON in localStorage."
 	/>
+	<meta name="robots" content="index, follow" />
 </svelte:head>
 
-<div class="min-h-screen bg-zinc-50 text-zinc-950">
-	<header class="border-b border-zinc-200 bg-white">
-		<nav class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-			<a href="/" class="flex items-center gap-3 text-sm font-semibold text-zinc-950">
-				<span class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500 text-white">
-					<FileText class="h-5 w-5" />
-				</span>
-				<span>sveltekit-pdf-editor</span>
-			</a>
-			<div class="hidden items-center gap-6 text-sm text-zinc-600 md:flex">
-				<a class="hover:text-zinc-950" href="#features">Features</a>
-				<a class="hover:text-zinc-950" href="#quick-start">Quick start</a>
-				<a class="hover:text-zinc-950" href="#api">Props</a>
-				<a class="hover:text-zinc-950" href="#plugins">Plugins</a>
-			</div>
-			<a
-				href="/editor"
-				class="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
-			>
-				Live demo
-				<ArrowRight class="h-4 w-4" />
-			</a>
-		</nav>
-	</header>
+<div class="min-h-screen w-full bg-zinc-50">
+	<main class="min-h-screen w-full">
+		{#if pdfBlob}
+			<PdfEditor
+				{fileName}
+				ownerId={'USER1'}
+				{pageAnnotations}
+				handleSave={handleSaveAnnotations}
+				autoSaveEnabled={false}
+				on:dataUpdated={handleDataUpdate}
+				{pdfBlob}
+				on:done={handleDone}
+			/>
+		{:else}
+			<div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+				<header class="grid gap-5 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
+						<h1 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
+							Open a PDF!
+						</h1>
 
-	<main>
-		<section class="border-b border-zinc-200 bg-white">
-			<div class="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_0.95fr] lg:px-8 lg:py-20">
-				<div class="flex flex-col justify-center">
-					<div class="mb-5 inline-flex w-fit items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-						<Zap class="h-4 w-4" />
-						Modern EmbedPDF-powered annotation UI for SvelteKit
-					</div>
-					<h1 class="max-w-3xl text-4xl font-bold tracking-tight text-zinc-950 sm:text-5xl lg:text-6xl">
-						A PDF editor library that ships the annotation workflow, not just a canvas.
-					</h1>
-					<p class="mt-6 max-w-2xl text-lg leading-8 text-zinc-600">
-						Use one Svelte component for multi-page PDF rendering, touch-friendly zoom and panning, pen/highlighter/text/line tools, eraser preview, merged PDF export, and annotation-only persistence.
-					</p>
-					<div class="mt-8 flex flex-col gap-3 sm:flex-row">
-						<a
-							href="/editor"
-							class="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-600"
-						>
-							Try the editor
-							<ArrowRight class="h-4 w-4" />
-						</a>
-						<a
-							href="#quick-start"
-							class="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
-						>
-							Read the docs
-							<BookOpen class="h-4 w-4" />
-						</a>
-						<a
-							href="https://github.com/TheBlankness/sveltekit-pdf-editor"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
-						>
-							GitHub
-							<Github class="h-4 w-4" />
-						</a>
-					</div>
-					<div class="mt-10 grid max-w-2xl grid-cols-3 gap-3">
-						{#each stats as stat}
-							<div class="border-l border-zinc-200 pl-4">
-								<div class="text-2xl font-bold text-zinc-950">{stat[0]}</div>
-								<div class="mt-1 text-sm text-zinc-500">{stat[1]}</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-
-				<div class="flex items-center">
-					<div class="w-full overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 shadow-sm">
-						<div class="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
-							<div class="flex items-center gap-2">
-								<span class="h-2.5 w-2.5 rounded-full bg-red-400"></span>
-								<span class="h-2.5 w-2.5 rounded-full bg-yellow-400"></span>
-								<span class="h-2.5 w-2.5 rounded-full bg-green-400"></span>
-							</div>
-							<div class="text-xs font-medium text-zinc-500">review-pack.pdf</div>
+					<div
+						class="grid gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-950"
+					>
+						<div class="flex gap-3">
+							<ShieldCheck class="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+							<span>PDF files are read by your browser only.</span>
 						</div>
-						<div class="grid min-h-[420px] grid-cols-[4rem_1fr] bg-zinc-100">
-							<aside class="border-r border-zinc-200 bg-white px-2 py-4">
-								<div class="space-y-2">
-									{#each [MousePointer2, Hand, PenLine, Highlighter, Type, Eraser, ZoomIn, Map] as ToolIcon}
-										<div class="flex h-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700">
-											<svelte:component this={ToolIcon} class="h-4 w-4" />
+						<div class="flex gap-3">
+							<Database class="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
+							<span>Annotations can be saved locally and copied as JSON.</span>
+						</div>
+					</div>
+				</header>
+
+				<section class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+					<label
+						for="pdf-file"
+						class="group flex min-h-[22rem] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-white p-8 text-center shadow-sm transition hover:border-orange-300 hover:bg-orange-50/40"
+						class:border-orange-400={isDragActive}
+						class:bg-orange-50={isDragActive}
+						on:dragenter={handleDragEnter}
+						on:dragover={handleDragOver}
+						on:dragleave={handleDragLeave}
+						on:drop={handleDrop}
+					>
+						<input
+							bind:this={fileInput}
+							id="pdf-file"
+							type="file"
+							class="sr-only"
+							accept="application/pdf"
+							on:change={handleFileChange}
+						/>
+
+						<span
+							class="rounded-full bg-orange-100 p-4 text-orange-600 transition group-hover:bg-orange-200"
+						>
+							<UploadCloud class="h-9 w-9" />
+						</span>
+						<h2 class="mt-5 text-xl font-semibold text-zinc-950">Select or drag a PDF here</h2>
+						<p class="mt-2 max-w-sm text-sm leading-6 text-zinc-600">
+							Drop a PDF to open it immediately.
+						</p>
+						<span
+							class="mt-6 inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition group-hover:bg-orange-600"
+						>
+							<FileUp class="h-4 w-4" />
+							{isUploading ? 'Opening PDF...' : 'Choose PDF'}
+						</span>
+
+						{#if uploadError}
+							<p class="mt-4 text-sm font-medium text-red-600">{uploadError}</p>
+						{/if}
+					</label>
+
+					<div class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+						<div class="flex items-start justify-between gap-4">
+							<div>
+								<h2 class="text-xl font-semibold text-zinc-950">Previous PDFs</h2>
+								<p class="mt-1 text-sm text-zinc-500">
+									Resume documents stored in localStorage on this device.
+								</p>
+							</div>
+							<span class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
+								{savedDocuments.length} saved
+							</span>
+						</div>
+
+						{#if savedDocuments.length === 0}
+							<div
+								class="mt-6 flex min-h-[16rem] flex-col items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center"
+							>
+								<FileText class="h-10 w-10 text-zinc-400" />
+								<h3 class="mt-3 text-sm font-semibold text-zinc-800">No previous PDFs yet</h3>
+								<p class="mt-1 max-w-xs text-sm text-zinc-500">
+									Uploaded PDFs will appear here with a first-page preview after you open them.
+								</p>
+							</div>
+						{:else}
+							<div class="mt-6 grid max-h-[34rem] gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
+								{#each savedDocuments as doc}
+									<article
+										class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm"
+									>
+										<div class="h-44 overflow-hidden bg-zinc-100">
+											<iframe
+												title={`${doc.name} preview`}
+												src={getPreviewUrl(doc)}
+												class="h-full w-full border-0 bg-white"
+												loading="lazy"
+											></iframe>
 										</div>
-									{/each}
-								</div>
-							</aside>
-							<div class="relative flex items-center justify-center p-6">
-								<div class="absolute right-4 top-4 grid w-20 gap-2 rounded-lg border border-zinc-200 bg-white p-2 shadow-sm">
-									<div class="h-16 border border-amber-300 bg-amber-50"></div>
-									<div class="h-16 border border-zinc-200 bg-white"></div>
-									<div class="h-16 border border-zinc-200 bg-white"></div>
-								</div>
-								<div class="relative h-[340px] w-[240px] border border-zinc-200 bg-white shadow-sm">
-									<div class="h-full px-8 py-9">
-										<div class="mb-5 h-3 w-28 bg-zinc-900"></div>
-										<div class="space-y-2">
-											<div class="h-2 w-full bg-zinc-200"></div>
-											<div class="h-2 w-5/6 bg-zinc-200"></div>
-											<div class="h-2 w-4/6 bg-zinc-200"></div>
+
+										<div class="space-y-4 p-4">
+											<div>
+												<h3 class="truncate text-sm font-semibold text-zinc-950">{doc.name}</h3>
+												<p class="mt-1 text-xs text-zinc-500">
+													{formatDate(doc.date)}
+													{#if formatBytes(doc.size)}
+														<span aria-hidden="true"> - </span>{formatBytes(doc.size)}
+													{/if}
+												</p>
+											</div>
+
+											<div class="flex flex-wrap gap-2 text-xs">
+												<span
+													class="rounded-full bg-orange-50 px-2.5 py-1 font-medium text-orange-700"
+												>
+													{getAnnotationLabel(doc)}
+												</span>
+												<span
+													class="rounded-full bg-zinc-100 px-2.5 py-1 font-medium text-zinc-600"
+												>
+													Local only
+												</span>
+											</div>
+
+											<div class="flex gap-2">
+												<button
+													type="button"
+													class="inline-flex flex-1 items-center justify-center rounded-md bg-zinc-950 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+													on:click={() => loadDocument(doc)}
+												>
+													Open
+												</button>
+												<button
+													type="button"
+													class="inline-flex items-center justify-center rounded-md border border-zinc-200 px-3 py-2 text-zinc-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+													aria-label={`Delete ${doc.name}`}
+													on:click={() => deleteDocument(doc.id)}
+												>
+													<Trash2 class="h-4 w-4" />
+												</button>
+											</div>
 										</div>
-										<div class="mt-8 h-16 border border-zinc-200 bg-zinc-50"></div>
-										<div class="absolute left-10 top-36 h-1 w-32 rotate-[-7deg] rounded bg-amber-300 opacity-80"></div>
-										<svg class="absolute left-12 top-48 h-24 w-40 overflow-visible" viewBox="0 0 160 96" aria-hidden="true">
-											<path d="M4 48 C 32 10, 60 76, 94 28 S 136 38, 154 12" fill="none" stroke="#111827" stroke-width="4" stroke-linecap="round" />
-											<path d="M20 78 L 122 78" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round" opacity="0.65" />
-										</svg>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
-
-		<section id="features" class="border-b border-zinc-200 bg-zinc-50 py-16">
-			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-				<div class="max-w-3xl">
-					<p class="text-sm font-semibold uppercase tracking-wide text-amber-700">Feature Set</p>
-					<h2 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950">Built for production review flows.</h2>
-					<p class="mt-4 text-zinc-600">
-						The public wrapper is meant for app developers; the copied core keeps the richer UI and rendering behavior behind it.
-					</p>
-				</div>
-				<div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{#each features as feature}
-						<div class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-							<div class="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-								<svelte:component this={feature.icon} class="h-5 w-5" />
-							</div>
-							<h3 class="font-semibold text-zinc-950">{feature.title}</h3>
-							<p class="mt-2 text-sm leading-6 text-zinc-600">{feature.description}</p>
-						</div>
-					{/each}
-				</div>
-			</div>
-		</section>
-
-		<section id="quick-start" class="border-b border-zinc-200 bg-white py-16">
-			<div class="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8">
-				<div>
-					<p class="text-sm font-semibold uppercase tracking-wide text-amber-700">Quick Start</p>
-					<h2 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950">Use the library wrapper first.</h2>
-					<p class="mt-4 text-zinc-600">
-						Import `PdfEditor` from the package, give it a PDF source, and store `pageAnnotations` whenever `dataUpdated` fires.
-					</p>
-					<div class="mt-6 space-y-3 text-sm text-zinc-700">
-						<div class="flex gap-3"><CheckCircle2 class="mt-0.5 h-4 w-4 text-amber-600" /> Put `pdfium.wasm` at the configured `wasmUrl`.</div>
-						<div class="flex gap-3"><CheckCircle2 class="mt-0.5 h-4 w-4 text-amber-600" /> Keep annotations as a page-indexed array.</div>
-						<div class="flex gap-3"><CheckCircle2 class="mt-0.5 h-4 w-4 text-amber-600" /> Save JSON separately or export a merged PDF from the editor UI.</div>
-					</div>
-				</div>
-				<div class="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-950 shadow-sm">
-					<div class="border-b border-zinc-800 px-4 py-3 text-xs font-medium text-zinc-400">Basic usage</div>
-					<pre class="overflow-x-auto p-5 text-sm leading-6 text-amber-100"><code>{quickStartCode}</code></pre>
-				</div>
-			</div>
-		</section>
-
-		<section class="border-b border-zinc-200 bg-zinc-50 py-16">
-			<div class="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-				<div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-					<div class="mb-4 flex items-center gap-3 text-zinc-950">
-						<Save class="h-5 w-5 text-amber-600" />
-						<h2 class="text-xl font-bold">Annotation data model</h2>
-					</div>
-					<p class="mb-4 text-sm leading-6 text-zinc-600">
-						`pageAnnotations` stores all annotation data without rewriting the PDF. Persist this payload when you want users to resume editing later.
-					</p>
-					<pre class="overflow-x-auto rounded-lg bg-zinc-950 p-4 text-xs leading-5 text-amber-100"><code>{annotationCode}</code></pre>
-				</div>
-				<div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-					<div class="mb-4 flex items-center gap-3 text-zinc-950">
-						<ShieldCheck class="h-5 w-5 text-amber-600" />
-						<h2 class="text-xl font-bold">Save callbacks</h2>
-					</div>
-					<p class="mb-4 text-sm leading-6 text-zinc-600">
-						Use callback props when you prefer direct functions over DOM events. Each save callback receives the all-page annotation array.
-					</p>
-					<pre class="overflow-x-auto rounded-lg bg-zinc-950 p-4 text-xs leading-5 text-amber-100"><code>{callbacksCode}</code></pre>
-				</div>
-			</div>
-		</section>
-
-		<section id="api" class="border-b border-zinc-200 bg-white py-16">
-			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-				<div class="mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-					<div>
-						<p class="text-sm font-semibold uppercase tracking-wide text-amber-700">API Reference</p>
-						<h2 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950">Props accepted by `PdfEditor`.</h2>
-					</div>
-					<p class="max-w-2xl text-sm leading-6 text-zinc-600">
-						`PdfEditorCore` is exported for advanced integrations, but most apps should use `PdfEditor` so multi-page annotation sync, events, and legacy prop compatibility are handled for you.
-					</p>
-				</div>
-				<div class="overflow-hidden rounded-lg border border-zinc-200">
-					<div class="overflow-x-auto">
-						<table class="min-w-full divide-y divide-zinc-200 text-left text-sm">
-							<thead class="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
-								<tr>
-									<th class="px-4 py-3 font-semibold">Prop</th>
-									<th class="px-4 py-3 font-semibold">Type</th>
-									<th class="px-4 py-3 font-semibold">Default</th>
-									<th class="px-4 py-3 font-semibold">What it does</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-zinc-200 bg-white align-top">
-								{#each propRows as row}
-									<tr>
-										<td class="whitespace-nowrap px-4 py-4 font-mono text-xs font-semibold text-zinc-950">{row[0]}</td>
-										<td class="px-4 py-4 font-mono text-xs text-zinc-600">{row[1]}</td>
-										<td class="px-4 py-4 font-mono text-xs text-zinc-600">{row[2]}</td>
-										<td class="min-w-[20rem] px-4 py-4 text-zinc-600">{row[3]}</td>
-									</tr>
+									</article>
 								{/each}
-							</tbody>
-						</table>
-					</div>
-				</div>
-			</div>
-		</section>
-
-		<section class="border-b border-zinc-200 bg-zinc-50 py-16">
-			<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-				<div class="mb-8 max-w-3xl">
-					<p class="text-sm font-semibold uppercase tracking-wide text-amber-700">Events</p>
-					<h2 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950">Subscribe with Svelte events or callback props.</h2>
-				</div>
-				<div class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
-					<div class="overflow-x-auto">
-						<table class="min-w-full divide-y divide-zinc-200 text-left text-sm">
-							<thead class="bg-white text-xs uppercase tracking-wide text-zinc-500">
-								<tr>
-									<th class="px-4 py-3 font-semibold">Event</th>
-									<th class="px-4 py-3 font-semibold">Detail</th>
-									<th class="px-4 py-3 font-semibold">When it fires</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-zinc-200 align-top">
-								{#each eventRows as row}
-									<tr>
-										<td class="whitespace-nowrap px-4 py-4 font-mono text-xs font-semibold text-zinc-950">on:{row[0]}</td>
-										<td class="px-4 py-4 font-mono text-xs text-zinc-600">{row[1]}</td>
-										<td class="min-w-[20rem] px-4 py-4 text-zinc-600">{row[2]}</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				</div>
-			</div>
-		</section>
-
-		<section id="plugins" class="border-b border-zinc-200 bg-white py-16">
-			<div class="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-				<div>
-					<p class="text-sm font-semibold uppercase tracking-wide text-amber-700">Plugin System</p>
-					<h2 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950">Install tools by passing plugins.</h2>
-					<p class="mt-4 leading-7 text-zinc-600">
-						The current plugin system controls the editor capabilities at runtime. A plugin can enable a built-in tool, be disabled with `enabled: false`, or attach an EmbedPDF registration that the core forwards into `&lt;EmbedPDF /&gt;`.
-					</p>
-					<div class="mt-6 grid gap-3 sm:grid-cols-2">
-						{#each pluginRows as row}
-							<div class="flex gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-								<Plug class="mt-0.5 h-4 w-4 flex-none text-amber-600" />
-								<div>
-									<div class="font-mono text-xs font-semibold text-zinc-950">{row[0]}</div>
-									<div class="mt-1 text-xs leading-5 text-zinc-600">{row[1]}</div>
-								</div>
 							</div>
-						{/each}
+						{/if}
 					</div>
-				</div>
-				<div class="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-950 shadow-sm">
-					<div class="border-b border-zinc-800 px-4 py-3 text-xs font-medium text-zinc-400">Plugin configuration</div>
-					<pre class="overflow-x-auto p-5 text-sm leading-6 text-amber-100"><code>{pluginCode}</code></pre>
-				</div>
+				</section>
 			</div>
-			<div class="mx-auto mt-10 max-w-7xl px-4 sm:px-6 lg:px-8">
-				<div class="overflow-hidden rounded-lg border border-zinc-200">
-					<div class="border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-950">PdfEditorPlugin fields</div>
-					<div class="grid divide-y divide-zinc-200 bg-white md:grid-cols-2 md:divide-x md:divide-y-0">
-						{#each pluginFields as field}
-							<div class="p-4">
-								<div class="font-mono text-xs font-semibold text-zinc-950">{field[0]}</div>
-								<p class="mt-2 text-sm leading-6 text-zinc-600">{field[1]}</p>
-							</div>
-						{/each}
-					</div>
-				</div>
-			</div>
-		</section>
-
-		<section class="bg-amber-50 py-16">
-			<div class="mx-auto flex max-w-7xl flex-col justify-between gap-8 px-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">
-				<div>
-					<p class="text-sm font-semibold uppercase tracking-wide text-amber-800">Ready to test</p>
-					<h2 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950">Open the demo and draw on a real PDF.</h2>
-					<p class="mt-4 max-w-2xl text-zinc-700">
-						The demo route uses the same exported `PdfEditor` wrapper documented above, so it is the best place to verify props, saves, and plugin combinations.
-					</p>
-				</div>
-				<div class="flex flex-col gap-3 sm:flex-row">
-					<a href="/editor" class="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-950 px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-800">
-						Open live demo
-						<ExternalLink class="h-4 w-4" />
-					</a>
-					<a href="#api" class="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-5 py-3 text-sm font-semibold text-zinc-900 hover:bg-amber-100">
-						Review props
-						<Settings class="h-4 w-4" />
-					</a>
-				</div>
-			</div>
-		</section>
+		{/if}
 	</main>
 
-	<footer class="border-t border-zinc-200 bg-white">
-		<div class="mx-auto flex max-w-7xl flex-col justify-between gap-4 px-4 py-8 text-sm text-zinc-500 sm:px-6 md:flex-row md:items-center lg:px-8">
-			<div class="flex items-center gap-2">
-				<FileText class="h-4 w-4 text-amber-600" />
-				<span>sveltekit-pdf-editor</span>
-			</div>
-			<div class="flex flex-wrap gap-4">
-				<a href="/editor" class="hover:text-zinc-950">Demo</a>
-				<a href="#quick-start" class="hover:text-zinc-950">Quick start</a>
-				<a href="#plugins" class="hover:text-zinc-950">Plugins</a>
-				<a href="https://github.com/TheBlankness/sveltekit-pdf-editor" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-950">GitHub</a>
+	{#if isSaveJsonModalOpen}
+		<div class="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
+			<button
+				type="button"
+				class="absolute inset-0 cursor-default"
+				aria-label="Close JSON output modal"
+				on:click={closeSaveJsonModal}
+			></button>
+			<div
+				class="relative z-10 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="save-json-title"
+			>
+				<header class="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+					<div>
+						<h2 id="save-json-title" class="text-lg font-semibold text-gray-900">
+							Saved annotation JSON
+						</h2>
+						<p class="mt-1 text-sm text-gray-500">
+							This annotation payload was also saved locally for the current demo PDF.
+						</p>
+					</div>
+					<button
+						type="button"
+						class="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+						on:click={closeSaveJsonModal}
+						aria-label="Close"
+					>
+						<X class="h-5 w-5" />
+					</button>
+				</header>
+
+				<div class="min-h-0 flex-1 overflow-auto bg-gray-950 p-4">
+					<pre class="whitespace-pre-wrap break-words text-xs leading-5 text-amber-100"><code
+							>{saveJsonOutput}</code
+						></pre>
+				</div>
+
+				<footer
+					class="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+				>
+					<p class="text-sm text-gray-500">
+						Copy this annotation-only JSON or reopen the PDF later from localStorage.
+					</p>
+					<button
+						type="button"
+						class="inline-flex items-center justify-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+						on:click={copySaveJson}
+					>
+						{#if copyState === 'copied'}
+							<Check class="h-4 w-4" />
+							Copied
+						{:else}
+							<ClipboardCopy class="h-4 w-4" />
+							{copyState === 'failed' ? 'Copy failed' : 'Copy JSON'}
+						{/if}
+					</button>
+				</footer>
 			</div>
 		</div>
-	</footer>
+	{/if}
 </div>

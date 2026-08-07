@@ -13,9 +13,9 @@ import {
 } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import download from 'downloadjs';
-import { toast, TOAST_ERROR } from './toast.js';
+import { toast, TOAST_ERROR } from './toast';
 
-import { getTeacherMarkColorPreset, getTeacherMarkIcon } from './teacherMarkPresets.js';
+import { getTeacherMarkColorPreset, getTeacherMarkIcon } from './teacherMarkPresets';
 
 const DEFAULT_FONT_FAMILY = 'Roboto';
 const DEFAULT_TEXT_COLOR = '#000000';
