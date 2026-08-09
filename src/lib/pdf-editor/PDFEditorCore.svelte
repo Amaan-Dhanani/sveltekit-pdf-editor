@@ -348,7 +348,7 @@
 	}
 
 	// Utils
-	import { save } from './utils/PDF.js';
+	import { save } from './utils/PDF';
 	import HomeworkInfoModal from './components/HomeworkInfoModal.svelte';
 	import { findDrawingsAtPoint, getPathGeometry, getTransformedDrawingBBox } from './utils/hitTest';
 	import { createObjectSpatialIndex } from './utils/spatialIndex';

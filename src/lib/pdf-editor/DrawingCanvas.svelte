@@ -64,7 +64,7 @@
 	let useTouchFallback = false;
 	let pointerReliabilityFailures: number[] = [];
 	let previewResizeDeferred = false;
-	let strokePageScale = pageScale;
+	let strokePageScale = $derived(pageScale);
 
 	const liveStroke = new LiveStroke(
 		() => canvas,
