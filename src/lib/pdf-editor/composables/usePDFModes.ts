@@ -76,7 +76,7 @@ export function usePDFModes() {
 	/**
 	 * Toggle line drawing mode
 	 */
-	function activateLineMode(_isAddingLine: boolean) {
+	function activateLineMode(_isAddingLine: boolean = true) {
 		if (ctx.selectedPageIndex >= 0) {
 			ctx.state.isAddingLine = !_isAddingLine;
 			ctx.state.addingDrawing = false;

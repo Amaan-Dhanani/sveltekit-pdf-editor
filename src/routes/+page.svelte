@@ -205,8 +205,12 @@
 		}
 	}
 
-	function handleDataUpdate(event: { detail: { newData: any[][] } }) {
-		const updatedData = event.detail.newData;
+	function handleDataUpdate(payload: {
+		newData: any[][];
+		annotations: any[][];
+		currentPage: number;
+	}) {
+		const updatedData = payload.newData;
 		pageAnnotations = updatedData;
 
 		if (fileName) {
@@ -356,16 +360,16 @@
 				{pageAnnotations}
 				handleSave={handleSaveAnnotations}
 				autoSaveEnabled={false}
-				on:dataUpdated={handleDataUpdate}
+				onDataUpdated={handleDataUpdate}
 				{pdfBlob}
-				on:done={handleDone}
+				onDone={handleDone}
 			/>
 		{:else}
 			<div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
 				<header class="grid gap-5 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
-						<h1 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
-							Open a PDF!
-						</h1>
+					<h1 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
+						Open a PDF!
+					</h1>
 
 					<div
 						class="grid gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-950"

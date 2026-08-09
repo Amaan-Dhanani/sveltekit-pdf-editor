@@ -1,5 +1,5 @@
-import { readAsArrayBuffer } from './asyncReader.js';
-import { fetchFontbyName, Fonts } from './prepareFonts.js';
+import { readAsArrayBuffer } from './asyncReader';
+import { fetchFontbyName, Fonts } from './prepareFonts';
 import {
 	PDFDocument,
 	degrees,
@@ -13,35 +13,57 @@ import {
 } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import download from 'downloadjs';
-import { toast, TOAST_ERROR } from './toast';
+import { toast, TOAST_ERROR } from './toast.js';
 
-import { getTeacherMarkColorPreset, getTeacherMarkIcon } from './teacherMarkPresets';
+import { getTeacherMarkColorPreset, getTeacherMarkIcon } from './teacherMarkPresets.js';
 
 const DEFAULT_FONT_FAMILY = 'Roboto';
 const DEFAULT_TEXT_COLOR = '#000000';
 
+/**
+ * @param {{ [x: string]: any; }} objects
+ * @param {number} pageIndex
+ */
 function getPageObjects(objects, pageIndex, currentPage = 1) {
 	if (!Array.isArray(objects)) return [];
 	if (Array.isArray(objects[pageIndex])) return objects[pageIndex];
 	return pageIndex === Math.max(0, Number(currentPage || 1) - 1) ? objects : [];
 }
 
-export async function save(pdfFile, objects, name, options = {}) {
+/**
+ * @param {File} pdfFile
+ * @param {any} objects
+ * @param {string | undefined} name
+ * @param {{ currentPage: any; }} options
+ */
+export async function save(pdfFile, objects, name, options) {
+	/**
+	 * @type {PDFDocument}
+	 */
 	let pdfDoc;
 	const embeddedFonts = new Map();
 
+	/**
+	 * @typedef {'Roboto' | 'Noto Sans CJK' | 'KaiTi Regular'} FontFamily
+	 *
+	 * @param {FontFamily} fontFamily
+	 */
 	async function getEmbeddedFont(fontFamily = DEFAULT_FONT_FAMILY) {
 		const normalizedFontFamily = Fonts[fontFamily] ? fontFamily : DEFAULT_FONT_FAMILY;
+
 		if (embeddedFonts.has(normalizedFontFamily)) {
 			return embeddedFonts.get(normalizedFontFamily);
 		}
 
 		const fontResponse = await fetchFontbyName(normalizedFontFamily);
 		const fontBytes = await fontResponse.arrayBuffer();
+
 		pdfDoc.registerFontkit(fontkit);
+
 		const customFont = await pdfDoc.embedFont(fontBytes, {
 			subset: Fonts[normalizedFontFamily].subset
 		});
+
 		embeddedFonts.set(normalizedFontFamily, customFont);
 		return customFont;
 	}
@@ -58,6 +80,9 @@ export async function save(pdfFile, objects, name, options = {}) {
 		const embedProcesses = pageObjects.map(async (object) => {
 			if (object.type === 'image') {
 				let { file, x, y, width, height } = object;
+				/**
+				 * @type {import("pdf-lib").PDFImage}
+				 */
 				let img;
 				try {
 					if (file.type === 'image/jpeg') {
@@ -169,11 +194,17 @@ export async function save(pdfFile, objects, name, options = {}) {
 	}
 }
 
+/**
+ * @param {string} hex
+ */
 function colorFromHex(hex, fallback = DEFAULT_TEXT_COLOR) {
 	const parsed = hexToRgb(hex || fallback);
 	return rgb(parsed.r, parsed.g, parsed.b);
 }
 
+/**
+ * @param {string} hex
+ */
 function hexToRgb(hex) {
 	const normalized = String(hex || DEFAULT_TEXT_COLOR)
 		.trim()
@@ -196,23 +227,36 @@ function hexToRgb(hex) {
 	return { r, g, b };
 }
 
+/**
+ * @param {any} value
+ */
 function normalizeOpacity(value, fallback = 1) {
 	const opacity = Number(value);
 	return Number.isFinite(opacity) ? Math.max(0, Math.min(opacity, 1)) : fallback;
 }
 
+/**
+ * @param {string} lineType
+ * @param {number} strokeWidth
+ */
 function getLineDashArray(lineType, strokeWidth) {
 	if (lineType === 'dotted') return [strokeWidth * 2, strokeWidth * 2];
 	if (lineType === 'dashed') return [strokeWidth * 4, strokeWidth * 2];
 	return null;
 }
 
+/**
+ * @param {any} value
+ */
 function capitalizeFirstLetter(value) {
 	const trimmed = String(value || '').trim();
 	if (!trimmed) return 'Teacher';
 	return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
+/**
+ * @param {string | number | Date} value
+ */
 function formatMarkedAt(value) {
 	const date = new Date(value);
 	if (Number.isNaN(date.getTime())) return value || '';
@@ -226,6 +270,12 @@ function formatMarkedAt(value) {
 	});
 }
 
+/**
+ * @param {string} text
+ * @param {{ widthOfTextAtSize: (arg0: string, arg1: any) => number; }} font
+ * @param {number} fontSize
+ * @param {number} maxWidth
+ */
 function fitTextToWidth(text, font, fontSize, maxWidth) {
 	const value = String(text || '');
 	if (font.widthOfTextAtSize(value, fontSize) <= maxWidth) return value;
@@ -237,6 +287,12 @@ function fitTextToWidth(text, font, fontSize, maxWidth) {
 	return output.length > 1 ? `${output}...` : output;
 }
 
+/**
+ * @param {import("pdf-lib").PDFPage} page
+ * @param {number} pageHeight
+ * @param {{ x: any; y: any; width: any; height: any; stampColor: unknown; fontSize: any; stampIcon: unknown; label: any; markedBy: any; markedAt: any; updatedAt: any; opacity: any; }} object
+ * @param {any} font
+ */
 function drawTeacherMark(page, pageHeight, object, font) {
 	const x = Number(object.x || 0);
 	const y = Number(object.y || 0);
@@ -257,7 +313,7 @@ function drawTeacherMark(page, pageHeight, object, font) {
 	const markedBy = capitalizeFirstLetter(object.markedBy || 'Teacher');
 	const meta = fitTextToWidth(`Stamped by ${markedBy}`, font, metaFontSize, maxTextWidth);
 	const time = fitTextToWidth(
-		formatMarkedAt(object.markedAt || object.updatedAt || new Date().toISOString()),
+		String(formatMarkedAt(object.markedAt || object.updatedAt || new Date().toISOString())),
 		font,
 		metaFontSize,
 		maxTextWidth
@@ -313,6 +369,11 @@ function drawTeacherMark(page, pageHeight, object, font) {
 	});
 }
 
+/**
+ * @param {{ drawCircle: (arg0: { x: any; y: any; size: number; borderColor: any; borderOpacity: any; borderWidth: number; }) => void; drawLine: (arg0: { start: { x: number; y: number; } | { x: number; y: number; } | { x: number; y: number; } | { x: any; y: number; }; end: { x: number; y: number; } | { x: any; y: any; } | { x: number; y: number; } | { x: any; y: number; }; thickness: number; color: any; opacity: any; lineCap: LineCapStyle; }) => void; drawSvgPath: (arg0: string, arg1: { borderColor: any; borderOpacity: any; borderWidth: number; color: any; opacity: any; }) => void; }} page
+ * @param {string} iconName
+ * @param {{ x: any; y: any; size: any; color: any; opacity: any; }} options
+ */
 function drawTeacherMarkIcon(page, iconName, options) {
 	const { x, y, size, color, opacity } = options;
 	const strokeWidth = Math.max(1, size * 0.12);
@@ -409,6 +470,12 @@ function drawTeacherMarkIcon(page, iconName, options) {
 	}
 }
 
+/**
+ * @param {number} centerX
+ * @param {number} centerY
+ * @param {number} outerRadius
+ * @param {number} innerRadius
+ */
 function createStarPath(centerX, centerY, outerRadius, innerRadius) {
 	const points = [];
 	for (let index = 0; index < 10; index += 1) {
@@ -426,11 +493,14 @@ function createStarPath(centerX, centerY, outerRadius, innerRadius) {
 		.join(' ');
 }
 
+/**
+ * @param {{ match: (arg0: RegExp) => any[]; }} path
+ */
 function computeSvgPathBBox(path) {
 	const values = path
 		.match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi)
-		?.map((value) => Number(value))
-		.filter((value) => Number.isFinite(value));
+		?.map((/** @type {any} */ value) => Number(value))
+		.filter((/** @type {unknown} */ value) => Number.isFinite(value));
 
 	if (!values || values.length < 2) return null;
 
@@ -455,6 +525,3 @@ function computeSvgPathBBox(path) {
 		height: maxY - minY
 	};
 }
-
-
-

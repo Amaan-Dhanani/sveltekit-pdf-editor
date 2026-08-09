@@ -11,7 +11,7 @@ import { getContext, setContext } from 'svelte';
 const PDF_EDITOR_CONTEXT_KEY = Symbol('pdfEditor');
 
 export interface SaveState {
-	status: 'idle' | 'saving' | 'saved' | 'local_saved' | 'cloud_saved' | 'fail';
+	status?: 'idle' | 'saving' | 'saved' | 'local_saved' | 'cloud_saved' | 'fail';
 	hasUnsavedChanges?: boolean;
 	lastLocalSave?: string;
 	lastCloudSave?: string;
@@ -23,8 +23,8 @@ export interface AnnotationCache {
 	student: any[];
 	merged: any[];
 	timestamp: number;
-	fetchSuccess?: boolean; // Track if cloud fetch was successful
-	serverAnnotationsUnknown?: boolean; // Local edits must be merged additively once cloud data returns
+	fetchSuccess?: boolean;
+	serverAnnotationsUnknown?: boolean;
 }
 
 export interface ConflictResolution {
@@ -43,7 +43,7 @@ export interface PDFObject {
 	type: 'text' | 'drawing' | 'line' | 'image' | 'highlight' | 'teacher-mark';
 	x: number;
 	y: number;
-	[key: string]: unknown; // Allow additional properties specific to each type
+	[key: string]: unknown;
 }
 
 export type RenderQualityMode = 'performance' | 'default' | 'sharp';
@@ -101,6 +101,7 @@ export interface PDFEditorState {
 
 	// Line Tool State
 	selectedLineId: string | null;
+	editingLineId: string | null;
 
 	// Selection State
 	selectedObjectIds: string[];
@@ -204,6 +205,7 @@ export function createPDFEditorContext(initialState: Partial<PDFEditorState> = {
 
 		// Line Tool State
 		selectedLineId: initialState.selectedLineId || null,
+		editingLineId: initialState.editingLineId || null,
 
 		// Selection State
 		selectedObjectIds: initialState.selectedObjectIds || [],

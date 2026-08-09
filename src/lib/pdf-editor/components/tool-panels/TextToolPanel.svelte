@@ -14,7 +14,7 @@
 		LucideChevronUp
 	} from 'lucide-svelte';
 	import { presetColors } from '../../utils/colorPresets';
-	import { Fonts } from '../../utils/prepareFonts.js';
+	import { Fonts } from '../../utils/prepareFonts';
 
 	interface Props {
 		_size: number;
@@ -78,7 +78,7 @@
 	tabindex="0"
 	aria-label="Text editing toolbar"
 	transition:fly={{ x: 10, y: 0, duration: 200 }}
-	class={isFixed ? 'pdf-editor-touch-controls fixed top-20 right-3 z-[110]' : 'pdf-editor-touch-controls w-full'}
+	class={isFixed ? 'pdf-editor-touch-controls fixed top-20 right-3 z-110' : 'pdf-editor-touch-controls w-full'}
 >
 	<div
 		class="bg-white transition-all duration-200"

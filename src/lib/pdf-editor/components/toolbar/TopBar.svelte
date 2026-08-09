@@ -140,7 +140,7 @@
 </script>
 
 <!-- Top Bar - Fixed at top -->
-<div class="pdf-editor-touch-controls fixed top-4 right-0 left-0 z-[100] px-4 max-[520px]:top-2 max-[520px]:px-2">
+<div class="pdf-editor-touch-controls fixed top-4 right-0 left-0 z-100 px-4 max-[520px]:top-2 max-[520px]:px-2">
 	<div
 		class="top-bar-shell mx-auto flex max-w-[1600px] items-center justify-between gap-4 max-[520px]:flex-wrap max-[520px]:gap-2"
 	>

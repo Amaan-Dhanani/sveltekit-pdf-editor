@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import PDFEditorCore from './PDFEditorCore.svelte';
 	import { defaultPdfEditorPlugins, type PdfEditorPlugin } from './plugins';
 	import type { SaveState } from './context/pdfEditorContext.svelte';
@@ -7,45 +7,85 @@
 	type SavingState = 'saving' | 'saved' | 'fail';
 	type DisabledPageRange = { from_page: number; to_page: number };
 
-	export let pageAnnotations: any[][] = [];
-	export let pdfBlob: Blob | File | ArrayBuffer | Uint8Array | null = null;
-	export let allowPrinting = true;
-	export let ownerId = 'user1';
-	export let user: string | undefined = undefined;
-	export let fileName = '';
-	export let savingState: SavingState = 'saved';
-	export let disabledPages: DisabledPageRange[] = [];
-	export let disabled_pages: DisabledPageRange[] | undefined = undefined;
-	export let disabled = false;
-	export let currentPage = 1;
-	export let saveState: SaveState | undefined = undefined;
-	export let autoSaveEnabled: boolean | undefined = undefined;
-	export let plugins: PdfEditorPlugin[] = defaultPdfEditorPlugins;
-	export let allowTeacherMark = false;
-	export let teacherMarkName = 'User';
-	export let homework_info: any = undefined;
-	export let isPageLoading = false;
-	export const wasmUrl = '/vendor/embedpdf/pdfium.wasm?v=2.14.4';
-	export let handleSave: ((annotations: any[][]) => void | Promise<void>) | undefined = undefined;
-	export let handleComplete: ((annotations: any[][]) => void | Promise<void>) | undefined = undefined;
-	export let onSaveAnnotations: ((annotations: any[][]) => void | Promise<void>) | undefined = undefined;
-	export let onAnnotationChange: ((annotations: any[][]) => void) | undefined = undefined;
-	export let retryFailedSave: (() => void | Promise<void>) | undefined = undefined;
+	let {
+		children,
+		pageAnnotations = $bindable([]),
+		pdfBlob = null,
+		allowPrinting = true,
+		ownerId = 'user1',
+		user = undefined,
+		fileName = '',
+		savingState = 'saved',
+		disabledPages = [],
+		disabled_pages = undefined,
+		disabled = false,
+		currentPage = $bindable(1),
+		saveState = undefined,
+		autoSaveEnabled = undefined,
+		plugins = defaultPdfEditorPlugins,
+		allowTeacherMark = false,
+		teacherMarkName = 'User',
+		homework_info = undefined,
+		isPageLoading = false,
+		handleSave = undefined,
+		handleComplete = undefined,
+		onSaveAnnotations = undefined,
+		onAnnotationChange = undefined,
+		retryFailedSave = undefined,
+		allObjects = $bindable([]),
+		// Svelte 5 callback props (replaces createEventDispatcher)
+		onDataUpdated = undefined,
+		onAnnotationsChange = undefined,
+		onSave = undefined,
+		onDone = undefined,
+		onPageChange = undefined
+	}: {
+		children?: Snippet;
+		pageAnnotations?: any[][];
+		pdfBlob?: Blob | File | ArrayBuffer | Uint8Array | null;
+		allowPrinting?: boolean;
+		ownerId?: string;
+		user?: string | undefined;
+		fileName?: string;
+		savingState?: SavingState;
+		disabledPages?: DisabledPageRange[];
+		disabled_pages?: DisabledPageRange[] | undefined;
+		disabled?: boolean;
+		currentPage?: number;
+		saveState?: SaveState | undefined;
+		autoSaveEnabled?: boolean | undefined;
+		plugins?: PdfEditorPlugin[];
+		allowTeacherMark?: boolean;
+		teacherMarkName?: string;
+		homework_info?: any;
+		isPageLoading?: boolean;
+		handleSave?: ((annotations: any[][]) => void | Promise<void>) | undefined;
+		handleComplete?: ((annotations: any[][]) => void | Promise<void>) | undefined;
+		onSaveAnnotations?: ((annotations: any[][]) => void | Promise<void>) | undefined;
+		onAnnotationChange?: ((annotations: any[][]) => void) | undefined;
+		retryFailedSave?: (() => void | Promise<void>) | undefined;
+		allObjects?: any[];
+		onDataUpdated?: ((payload: { newData: any[][]; annotations: any[][]; currentPage: number }) => void) | undefined;
+		onAnnotationsChange?: ((payload: { annotations: any[][]; currentPage: number }) => void) | undefined;
+		onSave?: ((payload: { annotations: any[][]; currentPage: number }) => void) | undefined;
+		onDone?: ((payload: { newData: any[][]; annotations: any[][]; currentPage: number }) => void) | undefined;
+		onPageChange?: ((payload: { page: number; annotations: any[] }) => void) | undefined;
+	} = $props();
 
-	const dispatch = createEventDispatcher();
+	let internalAnnotations: any[][] = $state([]);
+	let activePage = $state(Math.max(1, Number(currentPage || 1)));
+	// Initialize without referencing props to avoid state_referenced_locally
+	let lastAnnotationsRef = $state<any[][] | undefined>(undefined);
+	let lastPdfBlobRef = $state<typeof pdfBlob>();
+	let initialized = $state(false);
+	let adjacentPageAnnotations: Record<number, any[]> = $state({});
+	let internalSaveState: SaveState | undefined = $state(undefined);
 
-	let internalAnnotations: any[][] = [];
-	let allObjects: any[] = [];
-	let activePage = Math.max(1, Number(currentPage || 1));
-	let lastAnnotationsRef = pageAnnotations;
-	let lastPdfBlobRef = pdfBlob;
-	let initialized = false;
-	let adjacentPageAnnotations: Record<number, any[]> = {};
-	let coreSaveState: SaveState = normalizeSavingState(savingState);
-	let effectiveSaveState: SaveState = coreSaveState;
-	let effectiveUser = ownerId;
-	let effectiveDisabledPages: DisabledPageRange[] = [];
-	let pdfInput: typeof pdfBlob = pdfBlob;
+	let effectiveUser = $derived(user || ownerId || 'user1');
+	let effectiveDisabledPages = $derived(disabled_pages || disabledPages || []);
+	let computedSaveState = $derived(normalizeSavingState(savingState));
+	let effectiveSaveState = $derived(saveState ?? internalSaveState ?? computedSaveState);
+	let pdfInput = $derived(makePdfInput(pdfBlob));
 
 	function cloneValue<T>(value: T): T {
 		if (value == null) return value;
@@ -53,10 +93,9 @@
 			try {
 				return structuredClone(value);
 			} catch {
-				// Fall through for values that structuredClone cannot handle.
+				// fall through
 			}
 		}
-
 		return JSON.parse(JSON.stringify(value));
 	}
 
@@ -68,7 +107,6 @@
 		const pages = Array.isArray(value)
 			? value.map((objects) => cloneObjects(Array.isArray(objects) ? objects : []))
 			: [];
-
 		while (pages.length < minPages) pages.push([]);
 		return pages;
 	}
@@ -118,8 +156,8 @@
 		const snapshot = getAnnotationSnapshot(objects, page);
 		pageAnnotations = snapshot;
 		lastAnnotationsRef = snapshot;
-		dispatch('dataUpdated', { newData: snapshot, annotations: snapshot, currentPage: activePage });
-		dispatch('annotationsChange', { annotations: snapshot, currentPage: activePage });
+		onDataUpdated?.({ newData: snapshot, annotations: snapshot, currentPage: activePage });
+		onAnnotationsChange?.({ annotations: snapshot, currentPage: activePage });
 		onAnnotationChange?.(snapshot);
 		return snapshot;
 	}
@@ -139,24 +177,25 @@
 	}
 
 	function handleCoreAnnotationChange(currentObjects = allObjects) {
+		// Keep the bindable prop in sync (PDFEditorCore does not declare allObjects as $bindable)
+		allObjects = cloneObjects(currentObjects);
 		saveActivePage(currentObjects);
-		coreSaveState = { status: 'idle', hasUnsavedChanges: true };
+		internalSaveState = { status: 'idle', hasUnsavedChanges: true };
 		rebuildAdjacentAnnotations(currentObjects);
 		publishAnnotations(currentObjects);
 	}
 
 	async function handleCoreSave() {
 		saveActivePage();
-		coreSaveState = { status: 'saving', hasUnsavedChanges: true };
+		internalSaveState = { status: 'saving', hasUnsavedChanges: true };
 		const snapshot = publishAnnotations();
-
 		try {
 			await Promise.resolve(handleSave?.(snapshot));
 			await Promise.resolve(onSaveAnnotations?.(snapshot));
-			coreSaveState = { status: 'saved', hasUnsavedChanges: false };
-			dispatch('save', { annotations: snapshot, currentPage: activePage });
+			internalSaveState = { status: 'saved', hasUnsavedChanges: false };
+			onSave?.({ annotations: snapshot, currentPage: activePage });
 		} catch (error) {
-			coreSaveState = { status: 'fail', hasUnsavedChanges: true };
+			internalSaveState = { status: 'fail', hasUnsavedChanges: true };
 			throw error;
 		}
 	}
@@ -165,14 +204,14 @@
 		await handleCoreSave();
 		const snapshot = getAnnotationSnapshot();
 		await Promise.resolve(handleComplete?.(snapshot));
-		dispatch('done', { newData: snapshot, annotations: snapshot, currentPage: activePage });
+		onDone?.({ newData: snapshot, annotations: snapshot, currentPage: activePage });
 	}
 
 	function handleCorePageChange(page: number) {
 		saveActivePage();
 		publishAnnotations();
 		loadPage(page);
-		dispatch('pageChange', { page, annotations: cloneObjects(internalAnnotations[page - 1]) });
+		onPageChange?.({ page, annotations: cloneObjects(internalAnnotations[page - 1]) });
 	}
 
 	async function handleCoreRetry() {
@@ -180,7 +219,6 @@
 			await Promise.resolve(retryFailedSave());
 			return;
 		}
-
 		await handleCoreSave();
 	}
 
@@ -189,39 +227,48 @@
 		return getAnnotationSnapshot(currentObjects, page);
 	}
 
-	$: if (!initialized) {
-		initialized = true;
-		hydrateFromProps();
-	}
+	// Initial hydration (runs once)
+	$effect(() => {
+		if (!initialized) {
+			initialized = true;
+			lastAnnotationsRef = pageAnnotations;
+			lastPdfBlobRef = pdfBlob;
+			hydrateFromProps();
+		}
+	});
 
-	$: if (pdfBlob !== lastPdfBlobRef) {
-		lastPdfBlobRef = pdfBlob;
-		lastAnnotationsRef = pageAnnotations;
-		hydrateFromProps();
-	}
+	// React to pdfBlob changes
+	$effect(() => {
+		if (!initialized) return;
+		if (pdfBlob !== lastPdfBlobRef) {
+			lastPdfBlobRef = pdfBlob;
+			lastAnnotationsRef = pageAnnotations;
+			hydrateFromProps();
+		}
+	});
 
-	$: if (pageAnnotations !== lastAnnotationsRef) {
-		lastAnnotationsRef = pageAnnotations;
-		internalAnnotations = normalizeAnnotations(pageAnnotations, activePage);
-		loadPage(activePage);
-	}
+	// React to pageAnnotations changes from outside
+	$effect(() => {
+		if (!initialized) return;
+		if (pageAnnotations !== lastAnnotationsRef) {
+			lastAnnotationsRef = pageAnnotations;
+			internalAnnotations = normalizeAnnotations(pageAnnotations, activePage);
+			loadPage(activePage);
+		}
+	});
 
-	$: effectiveUser = user || ownerId || 'user1';
-	$: effectiveDisabledPages = disabled_pages || disabledPages || [];
-	$: coreSaveState = saveState ?? normalizeSavingState(savingState);
-	$: effectiveSaveState = saveState ?? coreSaveState;
-	$: pdfInput = makePdfInput(pdfBlob);
-	$: {
+	// Keep adjacent page map in sync
+	$effect(() => {
 		internalAnnotations;
 		allObjects;
 		activePage;
 		rebuildAdjacentAnnotations();
-	}
+	});
 </script>
 
 {#if pdfInput}
 	<PDFEditorCore
-		bind:allObjects
+		allObjects={allObjects}
 		currentPage={activePage}
 		pdfBlob={pdfInput}
 		{allowPrinting}
@@ -229,7 +276,7 @@
 		saveState={effectiveSaveState}
 		disabled_pages={effectiveDisabledPages}
 		{disabled}
-		homework_info={homework_info}
+		{homework_info}
 		{isPageLoading}
 		{autoSaveEnabled}
 		{allowTeacherMark}
@@ -244,8 +291,5 @@
 		{getAllPageAnnotations}
 	/>
 {:else}
-	<slot />
+	{@render children?.()}
 {/if}
-
-
-

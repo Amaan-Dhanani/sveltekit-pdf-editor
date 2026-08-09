@@ -1,5 +1,6 @@
 // Define a strongly typed color entry
 export type PresetColor = {
+	name: string | null | undefined;
 	label: string;
 	hex: string;
 	outline: string;
@@ -10,47 +11,56 @@ export const presetColors: PresetColor[] = [
 	{
 		label: 'Black',
 		hex: '#232529',
-		outline: 'rgba(92, 94, 99, 0.6)'
+		outline: 'rgba(92, 94, 99, 0.6)',
+		name: undefined
 	},
 	{
 		label: 'Gray',
 		hex: '#5C5E63',
-		outline: 'rgba(35, 37, 41, 0.6)'
+		outline: 'rgba(35, 37, 41, 0.6)',
+		name: undefined
 	},
 	{
 		label: 'Red',
 		hex: '#FF5B59',
-		outline: 'rgba(255, 91, 89, 0.3)'
+		outline: 'rgba(255, 91, 89, 0.3)',
+		name: undefined
 	},
 	{
 		label: 'Pink',
 		hex: '#F65385',
-		outline: 'rgba(246, 83, 133, 0.3)'
+		outline: 'rgba(246, 83, 133, 0.3)',
+		name: undefined
 	},
 	{
 		label: 'Orange',
 		hex: '#FD9038',
-		outline: 'rgba(253, 144, 56, 0.4)'
+		outline: 'rgba(253, 144, 56, 0.4)',
+		name: undefined
 	},
 	{
 		label: 'Yellow',
 		hex: '#F5B900',
-		outline: 'rgba(245, 185, 0, 0.4)'
+		outline: 'rgba(245, 185, 0, 0.4)',
+		name: undefined
 	},
 	{
 		label: 'Green',
 		hex: '#0FC27B',
-		outline: 'rgba(15, 194, 123, 0.4)'
+		outline: 'rgba(15, 194, 123, 0.4)',
+		name: undefined
 	},
 	{
 		label: 'Cyan',
 		hex: '#17BDE9',
-		outline: 'rgba(23, 189, 233, 0.4)'
+		outline: 'rgba(23, 189, 233, 0.4)',
+		name: undefined
 	},
 	{
 		label: 'Blue',
 		hex: '#266DF0',
-		outline: 'rgba(38, 109, 240, 0.4)'
+		outline: 'rgba(38, 109, 240, 0.4)',
+		name: undefined
 	},
 	// {
 	// 	label: 'Purple',

@@ -14,7 +14,4 @@ export default defineConfig({
 			promiseImportName: (i) => `__tla_${i}`
 		})
 	],
-	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}']
-	}
 });

@@ -264,7 +264,7 @@
 			y2: currentPoint.y,
 			strokeColor,
 			strokeWidth,
-			lineType
+			lineType: lineType as 'solid' | 'dotted' | 'dashed'
 		};
 	}
 

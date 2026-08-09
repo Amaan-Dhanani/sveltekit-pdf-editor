@@ -74,8 +74,8 @@
 	}: Props = $props();
 
 	let isOpen = $state(false);
-	let triggerButton: HTMLButtonElement;
-	let menuElement: HTMLDivElement;
+	let menuElement = $state<HTMLDivElement | null>(null);
+	let triggerButton = $state<HTMLButtonElement | null>(null);
 	let menuStyle = $state('');
 	const ctx = getPDFEditorContext();
 	let toolbarPosition = $derived(ctx.state.toolbarPosition);
@@ -201,11 +201,11 @@
 		<Portal>
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="fixed inset-0 z-[60]" onclick={closeMenu}></div>
+			<div class="fixed inset-0 z-60" onclick={closeMenu}></div>
 			<div
 				bind:this={menuElement}
 				transition:fly={{ y: toolbarPosition === 'bottom' ? 10 : 0, duration: 200 }}
-				class="pdf-editor-touch-controls fixed z-[120] w-56 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
+				class="pdf-editor-touch-controls fixed z-120 w-56 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
 				style={menuStyle}
 			>
 				<div class="mb-2 px-3 py-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
@@ -332,5 +332,3 @@
 		</Portal>
 	{/if}
 </div>
-
-

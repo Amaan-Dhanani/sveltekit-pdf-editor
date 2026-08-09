@@ -11,7 +11,7 @@
 		LucideChevronUp
 	} from 'lucide-svelte';
 	import { presetColors } from '../../utils/colorPresets';
-	import type { PDFObject } from '../../context/pdfEditorContext';
+	import type { PDFObject } from '../../context/pdfEditorContext.svelte';
 
 	interface Props {
 		selectedLine: PDFObject | null;
@@ -36,7 +36,10 @@
 
 {#if selectedLine}
 	<!-- Fixed Top-Right Panel -->
-	<div transition:fly={{ x: 10, y: 0, duration: 200 }} class="pdf-editor-touch-controls fixed top-20 right-3 z-[110]">
+	<div
+		transition:fly={{ x: 10, y: 0, duration: 200 }}
+		class="pdf-editor-touch-controls fixed top-20 right-3 z-110"
+	>
 		<div
 			class="border border-gray-200 bg-white shadow-2xl transition-all duration-200"
 			class:w-64={!isMinimized}
@@ -112,7 +115,8 @@
 					<div class="flex items-center gap-2">
 						<button
 							class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
-							onclick={() => onStrokeWidthChange(Math.max(1, (selectedLine?.strokeWidth || 2) - 1))}
+							onclick={() =>
+								onStrokeWidthChange(Math.max(1, (Number(selectedLine?.strokeWidth) || 2) - 1))}
 							title="Decrease"
 						>
 							<LucideMinus size={16} />
@@ -134,7 +138,7 @@
 						<button
 							class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
 							onclick={() =>
-								onStrokeWidthChange(Math.min(20, (selectedLine?.strokeWidth || 2) + 1))}
+								onStrokeWidthChange(Math.min(20, (Number(selectedLine?.strokeWidth) || 2) + 1))}
 							title="Increase"
 						>
 							<LucidePlus size={16} />

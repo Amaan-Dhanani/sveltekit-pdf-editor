@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, tick } from 'svelte';
 	import { toast, TOAST_ERROR } from './utils/toast';
-	import { createPluginRegistration } from '@embedpdf/core';
+	import { createPluginRegistration, type PluginBatchRegistrations } from '@embedpdf/core';
 	import { EmbedPDF } from '@embedpdf/core/svelte';
 	import { usePdfiumEngine } from '@embedpdf/engines/svelte';
 	import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/svelte';
@@ -350,15 +350,11 @@
 	// Utils
 	import { save } from './utils/PDF.js';
 	import HomeworkInfoModal from './components/HomeworkInfoModal.svelte';
-	import {
-		findDrawingsAtPoint,
-		getPathGeometry,
-		getTransformedDrawingBBox,
-	} from './utils/hitTest';
+	import { findDrawingsAtPoint, getPathGeometry, getTransformedDrawingBBox } from './utils/hitTest';
 	import { createObjectSpatialIndex } from './utils/spatialIndex';
 
 	let {
-		allObjects = $bindable([]),
+		allObjects,
 		currentPage,
 		pdfBlob,
 		allowPrinting = false,
@@ -389,21 +385,43 @@
 
 	// Initialize context with current state (allObjects is managed externally as prop)
 	const ctx = setPDFEditorContext({
-		user,
-		currentPage,
-		saveState,
-		homework_info,
-		disabled_pages,
-		allowPrinting,
-		autoSaveEnabled,
-		allowTeacherMark,
-		teacherMarkName,
-		isPageLoading
+		get user() {
+			return user;
+		},
+		get currentPage() {
+			return currentPage;
+		},
+		get saveState() {
+			return saveState;
+		},
+		get homework_info() {
+			return homework_info;
+		},
+		get disabled_pages() {
+			return disabled_pages;
+		},
+		get allowPrinting() {
+			return allowPrinting;
+		},
+		get autoSaveEnabled() {
+			return autoSaveEnabled;
+		},
+		get allowTeacherMark() {
+			return allowTeacherMark;
+		},
+		get teacherMarkName() {
+			return teacherMarkName;
+		},
+		get isPageLoading() {
+			return isPageLoading;
+		}
 	});
-
+	
 	// Initialize composables
 	const modes = usePDFModes();
-	const resolvedPlugins = $derived(resolvePdfEditorPlugins(plugins as PdfEditorPlugin[] | undefined));
+	const resolvedPlugins = $derived(
+		resolvePdfEditorPlugins(plugins as PdfEditorPlugin[] | undefined)
+	);
 	const enabledTools = $derived(resolvedPlugins.enabledTools);
 	const enabledToolMap = $derived(resolvedPlugins.enabledToolMap);
 	const embedPdfPluginRegistrations = $derived(resolvedPlugins.embedPdfRegistrations);
@@ -474,8 +492,9 @@
 	let objectSpatialIndex = $derived.by(() => createObjectSpatialIndex(allObjects || []));
 	let selectedObjectIdSet = $derived.by(() => new Set(ctx.state.selectedObjectIds));
 
-	function getObjectById<T = any>(id: string | null | undefined): T | undefined {
-		return id ? objectById.get(id) : undefined;
+	function getObjectById(id: string, fallback?: string): any {
+		if (!id) return fallback;
+		return objectById.get(id) ?? fallback;
 	}
 
 	function getObjectIndexById(id: string | null | undefined) {
@@ -496,7 +515,7 @@
 	}
 
 	// internalPage is synced FROM currentPage (not TO it)
-	let internalPage = $state(currentPage);
+	let internalPage = $derived(currentPage);
 	let inputValue = $derived(internalPage.toString());
 	let toolPanelIsMinimized = $state(false);
 	let isCompleting = $state(false);
@@ -630,10 +649,11 @@
 		}
 	};
 
+	// svelte-ignore state_referenced_locally
 	const pdfEngine = usePdfiumEngine({ wasmUrl, worker: false });
 
 	let pdfFile: File | undefined = $state();
-	let pdfName = '';
+	let pdfName = $state('');
 	let pdfDocumentId = $state('pdf-editor-document');
 	let pdfBuffer: ArrayBuffer | null = $state(null);
 	let pages: number[] = $state([]);
@@ -662,7 +682,12 @@
 			: 0
 	);
 	let pageStackWidth = $derived(scaledPagePreviewWidth + columnPageTabWidth);
-	let visiblePageRect = $state({ x: 0, y: 0, width: currentPageWidth, height: currentPageHeight });
+	let visiblePageRect = $derived({
+		x: 0,
+		y: 0,
+		width: currentPageWidth,
+		height: currentPageHeight
+	});
 	let visiblePageRectFrame: number | null = null;
 	let cameraRestoreFrame: number | null = null;
 	let initialCenterFrame: number | null = null;
@@ -691,9 +716,7 @@
 	let scrollRootTouchAction = $derived(
 		ctx.state.isHandMode || drawingInputActive ? 'none' : 'pan-x pan-y'
 	);
-	let workspaceTouchAction = $derived(
-		ctx.state.isHandMode || drawingInputActive ? 'none' : 'auto'
-	);
+	let workspaceTouchAction = $derived(ctx.state.isHandMode || drawingInputActive ? 'none' : 'auto');
 
 	$effect(() => {
 		ctx.state.zoom;
@@ -728,7 +751,7 @@
 	}
 
 	const embedPdfPlugins = $derived(
-		pdfBuffer
+		(pdfBuffer
 			? [
 					createPluginRegistration(DocumentManagerPluginPackage, {
 						maxDocuments: 1
@@ -739,7 +762,7 @@
 					}),
 					...embedPdfPluginRegistrations
 				]
-			: []
+			: []) as PluginBatchRegistrations
 	);
 
 	// Pagination
@@ -978,7 +1001,11 @@
 
 	function scrollEditorBy(left: number, top: number, behavior: ScrollBehavior = 'auto') {
 		if (editorScrollRoot) {
-			scrollEditorTo(editorScrollRoot.scrollLeft + left, editorScrollRoot.scrollTop + top, behavior);
+			scrollEditorTo(
+				editorScrollRoot.scrollLeft + left,
+				editorScrollRoot.scrollTop + top,
+				behavior
+			);
 			return;
 		}
 
@@ -1315,9 +1342,7 @@
 			useVisibleObjectRendering = savedVisibleObjectRendering === 'true';
 		}
 
-		const savedMinimapAnnotations = localStorage.getItem(
-			'pdf-editor-minimap-annotations-enabled'
-		);
+		const savedMinimapAnnotations = localStorage.getItem('pdf-editor-minimap-annotations-enabled');
 		if (savedMinimapAnnotations !== null) {
 			minimapAnnotationsEnabled = savedMinimapAnnotations === 'true';
 		}
@@ -1339,10 +1364,7 @@
 		const savedAdjacentPagePreviewLayout = localStorage.getItem(
 			'pdf-editor-adjacent-page-preview-layout'
 		);
-		if (
-			savedAdjacentPagePreviewLayout === 'row' ||
-			savedAdjacentPagePreviewLayout === 'column'
-		) {
+		if (savedAdjacentPagePreviewLayout === 'row' || savedAdjacentPagePreviewLayout === 'column') {
 			adjacentPagePreviewLayout = savedAdjacentPagePreviewLayout;
 		} else if (savedAdjacentPagePreviewLayout === 'grid') {
 			adjacentPagePreviewLayout = 'column';
@@ -1397,7 +1419,8 @@
 		try {
 			pdfName = file?.name || 'document.pdf';
 			const blob = file instanceof Blob ? file : new Blob([file], { type: 'application/pdf' });
-			pdfFile = blob instanceof File ? blob : new File([blob], pdfName, { type: 'application/pdf' });
+			pdfFile =
+				blob instanceof File ? blob : new File([blob], pdfName, { type: 'application/pdf' });
 			pdfBuffer = await blob.arrayBuffer();
 			pdfDocumentId = `pdf-editor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 			internalPage = currentPage;
@@ -1513,7 +1536,7 @@
 		});
 
 		allObjects.push(object);
-		allObjects.sort((a, b) => {
+		allObjects.sort((a: Record<string, any>, b: Record<string, any>) => {
 			const TYPE_ORDER: Record<string, number> = {
 				drawing: 1,
 				highlight: 1,
@@ -1555,7 +1578,11 @@
 		brushOpacity: number,
 		type: 'drawing' | 'highlight' = 'drawing'
 	) {
-		if ((type === 'highlight' && !hasTool('highlighter')) || (type === 'drawing' && !hasTool('pen'))) return;
+		if (
+			(type === 'highlight' && !hasTool('highlighter')) ||
+			(type === 'drawing' && !hasTool('pen'))
+		)
+			return;
 		const id = genID();
 		const safePath = clampPathToPage(path, Math.max(brushSize || 1, 1) / 2);
 		const opacity = Number(brushOpacity);
@@ -1573,11 +1600,15 @@
 			rotation: 0,
 			brushSize,
 			brushColor,
-			opacity: Number.isFinite(opacity) ? Math.max(0, Math.min(opacity, 1)) : type === 'highlight' ? 0.5 : 1
+			opacity: Number.isFinite(opacity)
+				? Math.max(0, Math.min(opacity, 1))
+				: type === 'highlight'
+					? 0.5
+					: 1
 		});
 
 		allObjects.push(object);
-		allObjects.sort((a, b) => {
+		allObjects.sort((a: Record<string, any>, b: Record<string, any>) => {
 			const TYPE_ORDER: Record<string, number> = {
 				drawing: 1,
 				highlight: 1,
@@ -1733,8 +1764,9 @@
 		ctx
 	);
 
-	async function handlePageInput(event) {
-		const value = event.target.value;
+	async function handlePageInput(event: Event) {
+		const target = event.target as HTMLInputElement;
+		const value = target.value;
 
 		if (value === '') {
 			inputValue = '';
@@ -1772,13 +1804,16 @@
 	let selectedPageIndex = $derived(currentPage - 1);
 
 	// Check page disabled
-	function isPageDisdabledFunction(disabled_pages, currentPage) {
+	function isPageDisabledFunction(
+		disabled_pages: Array<{ from_page: number; to_page: number }>,
+		currentPage: number
+	): boolean {
 		return disabled_pages.some(
 			(range) => currentPage >= range.from_page && currentPage <= range.to_page
 		);
 	}
 
-	let isPageDisabled = $derived(isPageDisdabledFunction(disabled_pages, currentPage));
+	let isPageDisabled = $derived(isPageDisabledFunction(disabled_pages, currentPage));
 
 	// Global disabled state (combines global disabled prop with page-specific disabled)
 	let isEditorDisabled = $derived(disabled || isPageDisabled);
@@ -1794,19 +1829,19 @@
 	let dragOriginalBoxes = new Map<string, any>();
 	let previewedSelectionObjectId: string | null = $state(null);
 
-	function isObjectEditable(obj) {
+	function isObjectEditable(obj: Record<string, any>) {
 		return obj?.owner === user || obj?.owner === `global-${user}`;
 	}
 
-	function getDrawingPathBBox(obj) {
+	function getDrawingPathBBox(obj: Record<string, any>) {
 		return getPathGeometry(obj.path || '').bbox;
 	}
 
-	function getDrawingVisualBox(obj) {
+	function getDrawingVisualBox(obj: any) {
 		const pathBBox = getDrawingPathBBox(obj);
 		if (!pathBBox) return null;
 
-		const scale = obj.scale ?? obj.width / obj.originWidth ?? 1;
+		const scale = obj.scale ?? (obj.originWidth ? obj.width / obj.originWidth : 1);
 		const box = getTransformedDrawingBBox(obj, pathBBox, scale, obj.rotation || 0);
 		const strokePadding = Math.max((obj.brushSize || 1) * Math.abs(scale), 1) / 2;
 
@@ -1819,7 +1854,7 @@
 		};
 	}
 
-	function getObjectVisualBoxCacheKey(obj) {
+	function getObjectVisualBoxCacheKey(obj: Record<string, any>) {
 		if (obj.type === 'drawing') {
 			return [
 				obj.type,
@@ -1840,15 +1875,9 @@
 		}
 
 		if (obj.type === 'text') {
-			return [
-				obj.type,
-				obj.x,
-				obj.y,
-				obj.width,
-				obj.size,
-				obj.lineHeight,
-				obj.lines?.length
-			].join('|');
+			return [obj.type, obj.x, obj.y, obj.width, obj.size, obj.lineHeight, obj.lines?.length].join(
+				'|'
+			);
 		}
 
 		if (obj.type === 'teacher-mark') {
@@ -1870,7 +1899,7 @@
 		return [obj.type, obj.x, obj.y, obj.width, obj.height].join('|');
 	}
 
-	function getObjectVisualBox(obj) {
+	function getObjectVisualBox(obj: Record<string, any>) {
 		if (!obj) return null;
 
 		const cacheKey = getObjectVisualBoxCacheKey(obj);
@@ -1919,22 +1948,19 @@
 		return box;
 	}
 
-	function boxesIntersect(a, b) {
+	function boxesIntersect(a: Record<string, any>, b: Record<string, any>) {
 		return (
-			a.x <= b.x + b.width &&
-			a.x + a.width >= b.x &&
-			a.y <= b.y + b.height &&
-			a.y + a.height >= b.y
+			a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y
 		);
 	}
 
-	function clampNumber(value, min, max) {
+	function clampNumber(value: number, min: number, max: number) {
 		const safeValue = Number.isFinite(value) ? value : min;
 		if (min > max) return (min + max) / 2;
 		return Math.max(min, Math.min(safeValue, max));
 	}
 
-	function roundPageValue(value) {
+	function roundPageValue(value: number) {
 		const rounded = Math.round(value * 100) / 100;
 		return Object.is(rounded, -0) ? 0 : rounded;
 	}
@@ -1952,7 +1978,7 @@
 		});
 	}
 
-	function getFallbackObjectBox(obj) {
+	function getFallbackObjectBox(obj: Record<string, any>) {
 		if (!obj) return null;
 
 		const width = Math.abs(obj.width ?? obj.originWidth ?? 1);
@@ -1966,11 +1992,11 @@
 		};
 	}
 
-	function getObjectBoundaryBox(obj) {
+	function getObjectBoundaryBox(obj: Record<string, any>) {
 		return getObjectVisualBox(obj) || getFallbackObjectBox(obj);
 	}
 
-	function getBoxConfinementDelta(box) {
+	function getBoxConfinementDelta(box: any) {
 		if (!box) return { x: 0, y: 0 };
 
 		const targetX =
@@ -1988,12 +2014,12 @@
 		};
 	}
 
-	function getBoxesConfinementDelta(boxes) {
+	function getBoxesConfinementDelta(boxes: any) {
 		const combinedBox = combineBoxes(boxes.filter(Boolean));
 		return getBoxConfinementDelta(combinedBox);
 	}
 
-	function getClampedMoveDelta(boxes, dx, dy) {
+	function getClampedMoveDelta(boxes: any[], dx: number, dy: number) {
 		const movedBoxes = boxes.map((box) => ({
 			...box,
 			x: box.x + dx,
@@ -2007,7 +2033,7 @@
 		};
 	}
 
-	function limitObjectSizeToPage(obj) {
+	function limitObjectSizeToPage(obj: Record<string, any>) {
 		const candidate = { ...obj };
 		const box = getObjectBoundaryBox(candidate);
 		if (!box || (box.width <= currentPageWidth && box.height <= currentPageHeight)) {
@@ -2024,7 +2050,7 @@
 
 		if (candidate.type === 'drawing') {
 			const currentScale =
-				candidate.scale ?? candidate.width / candidate.originWidth ?? 1;
+				candidate.scale ?? (candidate.originWidth ? candidate.width / candidate.originWidth : 1);
 			const nextScale = Math.max(0.01, currentScale * fitScale);
 			candidate.scale = nextScale;
 			candidate.width = candidate.originWidth * nextScale;
@@ -2042,7 +2068,7 @@
 		return candidate;
 	}
 
-	function confineObjectToPage(obj) {
+	function confineObjectToPage(obj: any): any {
 		const candidate = limitObjectSizeToPage(obj);
 		const box = getObjectBoundaryBox(candidate);
 		const delta = getBoxConfinementDelta(box);
@@ -2067,22 +2093,27 @@
 		});
 	}
 
-	function getTeacherMarkContentSize(object, fontSize: number) {
+	function getTeacherMarkContentSize(object: Record<string, any>, fontSize: number) {
 		const label = String(object?.label || 'Marked correct').toUpperCase();
 		const markedBy = `Stamped by ${capitalizeFirstLetter(object?.markedBy || 'Teacher')}`;
-		const markedAt = getTeacherMarkDisplayDate(object?.markedAt || object?.updatedAt || new Date().toISOString());
+		const markedAt = getTeacherMarkDisplayDate(
+			object?.markedAt || object?.updatedAt || new Date().toISOString()
+		);
 		const metaFontSize = fontSize * 0.68;
 		const labelWidth = label.length * fontSize * 0.62;
 		const nameWidth = markedBy.length * metaFontSize * 0.5;
 		const timeWidth = markedAt.length * metaFontSize * 0.5;
 		const iconWidth = object?.stampIcon && object.stampIcon !== 'none' ? fontSize * 1.8 + 2 : 0;
-		const width = Math.max(30, Math.ceil(Math.max(labelWidth, nameWidth, timeWidth) + iconWidth + 8));
+		const width = Math.max(
+			30,
+			Math.ceil(Math.max(labelWidth, nameWidth, timeWidth) + iconWidth + 8)
+		);
 		const height = Math.max(16, Math.ceil(fontSize + metaFontSize * 2.1 + 4));
 
 		return { width, height };
 	}
 
-	function getTeacherMarkUpdatePayload(object, payload: Record<string, any>) {
+	function getTeacherMarkUpdatePayload(object: Record<string, any>, payload: Record<string, any>) {
 		const hasFontSize = Object.prototype.hasOwnProperty.call(payload, 'fontSize');
 		const hasStampIcon = Object.prototype.hasOwnProperty.call(payload, 'stampIcon');
 		if (!hasFontSize && !hasStampIcon) return payload;
@@ -2126,11 +2157,11 @@
 		};
 	}
 
-	function updateTeacherMark(object, payload: Record<string, any>) {
+	function updateTeacherMark(object: any, payload: Record<string, any>) {
 		updateObject(object.id, getTeacherMarkUpdatePayload(object, payload));
 	}
 
-	function shouldAlwaysRenderObject(obj) {
+	function shouldAlwaysRenderObject(obj: Record<string, any>) {
 		return (
 			isSelectedObjectId(obj.id) ||
 			previewedSelectionObjectId === obj.id ||
@@ -2140,7 +2171,7 @@
 		);
 	}
 
-	function isObjectVisible(obj) {
+	function isObjectVisible(obj: Record<string, any>) {
 		if (shouldAlwaysRenderObject(obj)) return true;
 
 		const box = getObjectVisualBox(obj);
@@ -2167,7 +2198,10 @@
 		return backingScale < Math.min(targetScale, maxBackingScale) * 0.9;
 	}
 
-	function shouldRenderObjectOnCanvas(object, backingScaleCapped = isAnnotationCanvasBackingScaleCapped()) {
+	function shouldRenderObjectOnCanvas(
+		object: any,
+		backingScaleCapped = isAnnotationCanvasBackingScaleCapped()
+	) {
 		if (object.type !== 'drawing' && object.type !== 'highlight') return false;
 		if (object._eraserHighlight) return false;
 		if (backingScaleCapped) return false;
@@ -2175,7 +2209,7 @@
 		return true;
 	}
 
-	function shouldRenderObjectOnScreen(object) {
+	function shouldRenderObjectOnScreen(object: any) {
 		if (object.type !== 'drawing' && object.type !== 'highlight') return false;
 		return shouldUseAnnotationVectorRendering(annotationRenderZoom);
 	}
@@ -2435,7 +2469,7 @@
 		};
 	}
 
-	function combineBoxes(boxes) {
+	function combineBoxes(boxes: any[]) {
 		if (boxes.length === 0) return null;
 
 		const left = Math.min(...boxes.map((box) => box.x));
@@ -2486,25 +2520,18 @@
 	});
 
 	$effect(() => {
-		if (
-			previewedSelectionObjectId &&
-			!isSelectedObjectId(previewedSelectionObjectId)
-		) {
+		if (previewedSelectionObjectId && !isSelectedObjectId(previewedSelectionObjectId)) {
 			previewedSelectionObjectId = null;
 		}
 	});
 
 	let selectionResizeBox = $derived.by(() => {
-		if (
-			!ctx.state.isSelectionMode ||
-			isLassoSelecting ||
-			resizableSelectedObjects.length === 0
-		)
+		if (!ctx.state.isSelectionMode || isLassoSelecting || resizableSelectedObjects.length === 0)
 			return null;
 		return combineBoxes(resizableSelectedObjects.map(getObjectVisualBox).filter(Boolean));
 	});
 
-	function getPagePoint(event) {
+	function getPagePoint(event: MouseEvent) {
 		if (!pageContentLayer) return null;
 
 		const rect = pageContentLayer.getBoundingClientRect();
@@ -2514,15 +2541,15 @@
 		};
 	}
 
-	function clampSelectionScale(value) {
+	function clampSelectionScale(value: number) {
 		return Math.max(0.1, Math.min(value, 10));
 	}
 
-	function normalizeFontSize(value) {
+	function normalizeFontSize(value: number) {
 		return Math.max(1, Math.round(Number(value) || 16));
 	}
 
-	function snapshotResizableObject(obj) {
+	function snapshotResizableObject(obj: Record<string, any>) {
 		return {
 			id: obj.id,
 			type: obj.type,
@@ -2547,7 +2574,7 @@
 		selectedTeacherMark ? horizontalResizeHandleConfigs : defaultResizeHandleConfigs
 	);
 
-	function getResizeHandlePoint(box, anchor) {
+	function getResizeHandlePoint(box: Record<string, any>, anchor: string) {
 		const x = anchor.includes('right') ? box.x + box.width : box.x;
 		const y =
 			anchor === 'left' || anchor === 'right'
@@ -2558,7 +2585,7 @@
 		return { x, y };
 	}
 
-	function getOppositeResizeAnchor(anchor) {
+	function getOppositeResizeAnchor(anchor: string) {
 		return anchor
 			.replace('top', 'temporary')
 			.replace('bottom', 'top')
@@ -2568,7 +2595,7 @@
 			.replace('temporary', 'right');
 	}
 
-	function getResizeScale(point, state) {
+	function getResizeScale(point: Record<string, any>, state: Record<string, any>) {
 		const fixedPoint = state.fixedPoint;
 		if (state.anchor === 'left' || state.anchor === 'right') {
 			const startDistance = Math.max(Math.abs(state.startPoint.x - fixedPoint.x), 1);
@@ -2584,11 +2611,15 @@
 		return clampSelectionScale(currentDistance / startDistance);
 	}
 
-	function getScaledPoint(value, origin, scale) {
+	function getScaledPoint(value: number, origin: number, scale: number) {
 		return origin + (value - origin) * scale;
 	}
 
-	function getScaledBoxFromFixedPoint(box, fixedPoint, scale) {
+	function getScaledBoxFromFixedPoint(
+		box: Record<string, any>,
+		fixedPoint: Record<string, any>,
+		scale: number
+	) {
 		const x1 = getScaledPoint(box.x, fixedPoint.x, scale);
 		const y1 = getScaledPoint(box.y, fixedPoint.y, scale);
 		const x2 = getScaledPoint(box.x + box.width, fixedPoint.x, scale);
@@ -2602,7 +2633,11 @@
 		};
 	}
 
-	function getHorizontallyScaledBoxFromFixedPoint(box, fixedPoint, scale) {
+	function getHorizontallyScaledBoxFromFixedPoint(
+		box: Record<string, any>,
+		fixedPoint: Record<string, any>,
+		scale: number
+	) {
 		const x1 = getScaledPoint(box.x, fixedPoint.x, scale);
 		const x2 = getScaledPoint(box.x + box.width, fixedPoint.x, scale);
 
@@ -2614,7 +2649,7 @@
 		};
 	}
 
-	function doesBoxFitPage(box) {
+	function doesBoxFitPage(box: Record<string, any>) {
 		return (
 			box.x >= 0 &&
 			box.y >= 0 &&
@@ -2623,7 +2658,7 @@
 		);
 	}
 
-	function clampResizeScaleToPage(scale, state) {
+	function clampResizeScaleToPage(scale: number, state: Record<string, any>) {
 		if (!state?.box || !state?.fixedPoint) return scale;
 
 		const isHorizontalResize = state.anchor === 'left' || state.anchor === 'right';
@@ -2651,7 +2686,7 @@
 		return low;
 	}
 
-	function applySelectionResize(scale) {
+	function applySelectionResize(scale: number) {
 		if (!selectionResizeState) return;
 
 		scale = clampResizeScaleToPage(scale, selectionResizeState);
@@ -2659,7 +2694,7 @@
 		let didResize = false;
 		const candidates: Array<{ index: number; object: any }> = [];
 
-		objects.forEach((entry) => {
+		objects.forEach((entry: Record<string, any>) => {
 			const index = getObjectIndexById(entry.id);
 			if (index === -1 || !entry.bounds) return;
 
@@ -2670,7 +2705,9 @@
 				const pathBBox = getDrawingPathBBox(original);
 				if (!pathBBox) return;
 
-				const originalScale = original.scale ?? original.width / original.originWidth ?? 1;
+				const originalScale =
+					original.scale ??
+					(original.width && original.originWidth ? original.width / original.originWidth : 1);
 				const nextScale = originalScale * scale;
 				const localBox = getTransformedDrawingBBox(
 					{ ...original, x: 0, y: 0, scale: nextScale },
@@ -2710,7 +2747,10 @@
 					size: nextSize
 				});
 				candidates.push({ index, object: candidate });
-				if (ctx.state.selectedObjectIds.length === 1 && ctx.state.selectedObjectIds[0] === original.id) {
+				if (
+					ctx.state.selectedObjectIds.length === 1 &&
+					ctx.state.selectedObjectIds[0] === original.id
+				) {
 					ctx.state._size = candidate.size;
 				}
 				didResize = true;
@@ -2748,7 +2788,7 @@
 		if (!selectionResizeState) return;
 
 		let didRestore = false;
-		selectionResizeState.objects.forEach((entry) => {
+		selectionResizeState.objects.forEach((entry: Record<string, any>) => {
 			const index = getObjectIndexById(entry.id);
 			if (index !== -1) {
 				invalidateObjectVisualBoxCache(entry.id);
@@ -2762,7 +2802,7 @@
 		}
 	}
 
-	function getResizeTrackedKeys(type) {
+	function getResizeTrackedKeys(type: string) {
 		if (type === 'drawing') return ['x', 'y', 'scale', 'width', 'rotation'];
 		if (type === 'line') return ['x', 'y', 'width', 'height'];
 		if (type === 'text') return ['x', 'y', 'width', 'size'];
@@ -2775,7 +2815,7 @@
 
 		const updates: any[] = [];
 
-		selectionResizeState.objects.forEach((entry) => {
+		selectionResizeState.objects.forEach((entry: Record<string, any>) => {
 			const current = getObjectById(entry.id);
 			if (!current) return;
 
@@ -2834,7 +2874,10 @@
 			activeResize?.pointerTarget?.releasePointerCapture?.(activeResize.pointerId);
 		} catch {}
 		activeResize?.pointerTarget?.removeEventListener?.('pointerup', handleSelectionResizeEnd);
-		activeResize?.pointerTarget?.removeEventListener?.('pointercancel', handleSelectionResizeCancel);
+		activeResize?.pointerTarget?.removeEventListener?.(
+			'pointercancel',
+			handleSelectionResizeCancel
+		);
 		activeResize?.pointerTarget?.removeEventListener?.(
 			'lostpointercapture',
 			handleSelectionResizeLostCapture
@@ -2849,16 +2892,20 @@
 		}
 	}
 
-	function normalizeRotation(value) {
+	function normalizeRotation(value: number) {
 		const normalized = value % 360;
 		return normalized < 0 ? normalized + 360 : normalized;
 	}
 
-	function getAngleFromCenter(point, center) {
+	function getAngleFromCenter(point: Record<string, any>, center: Record<string, any>) {
 		return (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
 	}
 
-	function rotatePointAroundCenter(point, center, rotation) {
+	function rotatePointAroundCenter(
+		point: Record<string, any>,
+		center: Record<string, any>,
+		rotation: number
+	) {
 		const angle = (rotation * Math.PI) / 180;
 		const cos = Math.cos(angle);
 		const sin = Math.sin(angle);
@@ -2871,7 +2918,7 @@
 		};
 	}
 
-	function snapshotRotatableObject(obj) {
+	function snapshotRotatableObject(obj: Record<string, any>) {
 		const pathBBox = getDrawingPathBBox(obj);
 		if (!pathBBox) return null;
 
@@ -2892,12 +2939,12 @@
 		};
 	}
 
-	function applySelectionRotation(deltaRotation) {
+	function applySelectionRotation(deltaRotation: number) {
 		if (!selectionRotationState) return;
 
 		let didRotate = false;
 		const candidates: Array<{ index: number; object: any }> = [];
-		selectionRotationState.objects.forEach((entry) => {
+		selectionRotationState.objects.forEach((entry: Record<string, any>) => {
 			const index = getObjectIndexById(entry.id);
 			if (index === -1) return;
 
@@ -2939,7 +2986,7 @@
 		if (!selectionRotationState) return;
 
 		let didRestore = false;
-		selectionRotationState.objects.forEach((entry) => {
+		selectionRotationState.objects.forEach((entry: Record<string, any>) => {
 			const index = getObjectIndexById(entry.id);
 			if (index !== -1) {
 				invalidateObjectVisualBoxCache(entry.id);
@@ -2957,7 +3004,7 @@
 		if (!selectionRotationState) return;
 
 		const updates: any[] = [];
-		selectionRotationState.objects.forEach((entry) => {
+		selectionRotationState.objects.forEach((entry: Record<string, any>) => {
 			const current = getObjectById(entry.id);
 			if (!current) return;
 
@@ -3007,7 +3054,7 @@
 		}
 	}
 
-	function handleSelectionResizeStart(event, anchor = 'bottom-right') {
+	function handleSelectionResizeStart(event: any, anchor = 'bottom-right') {
 		if (
 			!selectionResizeBox ||
 			resizableSelectedObjects.length === 0 ||
@@ -3023,10 +3070,7 @@
 
 		const point = getPagePoint(event);
 		if (!point) return;
-		const fixedPoint = getResizeHandlePoint(
-			selectionResizeBox,
-			getOppositeResizeAnchor(anchor)
-		);
+		const fixedPoint = getResizeHandlePoint(selectionResizeBox, getOppositeResizeAnchor(anchor));
 		const pointerTarget = event.currentTarget;
 
 		selectionResizeState = {
@@ -3050,7 +3094,7 @@
 		window.addEventListener('blur', handleSelectionInteractionAbort);
 	}
 
-	function handleSelectionResizeMove(event) {
+	function handleSelectionResizeMove(event: PointerEvent) {
 		if (!selectionResizeState || event.pointerId !== selectionResizeState.pointerId) return;
 
 		event.preventDefault();
@@ -3061,7 +3105,7 @@
 		applySelectionResize(getResizeScale(point, selectionResizeState));
 	}
 
-	function handleSelectionResizeEnd(event) {
+	function handleSelectionResizeEnd(event: PointerEvent) {
 		if (!selectionResizeState || event.pointerId !== selectionResizeState.pointerId) return;
 
 		event.preventDefault();
@@ -3070,7 +3114,7 @@
 		cleanupSelectionResize();
 	}
 
-	function handleSelectionResizeCancel(event) {
+	function handleSelectionResizeCancel(event: PointerEvent) {
 		if (!selectionResizeState || event.pointerId !== selectionResizeState.pointerId) return;
 
 		event.preventDefault();
@@ -3079,14 +3123,14 @@
 		cleanupSelectionResize();
 	}
 
-	function handleSelectionResizeLostCapture(event) {
+	function handleSelectionResizeLostCapture(event: PointerEvent) {
 		if (!selectionResizeState || event.pointerId !== selectionResizeState.pointerId) return;
 
 		commitSelectionResize();
 		cleanupSelectionResize();
 	}
 
-	function handleSelectionRotationStart(event) {
+	function handleSelectionRotationStart(event: any) {
 		if (
 			rotatableSelectedDrawingObjects.length === 0 ||
 			isEditorDisabled ||
@@ -3137,7 +3181,7 @@
 		window.addEventListener('blur', handleSelectionInteractionAbort);
 	}
 
-	function handleSelectionRotationMove(event) {
+	function handleSelectionRotationMove(event: PointerEvent) {
 		if (!selectionRotationState || event.pointerId !== selectionRotationState.pointerId) return;
 
 		event.preventDefault();
@@ -3149,7 +3193,7 @@
 		applySelectionRotation(currentAngle - selectionRotationState.startAngle);
 	}
 
-	function handleSelectionRotationEnd(event) {
+	function handleSelectionRotationEnd(event: PointerEvent) {
 		if (!selectionRotationState || event.pointerId !== selectionRotationState.pointerId) return;
 
 		event.preventDefault();
@@ -3158,7 +3202,7 @@
 		cleanupSelectionRotation();
 	}
 
-	function handleSelectionRotationCancel(event) {
+	function handleSelectionRotationCancel(event: PointerEvent) {
 		if (!selectionRotationState || event.pointerId !== selectionRotationState.pointerId) return;
 
 		event.preventDefault();
@@ -3167,7 +3211,7 @@
 		cleanupSelectionRotation();
 	}
 
-	function handleSelectionRotationLostCapture(event) {
+	function handleSelectionRotationLostCapture(event: PointerEvent) {
 		if (!selectionRotationState || event.pointerId !== selectionRotationState.pointerId) return;
 
 		commitSelectionRotation();
@@ -3184,7 +3228,8 @@
 	let selectedTextStyleObject = $derived(selectedTextObjects[0] ?? null);
 
 	$effect(() => {
-		if (!ctx.state.isSelectionMode || !selectedTextStyleObject || ctx.state.showingAddingText) return;
+		if (!ctx.state.isSelectionMode || !selectedTextStyleObject || ctx.state.showingAddingText)
+			return;
 
 		ctx.state._size = normalizeFontSize(selectedTextStyleObject.size);
 		ctx.state._lineHeight = selectedTextStyleObject.lineHeight || 1;
@@ -3251,7 +3296,7 @@
 	};
 
 	// Line handling
-	function addLine(lineData) {
+	function addLine(lineData: Record<string, any>) {
 		if (!hasTool('line')) return;
 		const id = genID();
 		const object = confineObjectToPage({
@@ -3270,8 +3315,14 @@
 		});
 
 		allObjects.push(object);
-		allObjects.sort((a, b) => {
-			const TYPE_ORDER = { drawing: 1, highlight: 1, line: 2, text: 3, 'teacher-mark': 4 };
+		allObjects.sort((a: Record<string, number>, b: Record<string, number>) => {
+			const TYPE_ORDER: Record<string, number> = {
+				drawing: 1,
+				highlight: 1,
+				line: 2,
+				text: 3,
+				'teacher-mark': 4
+			};
 			const orderA = TYPE_ORDER[a.type] || 0;
 			const orderB = TYPE_ORDER[b.type] || 0;
 			if (orderA !== orderB) return orderA - orderB;
@@ -3290,7 +3341,7 @@
 		ctx.state.selectedObjectIds = [id];
 	}
 
-	function selectLine(lineId) {
+	function selectLine(lineId: string) {
 		const line = getObjectById(lineId);
 		if (line && line.owner !== user) return;
 
@@ -3313,15 +3364,16 @@
 		}
 	}
 
-	function updateLine(lineId, updates) {
+	function updateLine(lineId: string, updates: Record<string, any>) {
 		const index = getObjectIndexById(lineId);
 		if (index !== -1 && allObjects[index]?.type === 'line') {
-			// Capture old state for undo
 			const oldObject = allObjects[index];
 			const nextObject = confineObjectToPage({ ...oldObject, ...updates });
-			const oldState = {};
-			const newState = {};
-			const trackedKeys = new Set([
+
+			const oldState: Record<string, any> = {};
+			const newState: Record<string, any> = {};
+
+			const trackedKeys = new Set<string>([
 				...Object.keys(updates),
 				'x',
 				'y',
@@ -3330,7 +3382,6 @@
 				'strokeWidth'
 			]);
 
-			// Only track the properties that are being changed
 			trackedKeys.forEach((key) => {
 				if (oldObject[key] !== nextObject[key]) {
 					oldState[key] = oldObject[key];
@@ -3340,10 +3391,8 @@
 
 			if (Object.keys(newState).length === 0) return;
 
-			// Update the object
 			allObjects[index] = nextObject;
 
-			// Add to history
 			const command = new UpdateObjectCommand(
 				lineId,
 				oldState,
@@ -3357,7 +3406,7 @@
 		}
 	}
 
-	function deleteLine(lineId) {
+	function deleteLine(lineId: string) {
 		const index = getObjectIndexById(lineId);
 		if (index !== -1) {
 			const removedObject = allObjects.splice(index, 1)[0];
@@ -3384,7 +3433,7 @@
 	}
 
 	// Selection mode
-	function isSelectableObjectForCurrentEditor(obj) {
+	function isSelectableObjectForCurrentEditor(obj: Record<string, any>) {
 		return obj && (allowTeacherMark || obj.type !== 'teacher-mark');
 	}
 
@@ -3397,7 +3446,7 @@
 		return ids.filter((id) => isSelectableObjectForCurrentEditor(getObjectById(id)));
 	}
 
-	function handleSelectionChange(selectedIds) {
+	function handleSelectionChange(selectedIds: string[]) {
 		ctx.state.selectedObjectIds = filterSelectableObjectIds(selectedIds);
 		ctx.state.selectedTextId = null;
 		ctx.state.showingAddingText = false;
@@ -3459,14 +3508,14 @@
 		}
 	}
 
-	function handleLineDoubleClick(lineId) {
+	function handleLineDoubleClick(lineId: string) {
 		// Trigger editing for the specific line element
 		ctx.state.editingLineId = lineId;
 		selectLine(lineId);
 		ctx.state.isSelectionMode = false;
 	}
 
-	function handleTextDoubleClick(textId) {
+	function handleTextDoubleClick(textId: string | null) {
 		// Trigger editing for the specific text element
 		ctx.state.editingTextId = textId;
 
@@ -3477,7 +3526,9 @@
 	}
 
 	function isSelectionControlEvent(event: Event) {
-		return event.target instanceof Element && Boolean(event.target.closest('[data-selection-control]'));
+		return (
+			event.target instanceof Element && Boolean(event.target.closest('[data-selection-control]'))
+		);
 	}
 
 	function startEditingSelectedText(textId: string) {
@@ -3488,7 +3539,7 @@
 		ctx.state.selectedTextId = null;
 	}
 
-	function handleSelectionClick(event) {
+	function handleSelectionClick(event: any) {
 		if (!ctx.state.isSelectionMode) return;
 
 		if (ctx.state.justFinishedDragging) {
@@ -3507,9 +3558,7 @@
 			y: (event.clientY - canvasRect.top) / ctx.state.zoom
 		};
 
-		const hitDrawingIds = filterSelectableObjectIds(
-			findObjectsAtPoint(clickPoint)
-		);
+		const hitDrawingIds = filterSelectableObjectIds(findObjectsAtPoint(clickPoint));
 
 		if (hitDrawingIds.length === 0) {
 			if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
@@ -3539,7 +3588,7 @@
 		ctx.state.showingAddingText = false;
 	}
 
-	function startDraggingSelection(event) {
+	function startDraggingSelection(event: any) {
 		if (
 			ctx.state.selectedObjectIds.length === 0 ||
 			isEditorDisabled ||
@@ -3570,7 +3619,7 @@
 		ctx.state.isDraggingSelection = true;
 	}
 
-	function dragSelection(event) {
+	function dragSelection(event: any) {
 		if (
 			!ctx.state.isDraggingSelection ||
 			ctx.state.selectedObjectIds.length === 0 ||
@@ -3742,7 +3791,7 @@
 
 		if (newIds.length > 0) {
 			// Re-sort objects to maintain type ordering
-			allObjects.sort((a, b) => {
+			allObjects.sort((a: Record<string, any>, b: Record<string, any>) => {
 				const TYPE_ORDER: Record<string, number> = {
 					drawing: 1,
 					highlight: 1,
@@ -3762,11 +3811,11 @@
 		}
 	}
 
-	function isObjectSelected(objectId) {
+	function isObjectSelected(objectId: string) {
 		return isSelectedObjectId(objectId);
 	}
 
-	function isObjectPreviewed(objectId) {
+	function isObjectPreviewed(objectId: string) {
 		return previewedSelectionObjectId === objectId;
 	}
 
@@ -3810,20 +3859,17 @@
 </script>
 
 <svelte:head>
-	<meta
-		name="viewport"
-		content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-	/>
-	 <style>
-    @font-face {
-      font-family: "KaiTi Regular";
-      src: url("/fonts/KaiTi-Regular.ttf") format("truetype");
-    }
-	  @font-face {
-      font-family: "Noto Sans CJK";
-      src: url("/fonts/NotoSansSC-Regular.ttf") format("truetype");
-    }
-  </style>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+	<style>
+		@font-face {
+			font-family: 'KaiTi Regular';
+			src: url('/fonts/KaiTi-Regular.ttf') format('truetype');
+		}
+		@font-face {
+			font-family: 'Noto Sans CJK';
+			src: url('/fonts/NotoSansSC-Regular.ttf') format('truetype');
+		}
+	</style>
 </svelte:head>
 
 <!-- Top Bar -->
@@ -3848,9 +3894,9 @@
 	autoSaveEnabled={ctx.state.autoSaveEnabled}
 	visibleObjectRenderingEnabled={useVisibleObjectRendering}
 	{minimapAnnotationsEnabled}
-	adjacentPagePreviewEnabled={adjacentPagePreviewEnabled}
-	adjacentPagePreviewCount={adjacentPagePreviewCount}
-	adjacentPagePreviewLayout={adjacentPagePreviewLayout}
+	{adjacentPagePreviewEnabled}
+	{adjacentPagePreviewCount}
+	{adjacentPagePreviewLayout}
 	renderQualityMode={ctx.state.renderQualityMode}
 	{isPageDisabled}
 	onRetryFailedSave={retryFailedSave}
@@ -3859,10 +3905,11 @@
 	onPageInput={handlePageInput}
 	onBlur={handleBlur}
 	onTogglePagePreview={() => (isPagePreviewOpen = !isPagePreviewOpen)}
-	onViewHomeworkInfo={() => view_homework_info.showModal()}
+	onViewHomeworkInfo={() => view_homework_info?.showModal()}
 	onPrint={savePDF}
 	onToggleFullscreen={toggleFullScreen}
-	onStrokeVisibilityChange={(value) => (ctx.state.stroke_visibility = value)}
+	onStrokeVisibilityChange={(value) =>
+		(ctx.state.stroke_visibility = value as 'all' | 'self' | 'others')}
 	onToggleZoom={zoomPan.handleZoomToggle}
 	onToggleDoubleTapZoom={() => (ctx.state.doubleTapZoomEnabled = !ctx.state.doubleTapZoomEnabled)}
 	onToggleAutoSave={() => (ctx.state.autoSaveEnabled = !ctx.state.autoSaveEnabled)}
@@ -4168,96 +4215,403 @@
 							buffer={pdfBuffer}
 							name={pdfName || 'document.pdf'}
 						>
-								{#snippet children(documentContent)}
-									{#if documentContent.isLoaded && documentContent.documentState.document}
-										<PDFDocumentSync
-											document={documentContent.documentState.document}
-											{currentPage}
-											onSync={syncEmbedPDFDocumentState}
+							{#snippet children(documentContent: Record<string, any>)}
+								{#if documentContent.isLoaded && documentContent.documentState.document}
+									<PDFDocumentSync
+										document={documentContent.documentState.document}
+										{currentPage}
+										onSync={syncEmbedPDFDocumentState}
+									/>
+									{#if isPagePreviewOpen}
+										<PagePreviewMenu
+											documentId={pdfDocumentId}
+											currentPage={internalPage}
+											{minPage}
+											{maxPage}
+											pageWidth={currentPageWidth}
+											pageHeight={currentPageHeight}
+											renderQualityMode={ctx.state.renderQualityMode}
+											visibilityRevision={pageRenderVisibilityRevision}
+											visibilityViewport={pageRenderVisibilityViewport}
+											currentPageObjects={allObjects}
+											onClose={() => (isPagePreviewOpen = false)}
+											onSelectPage={goToPage}
 										/>
-										{#if isPagePreviewOpen}
-											<PagePreviewMenu
-												documentId={pdfDocumentId}
-												currentPage={internalPage}
-												{minPage}
-												{maxPage}
-												pageWidth={currentPageWidth}
-												pageHeight={currentPageHeight}
-												renderQualityMode={ctx.state.renderQualityMode}
-												visibilityRevision={pageRenderVisibilityRevision}
-												visibilityViewport={pageRenderVisibilityViewport}
-												currentPageObjects={allObjects}
-												onClose={() => (isPagePreviewOpen = false)}
-												onSelectPage={goToPage}
-											/>
-										{/if}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div
-							class="pdf-workspace scroll-m-14"
-							class:pdf-workspace--side-pages-off={!adjacentPagePreviewEnabled}
-							class:pdf-workspace--row={adjacentPagePreviewLayout === 'row'}
-							class:pdf-workspace--column={adjacentPagePreviewLayout === 'column'}
-						>
-							<div
-								class="pdf-page-layout"
-								class:pdf-page-layout--row={adjacentPagePreviewLayout === 'row'}
-								class:pdf-page-layout--column={adjacentPagePreviewLayout === 'column'}
-							>
-								{#each leftAdjacentPreviewPages as pageNo (pageNo)}
+									{/if}
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
 									<div
-										use:observeAdjacentPage={pageNo}
-										class="pdf-page-stack pdf-page-stack--preview shrink-0"
-										class:pdf-page-stack--compact={useCompactPageTabs}
-										class:pdf-page-stack--minimal={useMinimalPageTabs}
-										style="width: {pageStackWidth}px;"
+										class="pdf-workspace scroll-m-14"
+										class:pdf-workspace--side-pages-off={!adjacentPagePreviewEnabled}
+										class:pdf-workspace--row={adjacentPagePreviewLayout === 'row'}
+										class:pdf-workspace--column={adjacentPagePreviewLayout === 'column'}
 									>
-										<div class="pdf-page-tab pdf-page-tab--preview">
-											{#if useCompactPageTabs}
-												<div class="pdf-page-tab-copy pdf-page-tab-copy--compact">
-													<div class="pdf-page-tab-title">Page {pageNo}</div>
-													<div class="pdf-page-tab-status">
-														<span class="pdf-page-tab-dot"></span>
-														<span>Preview</span>
+										<div
+											class="pdf-page-layout"
+											class:pdf-page-layout--row={adjacentPagePreviewLayout === 'row'}
+											class:pdf-page-layout--column={adjacentPagePreviewLayout === 'column'}
+										>
+											{#each leftAdjacentPreviewPages as pageNo (pageNo)}
+												<div
+													use:observeAdjacentPage={pageNo}
+													class="pdf-page-stack pdf-page-stack--preview shrink-0"
+													class:pdf-page-stack--compact={useCompactPageTabs}
+													class:pdf-page-stack--minimal={useMinimalPageTabs}
+													style="width: {pageStackWidth}px;"
+												>
+													<div class="pdf-page-tab pdf-page-tab--preview">
+														{#if useCompactPageTabs}
+															<div class="pdf-page-tab-copy pdf-page-tab-copy--compact">
+																<div class="pdf-page-tab-title">Page {pageNo}</div>
+																<div class="pdf-page-tab-status">
+																	<span class="pdf-page-tab-dot"></span>
+																	<span>Preview</span>
+																</div>
+															</div>
+														{:else}
+															<div class="pdf-page-tab-copy">
+																<div class="pdf-page-tab-kicker">Preview only</div>
+																<div class="pdf-page-tab-title">Page {pageNo}</div>
+																<div class="pdf-page-tab-note">Switch to this page to edit</div>
+															</div>
+														{/if}
+														{#if !useMinimalPageTabs}
+															<button
+																type="button"
+																class="pdf-page-tab-open"
+																aria-label={`Open page ${pageNo}`}
+																onclick={() => goToPage(pageNo)}
+															>
+																{#if !useCompactPageTabs}
+																	<span>Open</span>
+																{/if}
+																<LucideArrowRight
+																	size={useCompactPageTabs ? 16 : 14}
+																	strokeWidth={2.4}
+																/>
+															</button>
+														{/if}
+													</div>
+
+													<div
+														class="pdf-side-page pointer-events-none relative overflow-hidden rounded-sm bg-white shadow-md ring-1 ring-black/10"
+														data-minimap-page={pageNo}
+														style="width: {currentPageWidth *
+															ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+														aria-hidden="true"
+													>
+														{#if isAdjacentPagePreviewVisible(pageNo)}
+															<div
+																class="absolute top-0 left-0 origin-top-left"
+																class:smooth-zoom={zoomPan.smoothTransition}
+																style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx
+																	.state.zoom});"
+															>
+																{#key `${pdfDocumentId}-side-left-${pageNo}`}
+																	<PDFPage
+																		documentId={pdfDocumentId}
+																		pageIndex={pageNo - 1}
+																		zoom={settledRenderZoom}
+																		width={currentPageWidth}
+																		height={currentPageHeight}
+																		isPanning={cameraIsLive}
+																		renderQualityMode={settledRenderQualityMode}
+																		deferUpdates={pageRenderDeferUpdates}
+																		visibilityRevision={pageRenderVisibilityRevision}
+																		visibilityViewport={pageRenderVisibilityViewport}
+																	/>
+																{/key}
+																<div class="absolute top-0 left-0 z-10 h-full w-full">
+																	{#each getAdjacentPageObjects(pageNo) as object (object.id)}
+																		{#if object.type === 'text'}
+																			<Text
+																				isPenMode={false}
+																				isSelectionMode={false}
+																				isSelected={false}
+																				width={object.width}
+																				onUpdateText={() => {}}
+																				viewOnly={true}
+																				lines={object.lines}
+																				x={object.x}
+																				y={object.y}
+																				size={object.size}
+																				lineHeight={object.lineHeight}
+																				fontFamily={object.fontFamily}
+																				fontColor={object.fontColor}
+																				onTextSelected={() => {}}
+																				onTextUnselected={() => {}}
+																				pageScale={ctx.state.zoom}
+																			/>
+																		{:else if object.type === 'drawing' || object.type === 'highlight'}
+																			<Drawing
+																				{object}
+																				{user}
+																				bind:stroke_visibility={ctx.state.stroke_visibility}
+																				path={object.path}
+																				x={object.x}
+																				y={object.y}
+																				width={object.width}
+																				scale={object.scale}
+																				rotation={object.rotation}
+																				originWidth={object.originWidth}
+																				originHeight={object.originHeight}
+																				brushSize={object.brushSize}
+																				brushColor={object.brushColor}
+																				pageScale={ctx.state.zoom}
+																			/>
+																		{:else if object.type === 'line'}
+																			<Line
+																				{object}
+																				{user}
+																				isPenMode={false}
+																				isAddingLine={false}
+																				x={object.x}
+																				y={object.y}
+																				shapeWidth={object.width}
+																				shapeHeight={object.height}
+																				strokeColor={object.strokeColor}
+																				strokeWidth={object.strokeWidth}
+																				lineType={object.lineType || 'solid'}
+																				originWidth={object.originWidth}
+																				originHeight={object.originHeight}
+																				pageScale={ctx.state.zoom}
+																				isSelected={false}
+																				isObjectSelected={false}
+																				onSelect={() => {}}
+																				onUpdate={() => {}}
+																				onDelete={() => {}}
+																			/>
+																		{:else if object.type === 'teacher-mark'}
+																			<TeacherMark
+																				{object}
+																				x={object.x}
+																				y={object.y}
+																				width={object.width}
+																				height={object.height}
+																				isSelected={false}
+																				isPreviewed={false}
+																			/>
+																		{/if}
+																	{/each}
+																</div>
+															</div>
+														{/if}
 													</div>
 												</div>
-											{:else}
-												<div class="pdf-page-tab-copy">
-													<div class="pdf-page-tab-kicker">Preview only</div>
-													<div class="pdf-page-tab-title">Page {pageNo}</div>
-													<div class="pdf-page-tab-note">Switch to this page to edit</div>
-												</div>
-											{/if}
-											{#if !useMinimalPageTabs}
-												<button
-													type="button"
-													class="pdf-page-tab-open"
-													aria-label={`Open page ${pageNo}`}
-													onclick={() => goToPage(pageNo)}
-												>
-													{#if !useCompactPageTabs}
-														<span>Open</span>
-													{/if}
-													<LucideArrowRight size={useCompactPageTabs ? 16 : 14} strokeWidth={2.4} />
-												</button>
-											{/if}
-										</div>
-
-										<div
-											class="pdf-side-page pointer-events-none relative overflow-hidden rounded-sm bg-white shadow-md ring-1 ring-black/10"
-											data-minimap-page={pageNo}
-											style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
-											aria-hidden="true"
-										>
-											{#if isAdjacentPagePreviewVisible(pageNo)}
+											{/each}
+											<div
+												class="pdf-page-stack pdf-page-stack--active shrink-0"
+												class:pdf-page-stack--compact={useCompactPageTabs}
+												class:pdf-page-stack--minimal={useMinimalPageTabs}
+												style="width: {pageStackWidth}px;"
+											>
+												{#if adjacentPagePreviewEnabled}
+													<div class="pdf-page-tab pdf-page-tab--active">
+														{#if useCompactPageTabs}
+															<div class="pdf-page-tab-copy pdf-page-tab-copy--compact">
+																<div class="pdf-page-tab-title">Page {currentPage}</div>
+																<div class="pdf-page-tab-status">
+																	<span class="pdf-page-tab-dot"></span>
+																	<span>Editing</span>
+																</div>
+															</div>
+														{:else}
+															<div class="pdf-page-tab-kicker">Editing</div>
+															<div class="pdf-page-tab-title">Page {currentPage}</div>
+															<div class="pdf-page-tab-note">Current page</div>
+														{/if}
+													</div>
+												{/if}
+												<!-- svelte-ignore a11y_click_events_have_key_events -->
 												<div
-													class="absolute top-0 left-0 origin-top-left"
-													class:smooth-zoom={zoomPan.smoothTransition}
-													style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx.state.zoom});"
+													bind:this={editablePageFrame}
+													class="pdf-canvas relative shadow-lg ring-2 ring-amber-400/80"
+													class:pdf-canvas--compact-active={useCompactPageTabs}
+													data-minimap-page={currentPage}
+													data-minimap-current="true"
+													class:cursor-crosshair={ctx.state.isAddingText}
+													class:cursor-move={ctx.state.isDraggingSelection}
+													class:cursor-grab={ctx.state.isHandMode}
+													class:page-transition={isChangingPage}
+													style="width: {currentPageWidth *
+														ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+													ontouchstart={(e) => {
+														if (isSelectionControlEvent(e)) return;
+
+														if (
+															ctx.state.isSelectionMode &&
+															e.touches.length === 1 &&
+															ctx.state.selectedObjectIds.length > 0
+														) {
+															const touch = e.touches[0];
+															const canvasRect = e.currentTarget.getBoundingClientRect();
+															const clickPoint = {
+																x: (touch.clientX - canvasRect.left) / ctx.state.zoom,
+																y: (touch.clientY - canvasRect.top) / ctx.state.zoom
+															};
+
+															const hitDrawingIds = filterSelectableObjectIds(
+																findObjectsAtPoint(clickPoint)
+															);
+															const clickedOnSelected = hitDrawingIds.some((id) =>
+																isSelectedObjectId(id)
+															);
+
+															if (clickedOnSelected) {
+																// Find the top-most selected object that was touched
+																const topSelectedId = hitDrawingIds
+																	.reverse()
+																	.find((id) => isSelectedObjectId(id));
+
+																if (topSelectedId) {
+																	const currentTime = Date.now();
+																	const timeDiff = currentTime - lastTouchTime;
+																	const distance = Math.sqrt(
+																		(clickPoint.x - lastTouchPosition.x) ** 2 +
+																			(clickPoint.y - lastTouchPosition.y) ** 2
+																	);
+
+																	// Check if this is a double-touch
+																	const isSameObject = lastTouchedObjectId === topSelectedId;
+																	const isWithinTimeThreshold =
+																		timeDiff <= TOUCH_DOUBLE_CLICK_TIME_THRESHOLD;
+																	const isWithinPositionThreshold =
+																		distance <= TOUCH_DOUBLE_CLICK_POSITION_THRESHOLD;
+
+																	if (
+																		isSameObject &&
+																		isWithinTimeThreshold &&
+																		isWithinPositionThreshold
+																	) {
+																		// Trigger double-click handler based on object type
+																		const obj = getObjectById(topSelectedId);
+																		if (obj) {
+																			if (obj.type === 'text') {
+																				handleTextDoubleClick(topSelectedId);
+																			} else if (obj.type === 'line') {
+																				handleLineDoubleClick(topSelectedId);
+																			}
+																		}
+																		// Reset tracking to prevent drag
+																		lastTouchedObjectId = null;
+																		lastTouchTime = 0;
+																		lastTouchPosition = { x: 0, y: 0 };
+																	} else {
+																		// Not a double-touch, start dragging
+																		const fakeEvent = {
+																			currentTarget: e.currentTarget,
+																			clientX: touch.clientX,
+																			clientY: touch.clientY
+																		};
+																		startDraggingSelection(fakeEvent);
+
+																		// Update tracking state
+																		lastTouchedObjectId = topSelectedId;
+																		lastTouchTime = currentTime;
+																		lastTouchPosition = clickPoint;
+																	}
+																}
+															}
+														}
+													}}
+													ontouchmove={(e) => {
+														if (
+															ctx.state.isSelectionMode &&
+															e.touches.length === 1 &&
+															ctx.state.isDraggingSelection
+														) {
+															const touch = e.touches[0];
+															const fakeEvent = {
+																currentTarget: e.currentTarget,
+																clientX: touch.clientX,
+																clientY: touch.clientY
+															};
+															dragSelection(fakeEvent);
+														}
+													}}
+													ontouchend={(e) => {
+														if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
+															if (e.cancelable) e.preventDefault();
+															stopDraggingSelection();
+														}
+													}}
+													ontouchcancel={(e) => {
+														if (ctx.state.isDraggingSelection) {
+															if (e.cancelable) e.preventDefault();
+														}
+														resetActivePointerLocks();
+													}}
+													onclick={(e) => {
+														if (isSelectionControlEvent(e)) return;
+
+														if (ctx.state.isAddingText && !isEditorDisabled) {
+															const rect = e.currentTarget.getBoundingClientRect();
+															const x = (e.clientX - rect.left) / ctx.state.zoom;
+															const y = (e.clientY - rect.top) / ctx.state.zoom;
+															addTextField(x, y);
+															// Return to selection mode after adding text
+															ctx.state.isAddingText = false;
+															ctx.state.isCursorMode = false;
+															ctx.state.AddTextButtonField = 'Add Text';
+															ctx.state.isSelectionMode = true;
+														} else if (ctx.state.isSelectionMode) {
+															handleSelectionClick(e);
+														}
+													}}
+													onmousedown={(e) => {
+														if (isSelectionControlEvent(e)) return;
+
+														if (
+															ctx.state.isSelectionMode &&
+															ctx.state.selectedObjectIds.length > 0
+														) {
+															const canvasRect = e.currentTarget.getBoundingClientRect();
+															const clickPoint = {
+																x: (e.clientX - canvasRect.left) / ctx.state.zoom,
+																y: (e.clientY - canvasRect.top) / ctx.state.zoom
+															};
+
+															const hitDrawingIds = filterSelectableObjectIds(
+																findObjectsAtPoint(clickPoint)
+															);
+															const clickedOnSelected = hitDrawingIds.some((id) =>
+																isSelectedObjectId(id)
+															);
+
+															if (clickedOnSelected) {
+																e.preventDefault();
+																startDraggingSelection(e);
+															}
+														}
+													}}
+													onmousemove={(e) => {
+														if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
+															e.preventDefault();
+															dragSelection(e);
+														}
+													}}
+													onmouseup={(e) => {
+														if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
+															e.preventDefault();
+															stopDraggingSelection();
+														}
+													}}
+													onmouseleave={(e) => {
+														if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
+															e.preventDefault();
+															stopDraggingSelection();
+														}
+													}}
 												>
-													{#key `${pdfDocumentId}-side-left-${pageNo}`}
+													<div
+														bind:this={pageContentLayer}
+														class="absolute top-0 left-0 origin-top-left transform"
+														class:smooth-zoom={zoomPan.smoothTransition}
+														style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx
+															.state.zoom});"
+													>
 														<PDFPage
 															documentId={pdfDocumentId}
-															pageIndex={pageNo - 1}
+															pageIndex={currentPage - 1}
 															zoom={settledRenderZoom}
 															width={currentPageWidth}
 															height={currentPageHeight}
@@ -4267,29 +4621,141 @@
 															visibilityRevision={pageRenderVisibilityRevision}
 															visibilityViewport={pageRenderVisibilityViewport}
 														/>
-													{/key}
-													<div class="absolute top-0 left-0 z-10 h-full w-full">
-														{#each getAdjacentPageObjects(pageNo) as object (object.id)}
-															{#if object.type === 'text'}
-																<Text
-																	isPenMode={false}
-																	isSelectionMode={false}
-																	isSelected={false}
-																	width={object.width}
-																	onUpdateText={() => {}}
-																	viewOnly={true}
-																	lines={object.lines}
-																	x={object.x}
-																	y={object.y}
-																	size={object.size}
-																	lineHeight={object.lineHeight}
-																	fontFamily={object.fontFamily}
-																	fontColor={object.fontColor}
-																	onTextSelected={() => {}}
-																	onTextUnselected={() => {}}
-																	pageScale={ctx.state.zoom}
+
+														<AnnotationCanvasLayer
+															objects={canvasDrawableObjects}
+															pageWidth={currentPageWidth}
+															pageHeight={currentPageHeight}
+															pageScale={annotationRenderZoom}
+															{user}
+															stroke_visibility={ctx.state.stroke_visibility}
+															deferRedraw={ctx.state.deferAnnotationRedraw}
+														/>
+
+														<div class="absolute top-0 left-0 z-10 h-full w-full">
+															{#each interactiveCurrentPageObjects as object (object.id)}
+																{#if object.type === 'text'}
+																	<Text
+																		bind:isPenMode={ctx.state.isPenMode}
+																		shouldStartEditing={ctx.state.editingTextId === object.id}
+																		bind:isSelectionMode={ctx.state.isSelectionMode}
+																		isSelected={false}
+																		isPreviewed={isObjectPreviewed(object.id)}
+																		width={object.width}
+																		onUpdateText={(detail: Record<string, any>) => {
+																			if (object.owner !== user) return;
+																			updateObject(object.id, detail);
+																		}}
+																		viewOnly={object.owner !== user || isEditorDisabled}
+																		lines={object.lines}
+																		x={object.x}
+																		y={object.y}
+																		size={object.size}
+																		lineHeight={object.lineHeight}
+																		fontFamily={object.fontFamily}
+																		fontColor={object.fontColor}
+																		onTextSelected={(e: any) => {
+																			if (object.owner !== user) return;
+																			Object.assign(ctx.state, {
+																				_size: normalizeFontSize(e.size),
+																				_lineHeight: e.lineHeight,
+																				_fontFamily: e.fontFamily,
+																				_textColor: e.fontColor,
+																				showingAddingText: true,
+																				selectedTextId: object.id,
+																				selectedLineId: null
+																			});
+																		}}
+																		onTextUnselected={() => {
+																			ctx.state.isSelectionMode = true;
+																		}}
+																		pageScale={ctx.state.zoom}
+																	/>
+																{:else if object.type === 'drawing' || object.type === 'highlight'}
+																	<Drawing
+																		{object}
+																		{user}
+																		bind:stroke_visibility={ctx.state.stroke_visibility}
+																		path={object.path}
+																		x={object.x}
+																		y={object.y}
+																		width={object.width}
+																		scale={object.scale}
+																		rotation={object.rotation}
+																		originWidth={object.originWidth}
+																		originHeight={object.originHeight}
+																		brushSize={object.brushSize}
+																		brushColor={object.brushColor}
+																		pageScale={ctx.state.zoom}
+																		isSelected={ctx.state.selectedObjectIds.length > 1 &&
+																			isObjectSelected(object.id) &&
+																			!selectionRotationState}
+																		isPreviewed={isObjectPreviewed(object.id)}
+																	/>
+																{:else if object.type === 'line'}
+																	<Line
+																		{object}
+																		{user}
+																		bind:isPenMode={ctx.state.isPenMode}
+																		isAddingLine={ctx.state.isAddingLine}
+																		x={object.x}
+																		y={object.y}
+																		shapeWidth={object.width}
+																		shapeHeight={object.height}
+																		strokeColor={object.strokeColor}
+																		strokeWidth={object.strokeWidth}
+																		lineType={object.lineType || 'solid'}
+																		originWidth={object.originWidth}
+																		originHeight={object.originHeight}
+																		pageScale={ctx.state.zoom}
+																		isSelected={ctx.state.selectedLineId === object.id &&
+																			!ctx.state.isSelectionMode}
+																		isObjectSelected={isObjectSelected(object.id) &&
+																			!ctx.state.isSelectionMode}
+																		isPreviewed={isObjectPreviewed(object.id)}
+																		onSelect={selectLine}
+																		onUpdate={updateLine}
+																		onDelete={deleteLine}
+																	/>
+																{:else if object.type === 'teacher-mark'}
+																	<TeacherMark
+																		{object}
+																		x={object.x}
+																		y={object.y}
+																		width={object.width}
+																		height={object.height}
+																		isSelected={false}
+																		isPreviewed={isObjectPreviewed(object.id)}
+																	/>
+																{/if}
+															{/each}
+
+															<!-- Render temporary pointer strokes -->
+															{#each ctx.state.temporaryStrokes as any[] as stroke (stroke.id)}
+																<PointerStroke
+																	path={stroke.path}
+																	originWidth={stroke.originWidth}
+																	originHeight={stroke.originHeight}
+																	width={stroke.width}
+																	x={0}
+																	y={0}
+																	strokeColor={stroke.strokeColor}
+																	strokeWidth={stroke.strokeWidth}
+																	opacity={stroke.opacity}
+																	{stroke}
 																/>
-															{:else if object.type === 'drawing' || object.type === 'highlight'}
+															{/each}
+														</div>
+													</div>
+
+													{#if screenCurrentPageObjects.length > 0}
+														<div
+															class="pointer-events-none absolute top-0 left-0"
+															style="width: {currentPageWidth *
+																ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+															aria-hidden="true"
+														>
+															{#each screenCurrentPageObjects as object (object.id)}
 																<Drawing
 																	{object}
 																	{user}
@@ -4305,613 +4771,170 @@
 																	brushSize={object.brushSize}
 																	brushColor={object.brushColor}
 																	pageScale={ctx.state.zoom}
+																	screenScale={ctx.state.zoom}
+																	isSelected={ctx.state.selectedObjectIds.length > 1 &&
+																		isObjectSelected(object.id) &&
+																		!selectionRotationState}
+																	isPreviewed={isObjectPreviewed(object.id)}
 																/>
-															{:else if object.type === 'line'}
-																<Line
-																	{object}
-																	{user}
-																	isPenMode={false}
-																	isAddingLine={false}
-																	x={object.x}
-																	y={object.y}
-																	shapeWidth={object.width}
-																	shapeHeight={object.height}
-																	strokeColor={object.strokeColor}
-																	strokeWidth={object.strokeWidth}
-																	lineType={object.lineType || 'solid'}
-																	originWidth={object.originWidth}
-																	originHeight={object.originHeight}
-																	pageScale={ctx.state.zoom}
-																	isSelected={false}
-																	isObjectSelected={false}
-																/>
-															{:else if object.type === 'teacher-mark'}
-																<TeacherMark
-																	{object}
-																	x={object.x}
-																	y={object.y}
-																	width={object.width}
-																	height={object.height}
-																	isSelected={false}
-																	isPreviewed={false}
-																/>
-															{/if}
-														{/each}
-													</div>
-												</div>
-											{/if}
-										</div>
-									</div>
-								{/each}
-							<div
-								class="pdf-page-stack pdf-page-stack--active shrink-0"
-								class:pdf-page-stack--compact={useCompactPageTabs}
-								class:pdf-page-stack--minimal={useMinimalPageTabs}
-								style="width: {pageStackWidth}px;"
-							>
-								{#if adjacentPagePreviewEnabled}
-									<div class="pdf-page-tab pdf-page-tab--active">
-										{#if useCompactPageTabs}
-											<div class="pdf-page-tab-copy pdf-page-tab-copy--compact">
-												<div class="pdf-page-tab-title">Page {currentPage}</div>
-												<div class="pdf-page-tab-status">
-													<span class="pdf-page-tab-dot"></span>
-													<span>Editing</span>
-												</div>
-											</div>
-										{:else}
-											<div class="pdf-page-tab-kicker">Editing</div>
-											<div class="pdf-page-tab-title">Page {currentPage}</div>
-											<div class="pdf-page-tab-note">Current page</div>
-										{/if}
-									</div>
-								{/if}
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
-							<div
-								bind:this={editablePageFrame}
-								class="pdf-canvas relative shadow-lg ring-2 ring-amber-400/80"
-								class:pdf-canvas--compact-active={useCompactPageTabs}
-								data-minimap-page={currentPage}
-								data-minimap-current="true"
-								class:cursor-crosshair={ctx.state.isAddingText}
-								class:cursor-move={ctx.state.isDraggingSelection}
-								class:cursor-grab={ctx.state.isHandMode}
-								class:page-transition={isChangingPage}
-								style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
-								ontouchstart={(e) => {
-									if (isSelectionControlEvent(e)) return;
+															{/each}
+														</div>
+													{/if}
 
-									if (
-										ctx.state.isSelectionMode &&
-										e.touches.length === 1 &&
-										ctx.state.selectedObjectIds.length > 0
-									) {
-										const touch = e.touches[0];
-										const canvasRect = e.currentTarget.getBoundingClientRect();
-										const clickPoint = {
-											x: (touch.clientX - canvasRect.left) / ctx.state.zoom,
-											y: (touch.clientY - canvasRect.top) / ctx.state.zoom
-										};
+													{#if ctx.state.addingDrawing}
+														<DrawingCanvas
+															bind:isPenMode={ctx.state.isPenMode}
+															pageScale={ctx.state.zoom}
+															brushSize={ctx.state.brushSize}
+															brushColor={ctx.state.brushColor}
+															brushOpacity={ctx.state.brushOpacity}
+															onStrokeStart={beginStrokeInteraction}
+															onStrokeEnd={endStrokeInteraction}
+															onStrokeCancel={cancelStrokeInteraction}
+															onFinishDrawing={(e: any) => {
+																if (isEditorDisabled) return;
+																addDrawing(
+																	e.originWidth,
+																	e.originHeight,
+																	e.path,
+																	1,
+																	e.brushSize,
+																	e.brushColor,
+																	e.brushOpacity
+																);
+															}}
+														/>
+													{/if}
+													{#if ctx.state.isErasing}
+														<ErasingCanvas
+															bind:isPenMode={ctx.state.isPenMode}
+															{allObjects}
+															pageScale={ctx.state.zoom}
+															brushSize={ctx.state.ErasingBrushSize}
+															brushColor={ctx.state.brushColor}
+															batchDeleteObjects={batchDeleteObjectsByIds}
+															onHighlightChange={handleTransientAnnotationStateChange}
+															onStrokeStart={beginStrokeInteraction}
+															onStrokeEnd={endStrokeInteraction}
+															onStrokeCancel={cancelStrokeInteraction}
+														/>
+													{/if}
+													{#if ctx.state.isAddingLine && hasTool('line')}
+														<LineCanvas
+															isAddingLine={ctx.state.isAddingLine}
+															bind:isPenMode={ctx.state.isPenMode}
+															pageScale={ctx.state.zoom}
+															strokeColor={ctx.state.lineStrokeColor}
+															strokeWidth={ctx.state.lineStrokeWidth}
+															lineType={ctx.state.lineType}
+															onFinishLine={(lineData: Record<string, any>) => {
+																if (isEditorDisabled) return;
+																addLine(lineData);
+															}}
+														/>
+													{/if}
+													{#if ctx.state.isPointerMode}
+														<PointerCanvas
+															bind:isPenMode={ctx.state.isPenMode}
+															pageScale={ctx.state.zoom}
+															onStrokeStart={beginStrokeInteraction}
+															onStrokeEnd={endStrokeInteraction}
+															onStrokeCancel={cancelStrokeInteraction}
+															onFinishPointing={(e: any) => {
+																if (isEditorDisabled) return;
+																const id = genID();
+																const stroke = {
+																	id,
+																	path: e.path,
+																	originWidth: e.originWidth,
+																	originHeight: e.originHeight,
+																	width: e.originWidth,
+																	strokeColor: '#FF0000',
+																	strokeWidth: POINTER_STROKE_WIDTH,
+																	opacity: 1,
+																	createdAt: Date.now()
+																};
 
-										const hitDrawingIds = filterSelectableObjectIds(
-											findObjectsAtPoint(clickPoint)
-										);
-										const clickedOnSelected = hitDrawingIds.some((id) =>
-											isSelectedObjectId(id)
-										);
+																ctx.state.temporaryStrokes = [
+																	...ctx.state.temporaryStrokes,
+																	stroke
+																];
 
-										if (clickedOnSelected) {
-											// Find the top-most selected object that was touched
-											const topSelectedId = hitDrawingIds
-												.reverse()
-												.find((id) => isSelectedObjectId(id));
+																const fadeStart = POINTER_DURATION - 500;
+																const fadeInterval = setInterval(() => {
+																	const elapsed = Date.now() - stroke.createdAt;
+																	if (elapsed >= fadeStart) {
+																		const fadeProgress = (elapsed - fadeStart) / 500;
+																		const strokeIndex = ctx.state.temporaryStrokes.findIndex(
+																			(s: any) => s.id === id
+																		);
+																		if (strokeIndex !== -1) {
+																			(ctx.state.temporaryStrokes[strokeIndex] as any).opacity =
+																				Math.max(0, 1 - fadeProgress);
+																			ctx.state.temporaryStrokes = [...ctx.state.temporaryStrokes];
+																		}
+																	}
+																}, 50);
 
-											if (topSelectedId) {
-												const currentTime = Date.now();
-												const timeDiff = currentTime - lastTouchTime;
-												const distance = Math.sqrt(
-													(clickPoint.x - lastTouchPosition.x) ** 2 +
-														(clickPoint.y - lastTouchPosition.y) ** 2
-												);
-
-												// Check if this is a double-touch
-												const isSameObject = lastTouchedObjectId === topSelectedId;
-												const isWithinTimeThreshold = timeDiff <= TOUCH_DOUBLE_CLICK_TIME_THRESHOLD;
-												const isWithinPositionThreshold =
-													distance <= TOUCH_DOUBLE_CLICK_POSITION_THRESHOLD;
-
-												if (isSameObject && isWithinTimeThreshold && isWithinPositionThreshold) {
-													// Trigger double-click handler based on object type
-													const obj = getObjectById(topSelectedId);
-													if (obj) {
-														if (obj.type === 'text') {
-															handleTextDoubleClick(topSelectedId);
-														} else if (obj.type === 'line') {
-															handleLineDoubleClick(topSelectedId);
-														}
-													}
-													// Reset tracking to prevent drag
-													lastTouchedObjectId = null;
-													lastTouchTime = 0;
-													lastTouchPosition = { x: 0, y: 0 };
-												} else {
-													// Not a double-touch, start dragging
-													const fakeEvent = {
-														currentTarget: e.currentTarget,
-														clientX: touch.clientX,
-														clientY: touch.clientY
-													};
-													startDraggingSelection(fakeEvent);
-
-													// Update tracking state
-													lastTouchedObjectId = topSelectedId;
-													lastTouchTime = currentTime;
-													lastTouchPosition = clickPoint;
-												}
-											}
-										}
-									}
-								}}
-								ontouchmove={(e) => {
-									if (
-										ctx.state.isSelectionMode &&
-										e.touches.length === 1 &&
-										ctx.state.isDraggingSelection
-									) {
-										const touch = e.touches[0];
-										const fakeEvent = {
-											currentTarget: e.currentTarget,
-											clientX: touch.clientX,
-											clientY: touch.clientY
-										};
-										dragSelection(fakeEvent);
-									}
-								}}
-								ontouchend={(e) => {
-									if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
-										if (e.cancelable) e.preventDefault();
-										stopDraggingSelection();
-									}
-								}}
-								ontouchcancel={(e) => {
-									if (ctx.state.isDraggingSelection) {
-										if (e.cancelable) e.preventDefault();
-									}
-									resetActivePointerLocks();
-								}}
-								onclick={(e) => {
-									if (isSelectionControlEvent(e)) return;
-
-									if (ctx.state.isAddingText && !isEditorDisabled) {
-										const rect = e.currentTarget.getBoundingClientRect();
-										const x = (e.clientX - rect.left) / ctx.state.zoom;
-										const y = (e.clientY - rect.top) / ctx.state.zoom;
-										addTextField(x, y);
-										// Return to selection mode after adding text
-										ctx.state.isAddingText = false;
-										ctx.state.isCursorMode = false;
-										ctx.state.AddTextButtonField = 'Add Text';
-										ctx.state.isSelectionMode = true;
-									} else if (ctx.state.isSelectionMode) {
-										handleSelectionClick(e);
-									}
-								}}
-								onmousedown={(e) => {
-									if (isSelectionControlEvent(e)) return;
-
-									if (ctx.state.isSelectionMode && ctx.state.selectedObjectIds.length > 0) {
-										const canvasRect = e.currentTarget.getBoundingClientRect();
-										const clickPoint = {
-											x: (e.clientX - canvasRect.left) / ctx.state.zoom,
-											y: (e.clientY - canvasRect.top) / ctx.state.zoom
-										};
-
-										const hitDrawingIds = filterSelectableObjectIds(
-											findObjectsAtPoint(clickPoint)
-										);
-										const clickedOnSelected = hitDrawingIds.some((id) =>
-											isSelectedObjectId(id)
-										);
-
-										if (clickedOnSelected) {
-											e.preventDefault();
-											startDraggingSelection(e);
-										}
-									}
-								}}
-								onmousemove={(e) => {
-									if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
-										e.preventDefault();
-										dragSelection(e);
-									}
-								}}
-								onmouseup={(e) => {
-									if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
-										e.preventDefault();
-										stopDraggingSelection();
-									}
-								}}
-								onmouseleave={(e) => {
-									if (ctx.state.isSelectionMode && ctx.state.isDraggingSelection) {
-										e.preventDefault();
-										stopDraggingSelection();
-									}
-								}}
-							>
-								<div
-									bind:this={pageContentLayer}
-									class="absolute top-0 left-0 origin-top-left transform"
-									class:smooth-zoom={zoomPan.smoothTransition}
-									style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx.state.zoom});"
-								>
-									<PDFPage
-										documentId={pdfDocumentId}
-										pageIndex={currentPage - 1}
-										zoom={settledRenderZoom}
-										width={currentPageWidth}
-										height={currentPageHeight}
-										isPanning={cameraIsLive}
-										renderQualityMode={settledRenderQualityMode}
-										deferUpdates={pageRenderDeferUpdates}
-										visibilityRevision={pageRenderVisibilityRevision}
-										visibilityViewport={pageRenderVisibilityViewport}
-									/>
-
-									<AnnotationCanvasLayer
-										objects={canvasDrawableObjects}
-										pageWidth={currentPageWidth}
-										pageHeight={currentPageHeight}
-										pageScale={annotationRenderZoom}
-										{user}
-										stroke_visibility={ctx.state.stroke_visibility}
-										deferRedraw={ctx.state.deferAnnotationRedraw}
-									/>
-
-									<div class="absolute top-0 left-0 z-10 h-full w-full">
-									{#each interactiveCurrentPageObjects as object (object.id)}
-										{#if object.type === 'text'}
-											<Text
-												bind:isPenMode={ctx.state.isPenMode}
-												shouldStartEditing={ctx.state.editingTextId === object.id}
-												bind:isSelectionMode={ctx.state.isSelectionMode}
-												isSelected={false}
-												isPreviewed={isObjectPreviewed(object.id)}
-												width={object.width}
-												onUpdateText={(detail) => {
-													if (object.owner !== user) return;
-													updateObject(object.id, detail);
-												}}
-												viewOnly={object.owner !== user || isEditorDisabled}
-												lines={object.lines}
-												x={object.x}
-												y={object.y}
-												size={object.size}
-												lineHeight={object.lineHeight}
-												fontFamily={object.fontFamily}
-												fontColor={object.fontColor}
-												onTextSelected={({ size, lineHeight, fontFamily, fontColor }) => {
-													if (object.owner !== user) return;
-													ctx.state._size = normalizeFontSize(size);
-													ctx.state._lineHeight = lineHeight;
-													ctx.state._fontFamily = fontFamily;
-													ctx.state._textColor = fontColor;
-													ctx.state.showingAddingText = true;
-													ctx.state.selectedTextId = object.id;
-													ctx.state.selectedLineId = null;
-												}}
-												onTextUnselected={() => {
-													ctx.state.isSelectionMode = true;
-												}}
-												pageScale={ctx.state.zoom}
-											/>
-										{:else if object.type === 'drawing' || object.type === 'highlight'}
-											<Drawing
-												{object}
-												{user}
-												bind:stroke_visibility={ctx.state.stroke_visibility}
-												path={object.path}
-												x={object.x}
-												y={object.y}
-												width={object.width}
-												scale={object.scale}
-												rotation={object.rotation}
-												originWidth={object.originWidth}
-												originHeight={object.originHeight}
-												brushSize={object.brushSize}
-												brushColor={object.brushColor}
-												pageScale={ctx.state.zoom}
-												isSelected={
-													ctx.state.selectedObjectIds.length > 1 &&
-													isObjectSelected(object.id) &&
-													!selectionRotationState
-												}
-												isPreviewed={isObjectPreviewed(object.id)}
-											/>
-										{:else if object.type === 'line'}
-											<Line
-												{object}
-												{user}
-												bind:isPenMode={ctx.state.isPenMode}
-												isAddingLine={ctx.state.isAddingLine}
-												x={object.x}
-												y={object.y}
-												shapeWidth={object.width}
-												shapeHeight={object.height}
-												strokeColor={object.strokeColor}
-												strokeWidth={object.strokeWidth}
-												lineType={object.lineType || 'solid'}
-												originWidth={object.originWidth}
-												originHeight={object.originHeight}
-												pageScale={ctx.state.zoom}
-												isSelected={ctx.state.selectedLineId === object.id && !ctx.state.isSelectionMode}
-												isObjectSelected={isObjectSelected(object.id) && !ctx.state.isSelectionMode}
-												isPreviewed={isObjectPreviewed(object.id)}
-												onSelect={selectLine}
-												onUpdate={updateLine}
-												onDelete={deleteLine}
-											/>
-										{:else if object.type === 'teacher-mark'}
-											<TeacherMark
-												{object}
-												x={object.x}
-												y={object.y}
-												width={object.width}
-												height={object.height}
-												isSelected={false}
-												isPreviewed={isObjectPreviewed(object.id)}
-											/>
-										{/if}
-									{/each}
-
-									<!-- Render temporary pointer strokes -->
-									{#each ctx.state.temporaryStrokes as stroke (stroke.id)}
-										<PointerStroke
-											path={stroke.path}
-											originWidth={stroke.originWidth}
-											originHeight={stroke.originHeight}
-											width={stroke.width}
-											x={0}
-											y={0}
-											strokeColor={stroke.strokeColor}
-											strokeWidth={stroke.strokeWidth}
-											opacity={stroke.opacity}
-											{stroke}
-										/>
-									{/each}
-									</div>
-								</div>
-
-								{#if screenCurrentPageObjects.length > 0}
-									<div
-										class="pointer-events-none absolute top-0 left-0"
-										style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
-										aria-hidden="true"
-									>
-										{#each screenCurrentPageObjects as object (object.id)}
-											<Drawing
-												{object}
-												{user}
-												bind:stroke_visibility={ctx.state.stroke_visibility}
-												path={object.path}
-												x={object.x}
-												y={object.y}
-												width={object.width}
-												scale={object.scale}
-												rotation={object.rotation}
-												originWidth={object.originWidth}
-												originHeight={object.originHeight}
-												brushSize={object.brushSize}
-												brushColor={object.brushColor}
-												pageScale={ctx.state.zoom}
-												screenScale={ctx.state.zoom}
-												isSelected={
-													ctx.state.selectedObjectIds.length > 1 &&
-													isObjectSelected(object.id) &&
-													!selectionRotationState
-												}
-												isPreviewed={isObjectPreviewed(object.id)}
-											/>
-										{/each}
-									</div>
-								{/if}
-
-								{#if ctx.state.addingDrawing}
-									<DrawingCanvas
-										bind:isPenMode={ctx.state.isPenMode}
-										pageScale={ctx.state.zoom}
-										brushSize={ctx.state.brushSize}
-										brushColor={ctx.state.brushColor}
-										brushOpacity={ctx.state.brushOpacity}
-										onStrokeStart={beginStrokeInteraction}
-										onStrokeEnd={endStrokeInteraction}
-										onStrokeCancel={cancelStrokeInteraction}
-										onFinishDrawing={({
-											originWidth,
-											originHeight,
-											path,
-											brushSize,
-											brushColor,
-											brushOpacity
-										}) => {
-											if (isEditorDisabled) return;
-											addDrawing(
-												originWidth,
-												originHeight,
-												path,
-												1,
-												brushSize,
-												brushColor,
-												brushOpacity
-											);
-										}}
-									/>
-								{/if}
-								{#if ctx.state.isHighlighting && hasTool('highlighter')}
-									<HighlightCanvas
-										bind:isPenMode={ctx.state.isPenMode}
-										pageScale={ctx.state.zoom}
-										highlightSize={ctx.state.highlightSize}
-										highlightColor={ctx.state.highlightColor}
-										onStrokeStart={beginStrokeInteraction}
-										onStrokeEnd={endStrokeInteraction}
-										onStrokeCancel={cancelStrokeInteraction}
-										onFinishHighlight={({
-											originWidth,
-											originHeight,
-											path,
-											brushSize,
-											brushColor,
-											brushOpacity
-										}) => {
-											if (isEditorDisabled) return;
-											addDrawing(
-												originWidth,
-												originHeight,
-												path,
-												1,
-												brushSize,
-												brushColor,
-												brushOpacity,
-												'highlight'
-											);
-											// Return to selection mode after highlighting
-											ctx.state.isHighlighting = false;
-											requestAnimationFrame(() => {
-												ctx.state.isHighlighting = true;
-											});
-										}}
-									/>
-								{/if}
-								{#if ctx.state.isErasing}
-									<ErasingCanvas
-										bind:isPenMode={ctx.state.isPenMode}
-										{allObjects}
-										pageScale={ctx.state.zoom}
-										brushSize={ctx.state.ErasingBrushSize}
-										brushColor={ctx.state.brushColor}
-										batchDeleteObjects={batchDeleteObjectsByIds}
-										onHighlightChange={handleTransientAnnotationStateChange}
-										onStrokeStart={beginStrokeInteraction}
-										onStrokeEnd={endStrokeInteraction}
-										onStrokeCancel={cancelStrokeInteraction}
-									/>
-								{/if}
-								{#if ctx.state.isAddingLine && hasTool('line')}
-									<LineCanvas
-										isAddingLine={ctx.state.isAddingLine}
-										bind:isPenMode={ctx.state.isPenMode}
-										pageScale={ctx.state.zoom}
-										strokeColor={ctx.state.lineStrokeColor}
-										strokeWidth={ctx.state.lineStrokeWidth}
-										lineType={ctx.state.lineType}
-										onFinishLine={(lineData) => {
-											if (isEditorDisabled) return;
-											addLine(lineData);
-										}}
-									/>
-								{/if}
-								{#if ctx.state.isPointerMode}
-									<PointerCanvas
-										bind:isPenMode={ctx.state.isPenMode}
-										pageScale={ctx.state.zoom}
-										onStrokeStart={beginStrokeInteraction}
-										onStrokeEnd={endStrokeInteraction}
-										onStrokeCancel={cancelStrokeInteraction}
-										onFinishPointing={({ originWidth, originHeight, path }) => {
-											if (isEditorDisabled) return;
-											const id = genID();
-											const stroke = {
-												id,
-												path,
-												originWidth,
-												originHeight,
-												width: originWidth,
-												strokeColor: '#FF0000',
-												strokeWidth: POINTER_STROKE_WIDTH,
-												opacity: 1,
-												createdAt: Date.now()
-											};
-
-											ctx.state.temporaryStrokes = [...ctx.state.temporaryStrokes, stroke];
-
-											const fadeStart = POINTER_DURATION - 500;
-											const fadeInterval = setInterval(() => {
-												const elapsed = Date.now() - stroke.createdAt;
-												if (elapsed >= fadeStart) {
-													const fadeProgress = (elapsed - fadeStart) / 500;
-													const strokeIndex = ctx.state.temporaryStrokes.findIndex(
-														(s) => s.id === id
-													);
-													if (strokeIndex !== -1) {
-														ctx.state.temporaryStrokes[strokeIndex].opacity = Math.max(
-															0,
-															1 - fadeProgress
-														);
-														ctx.state.temporaryStrokes = [...ctx.state.temporaryStrokes];
-													}
-												}
-											}, 50);
-
-											setTimeout(() => {
-												clearInterval(fadeInterval);
-												ctx.state.temporaryStrokes = ctx.state.temporaryStrokes.filter(
-													(s) => s.id !== id
-												);
-											}, POINTER_DURATION);
-										}}
-									/>
-								{/if}
-								{#if ctx.state.isSelectionMode}
-									<SelectionCanvas
-										bind:isPenMode={ctx.state.isPenMode}
-										pageScale={ctx.state.zoom}
-										{allObjects}
-										bind:selectedObjectIds={ctx.state.selectedObjectIds}
-										onSelectionChange={handleSelectionChange}
-										onSelectionActiveChange={(selecting) => {
-											isLassoSelecting = selecting;
-										}}
-										onLassoComplete={() => {
-											ctx.state.justFinishedLassoSelection = true;
-										}}
-										onTextDoubleClick={handleTextDoubleClick}
-										onLineDoubleClick={handleLineDoubleClick}
-										isDraggingSelection={ctx.state.isDraggingSelection}
-										{allowTeacherMark}
-									/>
-								{/if}
-								{#if selectionResizeBox && !selectionRotationState}
-									<div class="pointer-events-none absolute top-0 left-0 z-30 h-full w-full">
-										<div
-											class="pointer-events-none absolute border border-blue-500/40"
-											style="
+																setTimeout(() => {
+																	clearInterval(fadeInterval);
+																	ctx.state.temporaryStrokes = ctx.state.temporaryStrokes.filter(
+																		(s: any) => s.id !== id
+																	);
+																}, POINTER_DURATION);
+															}}
+														/>
+													{/if}
+													{#if ctx.state.isSelectionMode}
+														<SelectionCanvas
+															bind:isPenMode={ctx.state.isPenMode}
+															pageScale={ctx.state.zoom}
+															{allObjects}
+															bind:selectedObjectIds={ctx.state.selectedObjectIds}
+															onSelectionChange={handleSelectionChange}
+															onSelectionActiveChange={(selecting: boolean) => {
+																isLassoSelecting = selecting;
+															}}
+															onLassoComplete={() => {
+																ctx.state.justFinishedLassoSelection = true;
+															}}
+															onTextDoubleClick={handleTextDoubleClick}
+															onLineDoubleClick={handleLineDoubleClick}
+															isDraggingSelection={ctx.state.isDraggingSelection}
+															{allowTeacherMark}
+														/>
+													{/if}
+													{#if selectionResizeBox && !selectionRotationState}
+														<div
+															class="pointer-events-none absolute top-0 left-0 z-30 h-full w-full"
+														>
+															<div
+																class="pointer-events-none absolute border border-blue-500/40"
+																style="
 												left: {selectionResizeBox.x * ctx.state.zoom}px;
 												top: {selectionResizeBox.y * ctx.state.zoom}px;
 												width: {selectionResizeBox.width * ctx.state.zoom}px;
 												height: {selectionResizeBox.height * ctx.state.zoom}px;
 												border-width: 1px;
 											"
-										></div>
-										{#if rotatableSelectedDrawingObjects.length > 0}
-											<div
-												class="pointer-events-none absolute bg-blue-400/50"
-												style="
-													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) *
-														ctx.state.zoom}px;
+															></div>
+															{#if rotatableSelectedDrawingObjects.length > 0}
+																<div
+																	class="pointer-events-none absolute bg-blue-400/50"
+																	style="
+													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom}px;
 													top: {selectionResizeBox.y * ctx.state.zoom - 30}px;
 													width: 1px;
 													height: 24px;
 												"
-											></div>
-											<button
-												type="button"
-												aria-label="Rotate selected drawings"
-												title="Rotate"
-												class="absolute flex items-center justify-center rounded-full border border-white bg-blue-500 text-white shadow-sm"
-												style="
-													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) *
-														ctx.state.zoom -
-													10}px;
+																></div>
+																<button
+																	type="button"
+																	aria-label="Rotate selected drawings"
+																	title="Rotate"
+																	class="absolute flex items-center justify-center rounded-full border border-white bg-blue-500 text-white shadow-sm"
+																	style="
+													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom - 10}px;
 													top: {selectionResizeBox.y * ctx.state.zoom - 42}px;
 													width: 20px;
 													height: 20px;
@@ -4920,30 +4943,26 @@
 													pointer-events: auto;
 													touch-action: none;
 												"
-												onpointerdown={handleSelectionRotationStart}
-												onmousedown={(event) => event.stopPropagation()}
-												ontouchstart={(event) => event.stopPropagation()}
-												ontouchmove={(event) => event.stopPropagation()}
-												ontouchend={(event) => event.stopPropagation()}
-												ontouchcancel={(event) => event.stopPropagation()}
-												onclick={(event) => event.stopPropagation()}
-											>
-												<LucideRotateCw size={12} strokeWidth={2.5} />
-											</button>
-										{/if}
-										{#each resizeHandleConfigs as handle (handle.anchor)}
-											<button
-												type="button"
-												aria-label={`Resize selected annotations from ${handle.anchor}`}
-												title="Resize"
-												class="absolute rounded-full border border-white bg-blue-500 shadow-sm"
-												style="
-													left: {(selectionResizeBox.x + selectionResizeBox.width * handle.x) *
-														ctx.state.zoom -
-													6}px;
-													top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) *
-														ctx.state.zoom -
-													6}px;
+																	onpointerdown={handleSelectionRotationStart}
+																	onmousedown={(event) => event.stopPropagation()}
+																	ontouchstart={(event) => event.stopPropagation()}
+																	ontouchmove={(event) => event.stopPropagation()}
+																	ontouchend={(event) => event.stopPropagation()}
+																	ontouchcancel={(event) => event.stopPropagation()}
+																	onclick={(event) => event.stopPropagation()}
+																>
+																	<LucideRotateCw size={12} strokeWidth={2.5} />
+																</button>
+															{/if}
+															{#each resizeHandleConfigs as handle (handle.anchor)}
+																<button
+																	type="button"
+																	aria-label={`Resize selected annotations from ${handle.anchor}`}
+																	title="Resize"
+																	class="absolute rounded-full border border-white bg-blue-500 shadow-sm"
+																	style="
+													left: {(selectionResizeBox.x + selectionResizeBox.width * handle.x) * ctx.state.zoom - 6}px;
+													top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) * ctx.state.zoom - 6}px;
 													width: 12px;
 													height: 12px;
 													border-width: 2px;
@@ -4951,180 +4970,189 @@
 													pointer-events: auto;
 													touch-action: none;
 												"
-												onpointerdown={(event) => handleSelectionResizeStart(event, handle.anchor)}
-												onmousedown={(event) => event.stopPropagation()}
-												ontouchstart={(event) => event.stopPropagation()}
-												ontouchmove={(event) => event.stopPropagation()}
-												ontouchend={(event) => event.stopPropagation()}
-												ontouchcancel={(event) => event.stopPropagation()}
-												onclick={(event) => event.stopPropagation()}
-											></button>
-										{/each}
-									</div>
-								{/if}
-							</div>
-							</div>
-								{#each rightAdjacentPreviewPages as pageNo (pageNo)}
-									<div
-										use:observeAdjacentPage={pageNo}
-										class="pdf-page-stack pdf-page-stack--preview shrink-0"
-										class:pdf-page-stack--compact={useCompactPageTabs}
-										class:pdf-page-stack--minimal={useMinimalPageTabs}
-										style="width: {pageStackWidth}px;"
-									>
-										<div class="pdf-page-tab pdf-page-tab--preview">
-											{#if useCompactPageTabs}
-												<div class="pdf-page-tab-copy pdf-page-tab-copy--compact">
-													<div class="pdf-page-tab-title">Page {pageNo}</div>
-													<div class="pdf-page-tab-status">
-														<span class="pdf-page-tab-dot"></span>
-														<span>Preview</span>
+																	onpointerdown={(event) =>
+																		handleSelectionResizeStart(event, handle.anchor)}
+																	onmousedown={(event) => event.stopPropagation()}
+																	ontouchstart={(event) => event.stopPropagation()}
+																	ontouchmove={(event) => event.stopPropagation()}
+																	ontouchend={(event) => event.stopPropagation()}
+																	ontouchcancel={(event) => event.stopPropagation()}
+																	onclick={(event) => event.stopPropagation()}
+																></button>
+															{/each}
+														</div>
+													{/if}
+												</div>
+											</div>
+											{#each rightAdjacentPreviewPages as pageNo (pageNo)}
+												<div
+													use:observeAdjacentPage={pageNo}
+													class="pdf-page-stack pdf-page-stack--preview shrink-0"
+													class:pdf-page-stack--compact={useCompactPageTabs}
+													class:pdf-page-stack--minimal={useMinimalPageTabs}
+													style="width: {pageStackWidth}px;"
+												>
+													<div class="pdf-page-tab pdf-page-tab--preview">
+														{#if useCompactPageTabs}
+															<div class="pdf-page-tab-copy pdf-page-tab-copy--compact">
+																<div class="pdf-page-tab-title">Page {pageNo}</div>
+																<div class="pdf-page-tab-status">
+																	<span class="pdf-page-tab-dot"></span>
+																	<span>Preview</span>
+																</div>
+															</div>
+														{:else}
+															<div class="pdf-page-tab-copy">
+																<div class="pdf-page-tab-kicker">Preview only</div>
+																<div class="pdf-page-tab-title">Page {pageNo}</div>
+																<div class="pdf-page-tab-note">Switch to this page to edit</div>
+															</div>
+														{/if}
+														{#if !useMinimalPageTabs}
+															<button
+																type="button"
+																class="pdf-page-tab-open"
+																aria-label={`Open page ${pageNo}`}
+																onclick={() => goToPage(pageNo)}
+															>
+																{#if !useCompactPageTabs}
+																	<span>Open</span>
+																{/if}
+																<LucideArrowRight
+																	size={useCompactPageTabs ? 16 : 14}
+																	strokeWidth={2.4}
+																/>
+															</button>
+														{/if}
+													</div>
+
+													<div
+														class="pdf-side-page pointer-events-none relative overflow-hidden rounded-sm bg-white shadow-md ring-1 ring-black/10"
+														data-minimap-page={pageNo}
+														style="width: {currentPageWidth *
+															ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+														aria-hidden="true"
+													>
+														{#if isAdjacentPagePreviewVisible(pageNo)}
+															<div
+																class="absolute top-0 left-0 origin-top-left"
+																class:smooth-zoom={zoomPan.smoothTransition}
+																style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx
+																	.state.zoom});"
+															>
+																{#key `${pdfDocumentId}-side-right-${pageNo}`}
+																	<PDFPage
+																		documentId={pdfDocumentId}
+																		pageIndex={pageNo - 1}
+																		zoom={settledRenderZoom}
+																		width={currentPageWidth}
+																		height={currentPageHeight}
+																		isPanning={cameraIsLive}
+																		renderQualityMode={settledRenderQualityMode}
+																		deferUpdates={pageRenderDeferUpdates}
+																		visibilityRevision={pageRenderVisibilityRevision}
+																		visibilityViewport={pageRenderVisibilityViewport}
+																	/>
+																{/key}
+																<div class="absolute top-0 left-0 z-10 h-full w-full">
+																	{#each getAdjacentPageObjects(pageNo) as object (object.id)}
+																		{#if object.type === 'text'}
+																			<Text
+																				isPenMode={false}
+																				isSelectionMode={false}
+																				isSelected={false}
+																				width={object.width}
+																				onUpdateText={() => {}}
+																				viewOnly={true}
+																				lines={object.lines}
+																				x={object.x}
+																				y={object.y}
+																				size={object.size}
+																				lineHeight={object.lineHeight}
+																				fontFamily={object.fontFamily}
+																				fontColor={object.fontColor}
+																				onTextSelected={() => {}}
+																				onTextUnselected={() => {}}
+																				pageScale={ctx.state.zoom}
+																			/>
+																		{:else if object.type === 'drawing' || object.type === 'highlight'}
+																			<Drawing
+																				{object}
+																				{user}
+																				bind:stroke_visibility={ctx.state.stroke_visibility}
+																				path={object.path}
+																				x={object.x}
+																				y={object.y}
+																				width={object.width}
+																				scale={object.scale}
+																				rotation={object.rotation}
+																				originWidth={object.originWidth}
+																				originHeight={object.originHeight}
+																				brushSize={object.brushSize}
+																				brushColor={object.brushColor}
+																				pageScale={ctx.state.zoom}
+																			/>
+																		{:else if object.type === 'line'}
+																			<Line
+																				{object}
+																				{user}
+																				isPenMode={false}
+																				isAddingLine={false}
+																				x={object.x}
+																				y={object.y}
+																				shapeWidth={object.width}
+																				shapeHeight={object.height}
+																				strokeColor={object.strokeColor}
+																				strokeWidth={object.strokeWidth}
+																				lineType={object.lineType || 'solid'}
+																				originWidth={object.originWidth}
+																				originHeight={object.originHeight}
+																				pageScale={ctx.state.zoom}
+																				isSelected={false}
+																				isObjectSelected={false}
+																				onSelect={() => {}}
+																				onUpdate={() => {}}
+																				onDelete={() => {}}
+																			/>
+																		{:else if object.type === 'teacher-mark'}
+																			<TeacherMark
+																				{object}
+																				x={object.x}
+																				y={object.y}
+																				width={object.width}
+																				height={object.height}
+																				isSelected={false}
+																				isPreviewed={false}
+																			/>
+																		{/if}
+																	{/each}
+																</div>
+															</div>
+														{/if}
 													</div>
 												</div>
-											{:else}
-												<div class="pdf-page-tab-copy">
-													<div class="pdf-page-tab-kicker">Preview only</div>
-													<div class="pdf-page-tab-title">Page {pageNo}</div>
-													<div class="pdf-page-tab-note">Switch to this page to edit</div>
-												</div>
-											{/if}
-											{#if !useMinimalPageTabs}
-												<button
-													type="button"
-													class="pdf-page-tab-open"
-													aria-label={`Open page ${pageNo}`}
-													onclick={() => goToPage(pageNo)}
-												>
-													{#if !useCompactPageTabs}
-														<span>Open</span>
-													{/if}
-													<LucideArrowRight size={useCompactPageTabs ? 16 : 14} strokeWidth={2.4} />
-												</button>
-											{/if}
-										</div>
-
-										<div
-											class="pdf-side-page pointer-events-none relative overflow-hidden rounded-sm bg-white shadow-md ring-1 ring-black/10"
-											data-minimap-page={pageNo}
-											style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
-											aria-hidden="true"
-										>
-											{#if isAdjacentPagePreviewVisible(pageNo)}
-												<div
-													class="absolute top-0 left-0 origin-top-left"
-													class:smooth-zoom={zoomPan.smoothTransition}
-													style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx.state.zoom});"
-												>
-													{#key `${pdfDocumentId}-side-right-${pageNo}`}
-														<PDFPage
-															documentId={pdfDocumentId}
-															pageIndex={pageNo - 1}
-															zoom={settledRenderZoom}
-															width={currentPageWidth}
-															height={currentPageHeight}
-															isPanning={cameraIsLive}
-															renderQualityMode={settledRenderQualityMode}
-															deferUpdates={pageRenderDeferUpdates}
-															visibilityRevision={pageRenderVisibilityRevision}
-															visibilityViewport={pageRenderVisibilityViewport}
-														/>
-													{/key}
-													<div class="absolute top-0 left-0 z-10 h-full w-full">
-														{#each getAdjacentPageObjects(pageNo) as object (object.id)}
-															{#if object.type === 'text'}
-																<Text
-																	isPenMode={false}
-																	isSelectionMode={false}
-																	isSelected={false}
-																	width={object.width}
-																	onUpdateText={() => {}}
-																	viewOnly={true}
-																	lines={object.lines}
-																	x={object.x}
-																	y={object.y}
-																	size={object.size}
-																	lineHeight={object.lineHeight}
-																	fontFamily={object.fontFamily}
-																	fontColor={object.fontColor}
-																	onTextSelected={() => {}}
-																	onTextUnselected={() => {}}
-																	pageScale={ctx.state.zoom}
-																/>
-															{:else if object.type === 'drawing' || object.type === 'highlight'}
-																<Drawing
-																	{object}
-																	{user}
-																	bind:stroke_visibility={ctx.state.stroke_visibility}
-																	path={object.path}
-																	x={object.x}
-																	y={object.y}
-																	width={object.width}
-																	scale={object.scale}
-																	rotation={object.rotation}
-																	originWidth={object.originWidth}
-																	originHeight={object.originHeight}
-																	brushSize={object.brushSize}
-																	brushColor={object.brushColor}
-																	pageScale={ctx.state.zoom}
-																/>
-															{:else if object.type === 'line'}
-																<Line
-																	{object}
-																	{user}
-																	isPenMode={false}
-																	isAddingLine={false}
-																	x={object.x}
-																	y={object.y}
-																	shapeWidth={object.width}
-																	shapeHeight={object.height}
-																	strokeColor={object.strokeColor}
-																	strokeWidth={object.strokeWidth}
-																	lineType={object.lineType || 'solid'}
-																	originWidth={object.originWidth}
-																	originHeight={object.originHeight}
-																	pageScale={ctx.state.zoom}
-																	isSelected={false}
-																	isObjectSelected={false}
-																/>
-														{:else if object.type === 'teacher-mark'}
-															<TeacherMark
-																{object}
-																x={object.x}
-																y={object.y}
-																width={object.width}
-																height={object.height}
-																isSelected={false}
-																isPreviewed={false}
-															/>
-														{/if}
-													{/each}
-												</div>
-											</div>
-											{/if}
+											{/each}
 										</div>
 									</div>
-								{/each}
-							</div>
-						</div>
-									{:else if documentContent.isError}
-										<div class="flex h-64 w-full items-center justify-center">
+								{:else if documentContent.isError}
+									<div class="flex h-64 w-full items-center justify-center">
+										<div
+											class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+										>
+											Failed to open PDF document.
+										</div>
+									</div>
+								{:else}
+									<div class="flex h-64 w-full items-center justify-center">
+										<div class="flex flex-col items-center space-y-3">
 											<div
-												class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-											>
-												Failed to open PDF document.
-											</div>
+												class="loading h-10 w-10 rounded-full border-4 border-amber-200 border-t-amber-500"
+											></div>
+											<p class="text-sm font-medium text-gray-600">Opening PDF document...</p>
 										</div>
-									{:else}
-										<div class="flex h-64 w-full items-center justify-center">
-											<div class="flex flex-col items-center space-y-3">
-												<div
-													class="loading h-10 w-10 rounded-full border-4 border-amber-200 border-t-amber-500"
-												></div>
-												<p class="text-sm font-medium text-gray-600">Opening PDF document...</p>
-											</div>
-										</div>
-									{/if}
-								{/snippet}
+									</div>
+								{/if}
+							{/snippet}
 						</PDFDocumentLoader>
 					{/snippet}
 				</EmbedPDF>
@@ -5559,7 +5587,7 @@
 	/* iOS Safari specific fixes */
 	@supports (-webkit-touch-callout: none) {
 		/* Disable momentum scrolling on iOS during pan/zoom */
-		body {
+		:global(body) {
 			-webkit-overflow-scrolling: auto;
 			overscroll-behavior: contain;
 		}

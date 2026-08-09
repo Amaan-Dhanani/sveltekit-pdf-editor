@@ -115,7 +115,10 @@
 	});
 
 	$effect(() => {
-		if ((!previewList || previewPages.length === 0) && (!pageNumberList || quickPages.length === 0)) {
+		if (
+			(!previewList || previewPages.length === 0) &&
+			(!pageNumberList || quickPages.length === 0)
+		) {
 			return;
 		}
 
@@ -137,7 +140,7 @@
 
 <div
 	bind:this={menuElement}
-	class="pdf-editor-touch-controls fixed top-[74px] left-1/2 z-[120] w-[min(94vw,520px)] -translate-x-1/2 rounded-lg border border-amber-200 bg-white shadow-2xl shadow-amber-950/15 max-[520px]:top-[118px]"
+	class="pdf-editor-touch-controls fixed top-18.5 left-1/2 z-120 w-[min(94vw,520px)] -translate-x-1/2 rounded-lg border border-amber-200 bg-white shadow-2xl shadow-amber-950/15 max-[520px]:top-29.5"
 	role="dialog"
 	aria-label="Page preview navigation"
 >
@@ -168,7 +171,7 @@
 								zoom={previewScale}
 								width={pageWidth}
 								height={pageHeight}
-								renderQualityMode={renderQualityMode}
+								{renderQualityMode}
 								{visibilityRevision}
 								{visibilityViewport}
 							/>
@@ -186,6 +189,9 @@
 												fontFamily={object.fontFamily}
 												fontColor={object.fontColor}
 												pageScale={previewScale}
+												onTextSelected={() => {}}
+												onTextUnselected={() => {}}
+												onUpdateText={() => {}}
 											/>
 										{:else if object.type === 'drawing' || object.type === 'highlight'}
 											<Drawing
@@ -215,6 +221,13 @@
 												strokeWidth={object.strokeWidth}
 												lineType={object.lineType || 'solid'}
 												pageScale={previewScale}
+												originWidth={object.width}
+												originHeight={object.height}
+												isSelected={false}
+												isObjectSelected={false}
+												onSelect={() => {}}
+												onUpdate={() => {}}
+												onDelete={() => {}}
 											/>
 										{:else if object.type === 'teacher-mark'}
 											<TeacherMark
@@ -231,7 +244,10 @@
 						</div>
 					</div>
 					<div class="mt-1 flex h-5 items-center justify-center gap-1 text-xs font-medium">
-						<span class:font-semibold={page === currentPage} class:text-amber-700={page === currentPage}>
+						<span
+							class:font-semibold={page === currentPage}
+							class:text-amber-700={page === currentPage}
+						>
 							{page}
 						</span>
 						{#if pendingPage === page}
@@ -273,4 +289,3 @@
 		</div>
 	</div>
 </div>
-
