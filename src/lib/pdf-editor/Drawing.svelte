@@ -110,7 +110,7 @@
 </script>
 
 <div
-    class="drawing-container pointer-events-none absolute top-0 left-0"
+    class="pointer-events-none absolute left-0 top-0 origin-top-left"
     style={drawingContainerStyle}
 >
     <svg
@@ -128,7 +128,7 @@
                 fill="none"
                 stroke="rgba(59, 130, 246, 0.3)"
                 stroke-width={1 / safePageScale}
-                class="selection-box"
+                class="transition-[stroke-width] duration-150 ease-out [shape-rendering:geometricPrecision]"
             />
         {/if}
 
@@ -141,7 +141,7 @@
                 fill="rgba(245, 158, 11, 0.08)"
                 stroke="rgba(217, 119, 6, 0.8)"
                 stroke-width={2 / safePageScale}
-                class="preview-box"
+                class="animate-[pulse_0.75s_ease-in-out_infinite_alternate] [shape-rendering:geometricPrecision]"
             />
         {/if}
 
@@ -154,7 +154,7 @@
                 fill="rgba(239, 68, 68, 0.1)"
                 stroke="rgba(239, 68, 68, 0.5)"
                 stroke-width={2 / safePageScale}
-                class="eraser-highlight-box"
+                class="animate-[pulse_0.5s_ease-in-out_infinite_alternate]"
             />
         {/if}
 
@@ -172,50 +172,3 @@
         {/if}
     </svg>
 </div>
-
-<style>
-    .selection-box {
-        transition: stroke-width 0.15s ease;
-        /* Optimize selection box rendering */
-        shape-rendering: geometricPrecision;
-    }
-
-    .eraser-highlight-box {
-        animation: pulse-highlight 0.5s ease-in-out infinite alternate;
-    }
-
-    .preview-box {
-        animation: preview-pulse 0.75s ease-in-out infinite alternate;
-        shape-rendering: geometricPrecision;
-    }
-
-    @keyframes pulse-highlight {
-        from {
-            opacity: 0.3;
-        }
-        to {
-            opacity: 0.7;
-        }
-    }
-
-    @keyframes preview-pulse {
-        from {
-            opacity: 0.65;
-        }
-        to {
-            opacity: 1;
-        }
-    }
-
-    .overflow-visible {
-        overflow: visible;
-    }
-
-    .pointer-events-none {
-        pointer-events: none;
-    }
-
-    .drawing-container {
-        transform-origin: top left;
-    }
-</style>

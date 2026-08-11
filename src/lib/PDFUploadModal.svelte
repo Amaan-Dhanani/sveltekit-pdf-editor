@@ -1,9 +1,13 @@
 <script lang="ts">
     import { createEventDispatcher, onMount } from 'svelte';
     // Alias the File icon so it doesn't conflict with the native browser File type
-    import { X, Upload, File as FileIcon } from 'lucide-svelte';
+    import { X, Upload, File as FileIcon } from '@lucide/svelte';
 
-    export let isOpen = false;
+    interface Props {
+        isOpen?: boolean;
+    }
+
+    let { isOpen = $bindable(false) }: Props = $props();
 
     interface SavedDocument {
         id: string;
@@ -15,11 +19,11 @@
 
     const dispatch = createEventDispatcher();
 
-    let savedDocuments: SavedDocument[] = [];
+    let savedDocuments: SavedDocument[] = $state([]);
     // Now TypeScript knows this is the native Web File object
-    let selectedFile: File | null = null; 
-    let documentName = '';
-    let error = '';
+    let selectedFile: File | null = $state(null); 
+    let documentName = $state('');
+    let error = $state('');
 
     onMount(() => {
         loadSavedDocuments();
@@ -145,7 +149,7 @@
 		<div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
 			<div class="flex justify-between items-center p-4 border-b">
 				<h2 class="text-xl font-semibold">PDF Documents</h2>
-				<button class="text-gray-500 hover:text-gray-700" on:click={closeModal}>
+				<button class="text-gray-500 hover:text-gray-700" onclick={closeModal}>
 					<X size={20} />
 				</button>
 			</div>
@@ -170,7 +174,7 @@
 								type="file"
 								class="hidden"
 								accept="application/pdf"
-								on:change={handleFileChange}
+								onchange={handleFileChange}
 							/>
 						</label>
 					</div>
@@ -196,7 +200,7 @@
 
 					<button
 						class="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-md transition-colors"
-						on:click={handleSubmit}
+						onclick={handleSubmit}
 					>
 						Upload and Open
 					</button>
@@ -219,8 +223,8 @@
 								role="button"
 								tabindex="0"
 								class="flex items-center p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
-								on:click={() => loadDocument(doc)}
-								on:keydown={(event) => {
+								onclick={() => loadDocument(doc)}
+								onkeydown={(event) => {
 									if (event.key === 'Enter' || event.key === ' ') {
 										event.preventDefault();
 										loadDocument(doc);
@@ -236,7 +240,7 @@
 								</div>
 								<button
 									class="text-gray-400 hover:text-red-500"
-									on:click={(e) => deleteDocument(doc.id, e)}
+									onclick={(e) => deleteDocument(doc.id, e)}
 								>
 									<X size={18} />
 								</button>

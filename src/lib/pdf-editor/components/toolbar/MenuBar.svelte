@@ -15,7 +15,7 @@
 		LucideChevronDown,
 		LucideSettings,
 		LucideRefreshCw
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import {
 		getPDFEditorContext,
 		type RenderQualityMode,
@@ -492,7 +492,7 @@
 								<div class="flex h-8 w-8 items-center justify-center rounded-md bg-white shadow-sm">
 									<span class="text-base">🖨️</span>
 								</div>
-								<span>{saving ? 'Saving...' : 'Print'}</span>
+								<span>{saving ? 'Saving...' : 'Download & Print'}</span>
 							</button>
 						{/if}
 					</div>

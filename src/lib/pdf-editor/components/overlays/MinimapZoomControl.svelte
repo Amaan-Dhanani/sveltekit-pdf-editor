@@ -6,7 +6,7 @@
 		LucideMaximize2,
 		LucideChevronLeft,
 		LucideChevronRight
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { fly } from 'svelte/transition';
 	import { getPDFEditorContext } from '../../context/pdfEditorContext.svelte';
 	import {
@@ -77,7 +77,7 @@
 	let miniAnnotationCanvasRef: HTMLCanvasElement | null = $state(null);
 	const ctx = getPDFEditorContext();
 	let toolbarPosition = $derived(ctx.state.toolbarPosition);
-	let shouldAvoidBottomToolbar = $state(false);
+	let shouldAvoidToolButtons = $state(false);
 	let minimapPages = $state<
 		Array<{
 			pageNo: number;
@@ -891,7 +891,7 @@
 	$effect(() => {
 		const mediaQuery = window.matchMedia('(max-width: 529px)');
 		const updateDocking = () => {
-			shouldAvoidBottomToolbar = mediaQuery.matches;
+			shouldAvoidToolButtons = mediaQuery.matches;
 		};
 
 		updateDocking();
@@ -913,17 +913,15 @@
 
 <!-- Fixed positioning to prevent iOS zoom issues -->
 <div
-	class="minimap-zoom-control fixed left-4 z-80 transition-[bottom] duration-300"
-	class:bottom-24={toolbarPosition === 'bottom' && shouldAvoidBottomToolbar}
-	class:bottom-4={toolbarPosition !== 'bottom' || !shouldAvoidBottomToolbar}
-	style="touch-action: manipulation; -webkit-user-select: none; user-select: none;"
+	class="fixed left-4 z-80 touch-manipulation select-none transition-[bottom] duration-300"
+	class:bottom-24={toolbarPosition === 'bottom' && shouldAvoidToolButtons}
+	class:bottom-4={toolbarPosition !== 'bottom' || !shouldAvoidToolButtons}
 >
 	<!-- Zoom Menu Popup -->
 	{#if isMenuOpen}
 		<div
 			transition:fly={{ y: 10, duration: 200 }}
-			class="absolute bottom-full left-0 mb-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
-			style="pointer-events: auto;"
+			class="pointer-events-auto absolute bottom-full left-0 mb-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
 		>
 			<!-- Interactive Minimap Visualization -->
 			<div class="border-b border-gray-200 bg-gray-50 p-3">
@@ -940,10 +938,10 @@
 						handleMinimapClick(event, expandedMinimapRef, () => expandedMinimapMetrics)}
 					use:nonPassiveTouchStart={(event) =>
 						startMinimapPan(event, expandedMinimapRef, () => expandedMinimapMetrics)}
-					class="relative rounded border border-gray-300 bg-white"
+					class="relative touch-none rounded border border-gray-300 bg-white"
 					class:cursor-grab={!isDragging && !disabled}
 					class:cursor-grabbing={isDragging}
-					style="width: {MINIMAP_WIDTH}px; height: {MINIMAP_HEIGHT}px; touch-action: none;"
+					style="width: {MINIMAP_WIDTH}px; height: {MINIMAP_HEIGHT}px;"
 				>
 					{#each minimapPages as page (page.pageNo)}
 						<div
@@ -1062,10 +1060,9 @@
 
 	{#if isCompact}
 		<div
-			class="flex h-10 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg"
+			class="pointer-events-auto flex h-10 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg"
 			class:ring-2={isMenuOpen}
 			class:ring-blue-400={isMenuOpen}
-			style="pointer-events: auto;"
 		>
 			<button
 				onclick={toggleMenu}
@@ -1089,10 +1086,9 @@
 		</div>
 	{:else}
 		<div
-			class="overflow-hidden rounded-lg border border-gray-300 bg-gray-100 shadow-lg"
+			class="pointer-events-auto w-41.5 overflow-hidden rounded-lg border border-gray-300 bg-gray-100 shadow-lg"
 			class:ring-2={isMenuOpen}
 			class:ring-blue-400={isMenuOpen}
-			style="width: 166px; pointer-events: auto;"
 		>
 			<div class="flex h-9 items-center justify-between px-2">
 				<button
@@ -1140,10 +1136,10 @@
 				onclick={(event) => handleMinimapClick(event, miniMinimapRef, () => miniMinimapMetrics)}
 				use:nonPassiveTouchStart={(event) =>
 					startMinimapPan(event, miniMinimapRef, () => miniMinimapMetrics)}
-				class="relative mx-2 mb-2 overflow-hidden rounded-md bg-gray-50"
+				class="relative mx-2 mb-2 touch-none overflow-hidden rounded-md bg-gray-50"
 				class:cursor-grab={!isDragging && !disabled}
 				class:cursor-grabbing={isDragging}
-				style="width: {MINI_MINIMAP_WIDTH}px; height: {MINI_MINIMAP_HEIGHT}px; touch-action: none;"
+				style="width: {MINI_MINIMAP_WIDTH}px; height: {MINI_MINIMAP_HEIGHT}px;"
 				title="Drag or click to move around the document"
 			>
 				{#each minimapPages as page (page.pageNo)}
@@ -1186,10 +1182,6 @@
 
 <style>
 	/* Prevent iOS zoom on double tap */
-	.minimap-zoom-control * {
-		touch-action: manipulation;
-		-webkit-tap-highlight-color: transparent;
-	}
 
 	.minimap-page-number {
 		position: absolute;

@@ -586,19 +586,16 @@
             lastClickPosition = { x, y };
         }
     }}
-    class="absolute top-0 left-0 h-full w-full select-none"
-    style="cursor: default; pointer-events: auto;"
+    class="absolute left-0 top-0 h-full w-full cursor-default select-none pointer-events-auto"
 >
     {#if isSelecting && selectionBox.width > 0 && selectionBox.height > 0}
         <div
-            class="pointer-events-none absolute"
+            class="pointer-events-none absolute border-2 border-blue-500/80 bg-blue-500/10"
             style="
                 left: {selectionBox.x * pageScale}px;
                 top: {selectionBox.y * pageScale}px;
                 width: {selectionBox.width * pageScale}px;
                 height: {selectionBox.height * pageScale}px;
-                border: 2px solid rgba(59, 130, 246, 0.8);
-                background-color: rgba(59, 130, 246, 0.1);
             "
         ></div>
     {/if}

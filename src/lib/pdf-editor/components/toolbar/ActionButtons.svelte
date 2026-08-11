@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Maximize, Minimize, Save, Check, LoaderCircle } from 'lucide-svelte';
+	import { Maximize, Minimize, Save, Check, LoaderCircle } from '@lucide/svelte';
 	import type { SaveState } from '../../context/pdfEditorContext.svelte.ts';
 
 	interface Props {

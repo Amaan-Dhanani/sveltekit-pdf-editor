@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LucideCheck, LucideAlertCircle, LucideLoader2, LucideCircle } from 'lucide-svelte';
+	import { LucideCheck, LucideAlertCircle, LucideLoader2, LucideCircle } from '@lucide/svelte';
 	import type { SaveState } from '../../context/pdfEditorContext.svelte';
 
 	interface Props {

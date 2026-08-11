@@ -10,7 +10,7 @@
 		LucideTextCursorInput,
 		LucideTrash2,
 		LucideX
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import TextToolPanel from '../tool-panels/TextToolPanel.svelte';
 
 	type SelectedObject = {
@@ -118,15 +118,13 @@
 {#if isSelectionMode && selectedObjectIds.length > 0}
 	<div
 		transition:fly={{ x: 10, y: 0, duration: 200 }}
-		class="pdf-editor-touch-controls fixed top-20 right-3 z-[110] w-[min(24rem,calc(100vw-1.5rem))]"
-		style="touch-action: manipulation; -webkit-user-select: none; user-select: none; pointer-events: none;"
+		class="pointer-events-none fixed top-20 right-3 z-110 w-[min(24rem,calc(100vw-1.5rem))] touch-manipulation select-none"
 	>
-		<div
-			class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
-			style="pointer-events: auto;"
-		>
+		<div class="pointer-events-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
 			<div class="flex items-center gap-2 px-3 py-2">
-				<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+				<div
+					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600"
+				>
 					<LucideMousePointerClick size={12} />
 				</div>
 				<button
@@ -190,10 +188,14 @@
 							}`}
 						>
 							<div class="flex min-w-0 flex-1 items-center gap-2 px-1 py-0.5">
-								<span class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+								<span
+									class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600"
+								>
 									{objectTypeLabel(object.type)}
 								</span>
-								<span class="min-w-0 flex-1 break-all text-xs font-medium text-gray-800">{object.id}</span>
+								<span class="min-w-0 flex-1 break-all text-xs font-medium text-gray-800"
+									>{object.id}</span
+								>
 							</div>
 							<div class="flex shrink-0 items-center gap-1">
 								<button
@@ -208,7 +210,9 @@
 									type="button"
 									onclick={() => handlePreviewObject(object.id)}
 									class={`flex h-7 w-7 items-center justify-center rounded-lg hover:bg-amber-50 active:bg-amber-100 ${
-										previewedObjectId === object.id ? 'bg-amber-100 text-amber-700' : 'text-amber-600'
+										previewedObjectId === object.id
+											? 'bg-amber-100 text-amber-700'
+											: 'text-amber-600'
 									}`}
 									title={`Preview ${object.id}`}
 								>
@@ -254,7 +258,7 @@
 						onUpdateColor={onUpdateTextColor}
 						onUpdateLineHeight={onUpdateTextLineHeight}
 						onUpdateFontFamily={onUpdateTextFontFamily}
-						onDelete={onDelete}
+						{onDelete}
 					/>
 				</div>
 			{/if}

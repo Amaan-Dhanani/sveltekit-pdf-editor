@@ -12,7 +12,7 @@
 		LucideMoreHorizontal,
 		LucideX,
 		LucideClipboardCheck
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { getPDFEditorContext } from '../../context/pdfEditorContext.svelte';
 	import Portal from '../../Portal.svelte';
 

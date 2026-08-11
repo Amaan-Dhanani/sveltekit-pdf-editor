@@ -6,19 +6,17 @@
 	import { usePdfiumEngine } from '@embedpdf/engines/svelte';
 	import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/svelte';
 	import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
-	import { LucideArrowRight, LucideRotateCw } from 'lucide-svelte';
+	import { LucideArrowRight, LucideRotateCw } from '@lucide/svelte';
 
 	// Canvas components
 	import PDFDocumentLoader from './PDFDocumentLoader.svelte';
 	import PDFDocumentSync from './PDFDocumentSync.svelte';
 	import PDFPage from './PDFPage.svelte';
-	import Image from './Image.svelte';
 	import Text from './Text.svelte';
 	import Drawing from './Drawing.svelte';
 	import AnnotationCanvasLayer from './AnnotationCanvasLayer.svelte';
 	import DrawingCanvas from './DrawingCanvas.svelte';
 	import ErasingCanvas from './ErasingCanvas.svelte';
-	import HighlightCanvas from './HighlightCanvas.svelte';
 	import PointerCanvas from './PointerCanvas.svelte';
 	import PointerStroke from './PointerStroke.svelte';
 	import Line from './Line.svelte';
@@ -28,7 +26,7 @@
 
 	// New toolbar components
 	import TopBar from './components/toolbar/TopBar.svelte';
-	import BottomToolbar from './components/toolbar/BottomToolbar.svelte';
+	import ToolButtons from './components/toolbar/ToolButtons.svelte';
 	import PagePreviewMenu from './components/toolbar/PagePreviewMenu.svelte';
 
 	// Tool panel components
@@ -354,7 +352,7 @@
 	import { createObjectSpatialIndex } from './utils/spatialIndex';
 
 	let {
-		allObjects,
+		allObjects = $bindable([]),
 		currentPage,
 		pdfBlob,
 		allowPrinting = false,
@@ -416,7 +414,7 @@
 			return isPageLoading;
 		}
 	});
-	
+
 	// Initialize composables
 	const modes = usePDFModes();
 	const resolvedPlugins = $derived(
@@ -3925,7 +3923,7 @@
 />
 
 <!-- Bottom Toolbar -->
-<BottomToolbar
+<ToolButtons
 	isAddingText={ctx.state.isAddingText}
 	addingDrawing={ctx.state.addingDrawing}
 	isErasing={ctx.state.isErasing}
@@ -4178,34 +4176,35 @@
 	<!-- Scrollable content area -->
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
-		role="list"
-		class:cursor-grab={ctx.state.isHandMode && !ctx.state.isPanning}
-		class:cursor-grabbing={ctx.state.isHandMode && ctx.state.isPanning}
-		onmousedown={handleWorkspaceMouseDown}
-		use:nonpassiveTouchStart={handleWorkspaceTouchStart}
-		use:nonpassiveTouchMove={handleWorkspaceTouchMove}
-		ontouchend={(e) => {
-			if (drawingInputActive && !ctx.state.isHandMode) {
-				zoomPan.onTouchEnd(e);
-				return;
-			}
-			// Clean up gesture state
-			zoomPan.onTouchEnd(e);
-			if (ctx.state.isHandMode) {
-				zoomPan.stopPanning();
-			}
-		}}
-		ontouchcancel={(e) => {
-			if (drawingInputActive && !ctx.state.isHandMode) {
-				zoomPan.onTouchEnd(e);
-				return;
-			}
-			zoomPan.onTouchEnd(e);
-			resetActivePointerLocks();
-		}}
-		onwheel={(e) => zoomPan.handleWheelZoom(e)}
-		style="-webkit-overflow-scrolling: auto; overscroll-behavior: contain; touch-action: {workspaceTouchAction};"
-	>
+	role="application"
+    class="overscroll-contain [-webkit-overflow-scrolling:auto]"
+    class:cursor-grab={ctx.state.isHandMode && !ctx.state.isPanning}
+    class:cursor-grabbing={ctx.state.isHandMode && ctx.state.isPanning}
+    style="touch-action: {workspaceTouchAction};"
+    onmousedown={handleWorkspaceMouseDown}
+    use:nonpassiveTouchStart={handleWorkspaceTouchStart}
+    use:nonpassiveTouchMove={handleWorkspaceTouchMove}
+    ontouchend={(e) => {
+        if (drawingInputActive && !ctx.state.isHandMode) {
+            zoomPan.onTouchEnd(e);
+            return;
+        }
+        // Clean up gesture state
+        zoomPan.onTouchEnd(e);
+        if (ctx.state.isHandMode) {
+            zoomPan.stopPanning();
+        }
+    }}
+    ontouchcancel={(e) => {
+        if (drawingInputActive && !ctx.state.isHandMode) {
+            zoomPan.onTouchEnd(e);
+            return;
+        }
+        zoomPan.onTouchEnd(e);
+        resetActivePointerLocks();
+    }}
+    onwheel={(e) => zoomPan.handleWheelZoom(e)}
+>
 		<div class="pdf-workspace-shell w-fit">
 			{#if PDFReady && !pdfEngine.isLoading && pdfEngine.engine && embedPdfPlugins.length}
 				<EmbedPDF engine={pdfEngine.engine} plugins={embedPdfPlugins}>
@@ -4915,17 +4914,14 @@
 												top: {selectionResizeBox.y * ctx.state.zoom}px;
 												width: {selectionResizeBox.width * ctx.state.zoom}px;
 												height: {selectionResizeBox.height * ctx.state.zoom}px;
-												border-width: 1px;
 											"
 															></div>
 															{#if rotatableSelectedDrawingObjects.length > 0}
 																<div
-																	class="pointer-events-none absolute bg-blue-400/50"
+																	class="pointer-events-none absolute w-px h-6 bg-blue-400/50"
 																	style="
 													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom}px;
 													top: {selectionResizeBox.y * ctx.state.zoom - 30}px;
-													width: 1px;
-													height: 24px;
 												"
 																></div>
 																<button
@@ -4934,15 +4930,15 @@
 																	title="Rotate"
 																	class="absolute flex items-center justify-center rounded-full border border-white bg-blue-500 text-white shadow-sm"
 																	style="
-													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom - 10}px;
-													top: {selectionResizeBox.y * ctx.state.zoom - 42}px;
-													width: 20px;
-													height: 20px;
-													border-width: 2px;
-													cursor: grab;
-													pointer-events: auto;
-													touch-action: none;
-												"
+																		left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom - 10}px;
+																		top: {selectionResizeBox.y * ctx.state.zoom - 42}px;
+																		width: 20px;
+																		height: 20px;
+																		border-width: 2px;
+																		cursor: grab;
+																		pointer-events: auto;
+																		touch-action: none;
+																	"
 																	onpointerdown={handleSelectionRotationStart}
 																	onmousedown={(event) => event.stopPropagation()}
 																	ontouchstart={(event) => event.stopPropagation()}
@@ -4959,17 +4955,12 @@
 																	type="button"
 																	aria-label={`Resize selected annotations from ${handle.anchor}`}
 																	title="Resize"
-																	class="absolute rounded-full border border-white bg-blue-500 shadow-sm"
+																	class="absolute rounded-full border-white bg-blue-500 shadow-sm h-3 w-3 touch-none border-2 pointer-events:auto"
 																	style="
-													left: {(selectionResizeBox.x + selectionResizeBox.width * handle.x) * ctx.state.zoom - 6}px;
-													top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) * ctx.state.zoom - 6}px;
-													width: 12px;
-													height: 12px;
-													border-width: 2px;
-													cursor: {handle.cursor};
-													pointer-events: auto;
-													touch-action: none;
-												"
+																		left: {(selectionResizeBox.x + selectionResizeBox.width * handle.x) * ctx.state.zoom - 6}px;
+																		top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) * ctx.state.zoom - 6}px;
+																		cursor: {handle.cursor};
+																	"
 																	onpointerdown={(event) =>
 																		handleSelectionResizeStart(event, handle.anchor)}
 																	onmousedown={(event) => event.stopPropagation()}

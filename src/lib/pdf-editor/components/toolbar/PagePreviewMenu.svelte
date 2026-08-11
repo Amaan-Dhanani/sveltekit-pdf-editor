@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { LucideCheck, LucideLoader2 } from 'lucide-svelte';
+	import { LucideCheck, LucideLoader2 } from '@lucide/svelte';
 	import PDFPage from '../../PDFPage.svelte';
 	import Text from '../../Text.svelte';
 	import Drawing from '../../Drawing.svelte';

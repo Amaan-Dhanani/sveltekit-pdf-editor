@@ -9,7 +9,7 @@
 		LucideTrash2,
 		LucideChevronDown,
 		LucideChevronUp
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { presetColors } from '../../utils/colorPresets';
 	import type { PDFObject } from '../../context/pdfEditorContext.svelte';
 

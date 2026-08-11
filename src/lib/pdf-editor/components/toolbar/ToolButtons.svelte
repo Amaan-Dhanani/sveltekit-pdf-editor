@@ -1,444 +1,414 @@
 <script lang="ts">
-	import {
-		LucideType,
-		LucidePencilLine,
-		LucideEraser,
-		LucideMinus,
-		LucideHighlighter,
-		LucidePen,
-		LucideMousePointerClick,
-		LucideZoomIn,
-		LucideUndo2,
-		LucideRedo2,
-		LucideHand
-	} from 'lucide-svelte';
-	import Tooltip from './Tooltip.svelte';
-	import { onMount } from 'svelte';
+    import {
+        LucideType,
+        LucidePencilLine,
+        LucideEraser,
+        LucideMinus,
+        LucideHighlighter,
+        LucidePen,
+        LucideMousePointerClick,
+        LucideUndo2,
+        LucideRedo2,
+        LucideHand,
+        LucideClipboardCheck
+    } from '@lucide/svelte';
+    import type { Component } from 'svelte';
+    import { onMount } from 'svelte';
 
-	interface Props {
-		// Tool mode states
-		isAddingText: boolean;
-		AddTextButtonField: string;
-		addingDrawing: boolean;
-		isErasing: boolean;
-		isAddingLine: boolean;
-		isHighlighting: boolean;
-		isPointerMode: boolean;
-		isSelectionMode: boolean;
-		isHandMode: boolean;
-		showingZoom: boolean;
-		zoom: number;
-		isCursorMode: boolean;
+    import ToolbarOverflow from './ToolbarOverflow.svelte';
+    import { getPDFEditorContext } from '../../context/pdfEditorContext.svelte';
 
-		// Page state
-		selectedPageIndex: number;
-		isPageDisabled: boolean;
-		isAddingDisabled: boolean;
+    interface Props {
+        isAddingText: boolean;
+        addingDrawing: boolean;
+        isErasing: boolean;
+        isAddingLine: boolean;
+        isHighlighting: boolean;
+        isPointerMode: boolean;
+        isSelectionMode: boolean;
+        isHandMode: boolean;
 
-		// Handlers
-		onAddTextField: () => void;
-		onAddDrawing: () => void;
-		onErasing: () => void;
-		activateLineMode: () => void;
-		onHighlighting: () => void;
-		onPointerMode: () => void;
-		onSelectionMode: () => void;
-		onHandMode: () => void;
-		toggleZoomPanel: () => void;
-		handleUndo: () => void;
-		handleRedo: () => void;
-	}
+        allowTeacherMark?: boolean;
+        enabledToolMap?: Partial<Record<string, boolean>>;
 
-	let {
-		isAddingText,
-		AddTextButtonField,
-		addingDrawing,
-		isErasing,
-		isAddingLine,
-		isHighlighting,
-		isPointerMode,
-		isSelectionMode,
-		isHandMode,
-		showingZoom,
-		zoom,
-		isCursorMode,
-		selectedPageIndex,
-		isPageDisabled,
-		isAddingDisabled,
-		onAddTextField,
-		onAddDrawing,
-		onErasing,
-		activateLineMode,
-		onHighlighting,
-		onPointerMode,
-		onSelectionMode,
-		onHandMode,
-		toggleZoomPanel,
-		handleUndo,
-		handleRedo
-	}: Props = $props();
+        selectedPageIndex: number;
+        isPageDisabled: boolean;
+        disabled?: boolean;
+        isAddingDisabled: boolean;
 
-	let isMobile = $state(false);
+        onAddTextField: () => void;
+        onAddDrawing: () => void;
+        onErasing: () => void;
+        activateLineMode: () => void;
+        onHighlighting: () => void;
+        onPointerMode: () => void;
+        onSelectionMode: () => void;
+        onHandMode: () => void;
+        onTeacherMark?: () => void;
+        handleUndo: () => void;
+        handleRedo: () => void;
+    }
 
-	onMount(() => {
-		// Detect if device is mobile/tablet based on screen width and touch capability
-		const checkMobile = () => {
-			isMobile = window.innerWidth < 768 || ('ontouchstart' in window);
-		};
+    let {
+        isAddingText,
+        addingDrawing,
+        isErasing,
+        isAddingLine,
+        isHighlighting,
+        isPointerMode,
+        isSelectionMode,
+        isHandMode,
+        allowTeacherMark = false,
+        enabledToolMap = {},
+        selectedPageIndex,
+        isPageDisabled,
+        disabled = false,
+        isAddingDisabled,
+        onAddTextField,
+        onAddDrawing,
+        onErasing,
+        activateLineMode,
+        onHighlighting,
+        onPointerMode,
+        onSelectionMode,
+        onHandMode,
+        onTeacherMark = () => {},
+        handleUndo,
+        handleRedo
+    }: Props = $props();
 
-		checkMobile();
-		window.addEventListener('resize', checkMobile);
+    const ctx = getPDFEditorContext();
 
-		return () => {
-			window.removeEventListener('resize', checkMobile);
-		};
-	});
+    let isMobile = $state(false);
+    
+    // Store hovered tool details & button rect coordinates
+    let hoveredTool = $state<ToolConfig | null>(null);
+    let activeBtnRect = $state<DOMRect | null>(null);
+
+    let isDisabled = $derived(disabled || isPageDisabled);
+    let hasExplicitToolMap = $derived(Object.keys(enabledToolMap).length > 0);
+    let toolbarPosition = $derived(ctx.state.toolbarPosition);
+    let isToolButtons = $derived(toolbarPosition === 'bottom');
+
+    function isToolEnabled(toolKey?: string) {
+        if (!toolKey) return true;
+        return !hasExplicitToolMap || enabledToolMap[toolKey] === true;
+    }
+
+    function handleMouseEnter(e: MouseEvent, tool: ToolConfig) {
+        if (isMobile) return;
+        const target = e.currentTarget as HTMLElement;
+        activeBtnRect = target.getBoundingClientRect();
+        hoveredTool = tool;
+    }
+
+    function handleMouseLeave() {
+        hoveredTool = null;
+        activeBtnRect = null;
+    }
+
+    onMount(() => {
+        const checkMobile = () => {
+            isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    });
+
+    interface ToolConfig {
+        id: string;
+        icon: Component;
+        title: string;
+        description: string;
+        shortcut?: string;
+        onclick: () => void;
+        active: boolean;
+        disabled: boolean;
+        show?: boolean;
+        toolKey?: string;
+        theme?: {
+            border: string;
+            kbd: string;
+            iconColor: string;
+        };
+    }
+
+    let toolGroups = $derived<ToolConfig[][]>([
+        // Group 1: History
+        [
+            {
+                id: 'undo',
+                icon: LucideUndo2,
+                title: 'Undo',
+                description: 'Remove last annotation',
+                shortcut: 'Ctrl+Z',
+                onclick: handleUndo,
+                active: false,
+                disabled: isDisabled,
+                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }
+            },
+            {
+                id: 'redo',
+                icon: LucideRedo2,
+                title: 'Redo',
+                description: 'Restore last removed',
+                shortcut: 'Ctrl+Y',
+                onclick: handleRedo,
+                active: false,
+                disabled: isDisabled,
+                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }
+            }
+        ],
+        // Group 2: Navigation & Selection
+        [
+            {
+                id: 'selection',
+                icon: LucideMousePointerClick,
+                title: 'Select & Move',
+                description: 'Select and move annotations',
+                shortcut: 'V',
+                onclick: onSelectionMode,
+                active: isSelectionMode,
+                disabled: selectedPageIndex < 0 || isDisabled,
+                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }
+            },
+            {
+                id: 'hand',
+                icon: LucideHand,
+                title: 'Hand Tool',
+                description: 'Pan and navigate (Space holds temporarily)',
+                shortcut: 'H / Space',
+                onclick: onHandMode,
+                active: isHandMode,
+                disabled: selectedPageIndex < 0,
+                theme: { border: 'border-emerald-400', kbd: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-500' }
+            }
+        ],
+        // Group 3: Freehand & Erase
+        [
+            {
+                id: 'drawing',
+                icon: LucidePencilLine,
+                title: 'Draw',
+                description: 'Draw freehand annotations',
+                shortcut: 'D',
+                onclick: onAddDrawing,
+                active: addingDrawing,
+                disabled: selectedPageIndex < 0 || isDisabled,
+                theme: { border: 'border-amber-400', kbd: 'bg-amber-100 text-amber-600', iconColor: 'text-amber-500' }
+            },
+            {
+                id: 'eraser',
+                icon: LucideEraser,
+                title: 'Erase',
+                description: 'Remove annotations by drawing',
+                shortcut: 'E',
+                onclick: onErasing,
+                active: isErasing,
+                disabled: isDisabled,
+                theme: { border: 'border-red-400', kbd: 'bg-red-100 text-red-600', iconColor: 'text-red-500' }
+            }
+        ],
+        // Group 4: Annotations & Utilities
+        [
+            {
+                id: 'highlighter',
+                toolKey: 'highlighter',
+                icon: LucideHighlighter,
+                title: 'Highlight',
+                description: 'Highlight text with transparency',
+                onclick: onHighlighting,
+                active: isHighlighting,
+                disabled: selectedPageIndex < 0 || isDisabled,
+                theme: { border: 'border-yellow-400', kbd: 'bg-yellow-100 text-yellow-600', iconColor: 'text-yellow-500' }
+            },
+            {
+                id: 'text',
+                toolKey: 'text',
+                icon: LucideType,
+                title: 'Add Text',
+                description: 'Click anywhere to add text',
+                shortcut: 'T',
+                onclick: onAddTextField,
+                active: isAddingText,
+                disabled: isAddingDisabled || isDisabled,
+                theme: { border: 'border-purple-400', kbd: 'bg-purple-100 text-purple-600', iconColor: 'text-purple-500' }
+            },
+            {
+                id: 'line',
+                toolKey: 'line',
+                icon: LucideMinus,
+                title: 'Line',
+                description: 'Draw straight lines',
+                onclick: activateLineMode,
+                active: isAddingLine,
+                disabled: selectedPageIndex < 0 || isDisabled,
+                theme: { border: 'border-slate-400', kbd: 'bg-slate-100 text-slate-600', iconColor: 'text-slate-600' }
+            },
+            {
+                id: 'teacherMark',
+                icon: LucideClipboardCheck,
+                title: 'Teacher Stamp',
+                description: 'Mark this answer as checked',
+                onclick: onTeacherMark,
+                active: false,
+                disabled: selectedPageIndex < 0 || isDisabled,
+                show: allowTeacherMark,
+                theme: { border: 'border-emerald-400', kbd: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-500' }
+            },
+            {
+                id: 'pointer',
+                icon: LucidePen,
+                title: 'Pointer',
+                description: 'Draw temporary strokes',
+                onclick: onPointerMode,
+                active: isPointerMode,
+                disabled: selectedPageIndex < 0 || isDisabled,
+                theme: { border: 'border-orange-400', kbd: 'bg-orange-100 text-orange-600', iconColor: 'text-orange-500' }
+            }
+        ]
+    ]);
+
+    let mobileVisibleIds = new Set(['undo', 'redo', 'selection', 'drawing', 'eraser']);
+
+    // Calculate absolute position for the floating tooltip dynamically
+    let tooltipStyle = $derived.by(() => {
+        if (!activeBtnRect) return '';
+        
+        const offset = 12; // Gap between button and tooltip
+
+        if (toolbarPosition === 'bottom') {
+            return `bottom: ${window.innerHeight - activeBtnRect.top + offset}px; left: ${activeBtnRect.left + activeBtnRect.width / 2}px; transform: translateX(-50%);`;
+        } else if (toolbarPosition === 'left') {
+            return `top: ${activeBtnRect.top + activeBtnRect.height / 2}px; left: ${activeBtnRect.right + offset}px; transform: translateY(-50%);`;
+        } else {
+            // right position
+            return `top: ${activeBtnRect.top + activeBtnRect.height / 2}px; right: ${window.innerWidth - activeBtnRect.left + offset}px; transform: translateY(-50%);`;
+        }
+    });
 </script>
 
-<div class="no-scrollbar -mx-1 mt-2 flex items-center gap-2 overflow-x-auto py-1">
-	<!-- Undo/Redo group -->
-	<div class="group flex shrink-0 rounded-lg border border-gray-200 shadow-sm">
-		<button
-			disabled={isPageDisabled}
-			onclick={handleUndo}
-			class="flex h-10 w-10 items-center justify-center rounded-l-lg border-r border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-amber-600 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400"
-		>
-			<LucideUndo2 size={18} />
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-blue-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucideUndo2 class="h-4 w-4 text-blue-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">
-							Undo <kbd
-								class="ml-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-600"
-								>Ctrl+Z</kbd
-							>
-						</p>
-						<p class="text-xs text-gray-500">Remove last annotation</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
-		<button
-			disabled={isPageDisabled}
-			onclick={handleRedo}
-			class="flex h-10 w-10 items-center justify-center rounded-r-lg text-gray-600 hover:bg-gray-50 hover:text-amber-600 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400"
-		>
-			<LucideRedo2 size={18} />
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-blue-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucideRedo2 class="h-4 w-4 text-blue-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">
-							Redo <kbd
-								class="ml-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-600"
-								>Ctrl+Y</kbd
-							>
-						</p>
-						<p class="text-xs text-gray-500">Restore last removed</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
-	</div>
+{#snippet toolButton(tool: ToolConfig)}
+    {@const Icon = tool.icon}
+    {@const theme = tool.theme ?? { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }}
 
-	<!-- Add Text button -->
-	<button
-		onclick={onAddTextField}
-		disabled={isAddingDisabled || isPageDisabled}
-		class="flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 text-sm text-gray-600 shadow-sm hover:bg-gray-50 hover:text-amber-600 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400"
-	>
-		<LucideType size={18} />
-		<span class="hidden sm:inline">{AddTextButtonField}</span>
-		<span class="inline sm:hidden">Text</span>
-	</button>
-	{#if !isMobile}
-		<Tooltip
-			type="custom"
-			defaultClass=""
-			class="z-50 rounded-lg border-2 border-purple-400 bg-white px-3 py-2 text-black shadow-lg"
-		>
-			<div class="flex items-center gap-2">
-				<LucideType class="h-4 w-4 text-purple-500" />
-				<div>
-					<p class="text-sm font-medium text-gray-800">
-						Add Text <kbd
-							class="ml-1 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-semibold text-purple-600"
-							>T</kbd
-						>
-					</p>
-					<p class="text-xs text-gray-500">Click anywhere to add text</p>
-				</div>
-			</div>
-		</Tooltip>
-	{/if}
+    <div 
+        role="tooltip"
+        class="relative flex items-center justify-center"
+        onmouseenter={(e) => handleMouseEnter(e, tool)}
+        onmouseleave={handleMouseLeave}
+    >
+        <button
+            onclick={tool.onclick}
+            disabled={tool.disabled}
+            class="flex h-9 w-9 items-center justify-center rounded-lg transition-all hover:bg-gray-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            class:bg-blue-100={tool.active}
+            class:text-blue-600={tool.active}
+            class:text-gray-700={!tool.active}
+        >
+            <Icon size={18} class={tool.active ? 'text-blue-600' : theme.iconColor} />
+        </button>
+    </div>
+{/snippet}
 
-	<!-- Drawing tools group -->
-	<div class="group flex shrink-0 rounded-lg border border-gray-200 shadow-sm">
-		<button
-			onclick={onAddDrawing}
-			disabled={selectedPageIndex < 0 || isPageDisabled}
-			class="flex h-10 items-center justify-center gap-2 rounded-l-lg border-r border-gray-200 px-3 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-			class:text-amber-600={addingDrawing && !isCursorMode}
-			class:bg-amber-50={addingDrawing && !isCursorMode}
-			class:text-gray-600={!addingDrawing || isCursorMode}
-		>
-			<LucidePencilLine size={18} />
-			<span class="hidden sm:inline">Draw</span>
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-amber-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucidePencilLine class="h-4 w-4 text-amber-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">
-							Draw <kbd
-								class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-600"
-								>D</kbd
-							>
-						</p>
-						<p class="text-xs text-gray-500">Draw freehand annotations</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
+<div
+    class="pdf-editor-touch-controls fixed z-70 transform transition-all duration-300 {toolbarPosition === 'bottom'
+        ? 'bottom-6 left-1/2 max-w-[calc(100vw-1rem)] -translate-x-1/2'
+        : toolbarPosition === 'left'
+            ? 'top-1/2 left-4 max-h-[calc(100dvh-12rem)] -translate-y-1/2'
+            : 'top-1/2 right-4 max-h-[calc(100dvh-12rem)] -translate-y-1/2'}"
+>
+    <div
+        class="scrollbar-thin flex gap-1 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-2xl transition-all duration-300 {isToolButtons
+            ? 'max-w-[calc(100vw-1rem)] items-center'
+            : 'max-h-[calc(100dvh-12rem)] flex-col items-center'}"
+    >
+        <div class="hidden gap-1 md:flex {isToolButtons ? 'items-center' : 'flex-col items-center'}">
+            {#each toolGroups as group, groupIdx}
+                {#if groupIdx > 0}
+                    <div class="bg-gray-300 self-center {isToolButtons ? 'mx-1 h-6 w-px' : 'my-1 h-px w-6'}"></div>
+                {/if}
 
-		<button
-			disabled={isPageDisabled}
-			onclick={onErasing}
-			class="flex h-10 items-center justify-center gap-2 border-r border-gray-200 px-3 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-			class:text-amber-600={isErasing}
-			class:bg-amber-50={isErasing}
-			class:text-gray-600={!isErasing}
-		>
-			<LucideEraser size={18} />
-			<span class="hidden sm:inline">Erase</span>
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-red-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucideEraser class="h-4 w-4 text-red-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">
-							Erase <kbd
-								class="ml-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-600"
-								>E</kbd
-							>
-						</p>
-						<p class="text-xs text-gray-500">Remove annotations by drawing</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
+                {#each group as tool}
+                    {#if (tool.show ?? true) && isToolEnabled(tool.toolKey)}
+                        {@render toolButton(tool)}
+                    {/if}
+                {/each}
+            {/each}
+        </div>
 
-		<button
-			onclick={onSelectionMode}
-			disabled={selectedPageIndex < 0 || isPageDisabled}
-			class="flex h-10 items-center justify-center gap-2 border-r border-gray-200 px-3 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-			class:text-amber-600={isSelectionMode}
-			class:bg-amber-50={isSelectionMode}
-			class:text-gray-600={!isSelectionMode}
-		>
-			<LucideMousePointerClick size={18} />
-			<span class="hidden sm:inline">Select</span>
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-blue-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucideMousePointerClick class="h-4 w-4 text-blue-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">
-							Select & Move <kbd
-								class="ml-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-600"
-								>V</kbd
-							>
-						</p>
-						<p class="text-xs text-gray-500">Select and move annotations</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
+        <div class="flex gap-1 md:hidden {isToolButtons ? 'items-center' : 'flex-col items-center'}">
+            {#each toolGroups.slice(0, 3) as group, groupIdx}
+                {#if groupIdx > 0}
+                    <div class="bg-gray-300 self-center {isToolButtons ? 'mx-1 h-6 w-px' : 'my-1 h-px w-6'}"></div>
+                {/if}
 
-		<button
-			onclick={onHandMode}
-			disabled={selectedPageIndex < 0 || isPageDisabled}
-			class="flex h-10 items-center justify-center gap-2 border-r border-gray-200 px-3 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-			class:text-amber-600={isHandMode}
-			class:bg-amber-50={isHandMode}
-			class:text-gray-600={!isHandMode}
-		>
-			<LucideHand size={18} />
-			<span class="hidden sm:inline">Hand</span>
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-green-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucideHand class="h-4 w-4 text-green-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">
-							Hand Tool <kbd
-								class="ml-1 rounded bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-600"
-								>H</kbd
-							>
-							or
-							<kbd class="rounded bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-600"
-								>Space</kbd
-							>
-						</p>
-						<p class="text-xs text-gray-500">Pan and navigate (Space holds temporarily)</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
+                {#each group as tool}
+                    {#if mobileVisibleIds.has(tool.id) && isToolEnabled(tool.toolKey)}
+                        {@render toolButton(tool)}
+                    {/if}
+                {/each}
+            {/each}
 
-		<button
-			onclick={onHighlighting}
-			disabled={selectedPageIndex < 0 || isPageDisabled}
-			class="flex h-10 items-center justify-center gap-2 border-r border-gray-200 px-3 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-			class:text-amber-600={isHighlighting}
-			class:bg-amber-50={isHighlighting}
-			class:text-gray-600={!isHighlighting}
-		>
-			<LucideHighlighter size={18} />
-			<span class="hidden sm:inline">Highlight</span>
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-yellow-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucideHighlighter class="h-4 w-4 text-yellow-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">Highlight</p>
-						<p class="text-xs text-gray-500">Highlight text with transparency</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
+            <div class="bg-gray-300 self-center {isToolButtons ? 'mx-1 h-6 w-px' : 'my-1 h-px w-6'}"></div>
 
-		<button
-			onclick={activateLineMode}
-			disabled={selectedPageIndex < 0 || isPageDisabled}
-			class="flex h-10 items-center justify-center gap-2 border-r border-gray-200 px-3 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-			class:text-amber-600={isAddingLine}
-			class:bg-amber-50={isAddingLine}
-			class:text-gray-600={!isAddingLine}
-		>
-			<LucideMinus size={18} />
-			<span class="hidden sm:inline">Line</span>
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-gray-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucideMinus class="h-4 w-4 text-gray-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">Line</p>
-						<p class="text-xs text-gray-500">Draw straight lines</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
-
-		<button
-			onclick={onPointerMode}
-			disabled={selectedPageIndex < 0 || isPageDisabled}
-			class="flex h-10 items-center justify-center gap-2 rounded-r-lg px-3 text-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-			class:text-amber-600={isPointerMode}
-			class:bg-amber-50={isPointerMode}
-			class:text-gray-600={!isPointerMode}
-		>
-			<LucidePen size={18} />
-			<span class="hidden sm:inline">Pointer</span>
-		</button>
-		{#if !isMobile}
-			<Tooltip
-				type="custom"
-				defaultClass=""
-				class="z-50 rounded-lg border-2 border-orange-400 bg-white px-3 py-2 text-black shadow-lg"
-			>
-				<div class="flex items-center gap-2">
-					<LucidePen class="h-4 w-4 text-orange-500" />
-					<div>
-						<p class="text-sm font-medium text-gray-800">Pointer</p>
-						<p class="text-xs text-gray-500">Draw temporary strokes</p>
-					</div>
-				</div>
-			</Tooltip>
-		{/if}
-	</div>
-
-	<!-- Zoom controls -->
-	<button
-		onclick={toggleZoomPanel}
-		disabled={isPageDisabled}
-		class="flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-sm shadow-sm hover:bg-gray-50 active:bg-gray-100 disabled:bg-gray-100 disabled:text-gray-400 sm:px-4"
-		class:text-amber-600={showingZoom}
-		class:bg-amber-50={showingZoom}
-		class:text-gray-600={!showingZoom}
-	>
-		<LucideZoomIn size={18} />
-		<span class="hidden sm:inline">Zoom</span>
-		<span class="text-xs text-gray-500">({Math.round((zoom / 2) * 100)}%)</span>
-	</button>
-	{#if !isMobile}
-		<Tooltip
-			type="custom"
-			defaultClass=""
-			class="z-50 rounded-lg border-2 border-indigo-400 bg-white px-3 py-2 text-black shadow-lg"
-		>
-			<div class="flex items-center gap-2">
-				<LucideZoomIn class="h-4 w-4 text-indigo-500" />
-				<div>
-					<p class="text-sm font-medium text-gray-800">Zoom Controls</p>
-					<p class="text-xs text-gray-500">Adjust PDF zoom level ({Math.round((zoom / 2) * 100)}%)</p>
-				</div>
-			</div>
-		</Tooltip>
-	{/if}
+            <ToolbarOverflow
+                {enabledToolMap}
+                {isAddingText}
+                {addingDrawing}
+                {isErasing}
+                {isAddingLine}
+                {isHighlighting}
+                {isPointerMode}
+                {isSelectionMode}
+                {isHandMode}
+                {allowTeacherMark}
+                {selectedPageIndex}
+                {isPageDisabled}
+                {disabled}
+                {isAddingDisabled}
+                {onAddTextField}
+                {onAddDrawing}
+                {onErasing}
+                {activateLineMode}
+                {onHighlighting}
+                {onPointerMode}
+                {onSelectionMode}
+                {onHandMode}
+                {onTeacherMark}
+            />
+        </div>
+    </div>
 </div>
 
-<style>
-	/* Custom scrollbar styling */
-	.no-scrollbar {
-		-ms-overflow-style: none;
-		scrollbar-width: none;
-	}
+{#if !isMobile && hoveredTool && activeBtnRect}
+    {@const theme = hoveredTool.theme ?? { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }}
+    {@const ToolIcon = hoveredTool.icon}
 
-	.no-scrollbar::-webkit-scrollbar {
-		display: none;
-	}
-</style>
+    <div 
+        class="fixed z-80 pointer-events-none transition-all duration-150" 
+        style={tooltipStyle}
+    >
+        <div class="max-w-xs rounded-lg border-2 {theme.border} bg-white px-3 py-2 text-black shadow-lg">
+            <div>
+                <div class="flex items-center justify-between gap-2 text-sm font-medium text-gray-800">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <ToolIcon size={16} class="shrink-0 {theme.iconColor}" />
+                        <span class="truncate">{hoveredTool.title}</span>
+                    </div>
+
+                    {#if hoveredTool.shortcut}
+                        <span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold {theme.kbd}">
+                            {hoveredTool.shortcut}
+                        </span>
+                    {/if}
+                </div>
+
+                <p class="mt-1 text-xs leading-tight text-gray-500">
+                    {hoveredTool.description}
+                </p>
+            </div>
+        </div>
+    </div>
+{/if}

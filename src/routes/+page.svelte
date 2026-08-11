@@ -11,7 +11,7 @@
 		Trash2,
 		UploadCloud,
 		X
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	type SavedDocument = {
 		id: string;
@@ -25,18 +25,18 @@
 
 	const STORAGE_KEY = 'savedDocuments';
 
-	let pageAnnotations: any[][] = [];
-	let pdfBlob: Blob | null = null;
-	let fileName = '';
+	let pageAnnotations: any[][] = $state([]);
+	let pdfBlob: Blob | null = $state(null);
+	let fileName = $state('');
 	let currentDocumentId = '';
-	let savedDocuments: SavedDocument[] = [];
-	let uploadError = '';
-	let isDragActive = false;
-	let isUploading = false;
-	let fileInput: HTMLInputElement;
-	let isSaveJsonModalOpen = false;
-	let saveJsonOutput = '';
-	let copyState: 'idle' | 'copied' | 'failed' = 'idle';
+	let savedDocuments: SavedDocument[] = $state([]);
+	let uploadError = $state('');
+	let isDragActive = $state(false);
+	let isUploading = $state(false);
+	let fileInput: HTMLInputElement | undefined = $state();
+	let isSaveJsonModalOpen = $state(false);
+	let saveJsonOutput = $state('');
+	let copyState: 'idle' | 'copied' | 'failed' = $state('idle');
 
 	function normalizeAnnotationPages(value: any): any[][] {
 		if (!Array.isArray(value)) return [];
@@ -205,12 +205,8 @@
 		}
 	}
 
-	function handleDataUpdate(payload: {
-		newData: any[][];
-		annotations: any[][];
-		currentPage: number;
-	}) {
-		const updatedData = payload.newData;
+	function handleDataUpdate(event: { detail: { newData: any[][] } }) {
+		const updatedData = event.detail.newData;
 		pageAnnotations = updatedData;
 
 		if (fileName) {
@@ -360,16 +356,16 @@
 				{pageAnnotations}
 				handleSave={handleSaveAnnotations}
 				autoSaveEnabled={false}
-				onDataUpdated={handleDataUpdate}
+				on:dataUpdated={handleDataUpdate}
 				{pdfBlob}
-				onDone={handleDone}
+				on:done={handleDone}
 			/>
 		{:else}
 			<div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
 				<header class="grid gap-5 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
-					<h1 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
-						Open a PDF!
-					</h1>
+						<h1 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
+							Open a PDF!
+						</h1>
 
 					<div
 						class="grid gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-950"
@@ -391,10 +387,10 @@
 						class="group flex min-h-88 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 bg-white p-8 text-center shadow-sm transition hover:border-orange-300 hover:bg-orange-50/40"
 						class:border-orange-400={isDragActive}
 						class:bg-orange-50={isDragActive}
-						on:dragenter={handleDragEnter}
-						on:dragover={handleDragOver}
-						on:dragleave={handleDragLeave}
-						on:drop={handleDrop}
+						ondragenter={handleDragEnter}
+						ondragover={handleDragOver}
+						ondragleave={handleDragLeave}
+						ondrop={handleDrop}
 					>
 						<input
 							bind:this={fileInput}
@@ -402,7 +398,7 @@
 							type="file"
 							class="sr-only"
 							accept="application/pdf"
-							on:change={handleFileChange}
+							onchange={handleFileChange}
 						/>
 
 						<span
@@ -492,7 +488,7 @@
 												<button
 													type="button"
 													class="inline-flex flex-1 items-center justify-center rounded-md bg-zinc-950 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
-													on:click={() => loadDocument(doc)}
+													onclick={() => loadDocument(doc)}
 												>
 													Open
 												</button>
@@ -500,7 +496,7 @@
 													type="button"
 													class="inline-flex items-center justify-center rounded-md border border-zinc-200 px-3 py-2 text-zinc-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
 													aria-label={`Delete ${doc.name}`}
-													on:click={() => deleteDocument(doc.id)}
+													onclick={() => deleteDocument(doc.id)}
 												>
 													<Trash2 class="h-4 w-4" />
 												</button>
@@ -522,7 +518,7 @@
 				type="button"
 				class="absolute inset-0 cursor-default"
 				aria-label="Close JSON output modal"
-				on:click={closeSaveJsonModal}
+				onclick={closeSaveJsonModal}
 			></button>
 			<div
 				class="relative z-10 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
@@ -542,7 +538,7 @@
 					<button
 						type="button"
 						class="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-						on:click={closeSaveJsonModal}
+						onclick={closeSaveJsonModal}
 						aria-label="Close"
 					>
 						<X class="h-5 w-5" />
@@ -564,7 +560,7 @@
 					<button
 						type="button"
 						class="inline-flex items-center justify-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"
-						on:click={copySaveJson}
+						onclick={copySaveJson}
 					>
 						{#if copyState === 'copied'}
 							<Check class="h-4 w-4" />

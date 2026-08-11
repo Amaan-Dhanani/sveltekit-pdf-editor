@@ -8,7 +8,7 @@
 		LucidePalette,
 		LucideChevronDown,
 		LucideChevronUp
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { presetColors } from '../../utils/colorPresets';
 
 	interface Props {

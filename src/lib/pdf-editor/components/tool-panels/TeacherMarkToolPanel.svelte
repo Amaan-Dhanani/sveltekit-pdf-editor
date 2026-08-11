@@ -10,7 +10,7 @@
 		LucideThumbsUp,
 		LucideTrash2,
 		LucideX
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import {
 		getTeacherMarkColorPreset,
 		getTeacherMarkIcon,
@@ -116,7 +116,7 @@
 </script>
 
 <div
-	class="teacher-mark-tool-panel pdf-editor-touch-controls fixed top-20 right-3 z-[115] max-h-[calc(100vh-6rem)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-green-200 bg-white shadow-2xl"
+	class="teacher-mark-tool-panel fixed top-20 right-3 z-115 max-h-[calc(100dvh-6rem)] w-[min(22rem,calc(100vw-1.5rem))] touch-pan-y overscroll-contain overflow-y-auto rounded-xl border border-green-200 bg-white shadow-2xl"
 >
 	<div class="flex items-center justify-between border-b border-green-100 px-4 py-3">
 		<div>
@@ -177,12 +177,16 @@
 						aria-pressed={selectedColor === preset.value}
 						title={preset.label}
 						class="flex h-9 w-9 items-center justify-center rounded-full border bg-white transition-transform hover:scale-105"
-						style:border-color={selectedColor === preset.value ? preset.border : '#d1d5db'}
-						style:box-shadow={selectedColor === preset.value
+						style="border-color: {selectedColor === preset.value
+							? preset.border
+							: '#d1d5db'}; box-shadow: {selectedColor === preset.value
 							? `0 0 0 2px white, 0 0 0 4px ${preset.border}`
-							: 'none'}
+							: 'none'};"
 					>
-						<span class="h-5 w-5 rounded-full" style:background={preset.border} aria-hidden="true"
+						<span
+							class="h-5 w-5 rounded-full"
+							style="background: {preset.border};"
+							aria-hidden="true"
 						></span>
 					</button>
 				{/each}
@@ -290,17 +294,3 @@
 		</button>
 	</div>
 </div>
-
-<style>
-	.teacher-mark-tool-panel {
-		overscroll-behavior: contain;
-		touch-action: pan-y;
-		-webkit-overflow-scrolling: touch;
-	}
-
-	@supports (height: 100dvh) {
-		.teacher-mark-tool-panel {
-			max-height: calc(100dvh - 6rem);
-		}
-	}
-</style>
