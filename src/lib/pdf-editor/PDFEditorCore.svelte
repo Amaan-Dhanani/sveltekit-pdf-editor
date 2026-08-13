@@ -17,6 +17,7 @@
 	import AnnotationCanvasLayer from './AnnotationCanvasLayer.svelte';
 	import DrawingCanvas from './DrawingCanvas.svelte';
 	import ErasingCanvas from './ErasingCanvas.svelte';
+	import HighlightCanvas from './HighlightCanvas.svelte';
 	import PointerCanvas from './PointerCanvas.svelte';
 	import PointerStroke from './PointerStroke.svelte';
 	import Line from './Line.svelte';
@@ -4176,35 +4177,35 @@
 	<!-- Scrollable content area -->
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
-	role="application"
-    class="overscroll-contain [-webkit-overflow-scrolling:auto]"
-    class:cursor-grab={ctx.state.isHandMode && !ctx.state.isPanning}
-    class:cursor-grabbing={ctx.state.isHandMode && ctx.state.isPanning}
-    style="touch-action: {workspaceTouchAction};"
-    onmousedown={handleWorkspaceMouseDown}
-    use:nonpassiveTouchStart={handleWorkspaceTouchStart}
-    use:nonpassiveTouchMove={handleWorkspaceTouchMove}
-    ontouchend={(e) => {
-        if (drawingInputActive && !ctx.state.isHandMode) {
-            zoomPan.onTouchEnd(e);
-            return;
-        }
-        // Clean up gesture state
-        zoomPan.onTouchEnd(e);
-        if (ctx.state.isHandMode) {
-            zoomPan.stopPanning();
-        }
-    }}
-    ontouchcancel={(e) => {
-        if (drawingInputActive && !ctx.state.isHandMode) {
-            zoomPan.onTouchEnd(e);
-            return;
-        }
-        zoomPan.onTouchEnd(e);
-        resetActivePointerLocks();
-    }}
-    onwheel={(e) => zoomPan.handleWheelZoom(e)}
->
+		role="application"
+		class="overscroll-contain [-webkit-overflow-scrolling:auto]"
+		class:cursor-grab={ctx.state.isHandMode && !ctx.state.isPanning}
+		class:cursor-grabbing={ctx.state.isHandMode && ctx.state.isPanning}
+		style="touch-action: {workspaceTouchAction};"
+		onmousedown={handleWorkspaceMouseDown}
+		use:nonpassiveTouchStart={handleWorkspaceTouchStart}
+		use:nonpassiveTouchMove={handleWorkspaceTouchMove}
+		ontouchend={(e) => {
+			if (drawingInputActive && !ctx.state.isHandMode) {
+				zoomPan.onTouchEnd(e);
+				return;
+			}
+			// Clean up gesture state
+			zoomPan.onTouchEnd(e);
+			if (ctx.state.isHandMode) {
+				zoomPan.stopPanning();
+			}
+		}}
+		ontouchcancel={(e) => {
+			if (drawingInputActive && !ctx.state.isHandMode) {
+				zoomPan.onTouchEnd(e);
+				return;
+			}
+			zoomPan.onTouchEnd(e);
+			resetActivePointerLocks();
+		}}
+		onwheel={(e) => zoomPan.handleWheelZoom(e)}
+	>
 		<div class="pdf-workspace-shell w-fit">
 			{#if PDFReady && !pdfEngine.isLoading && pdfEngine.engine && embedPdfPlugins.length}
 				<EmbedPDF engine={pdfEngine.engine} plugins={embedPdfPlugins}>
@@ -4801,6 +4802,49 @@
 																	e.brushColor,
 																	e.brushOpacity
 																);
+															}}
+														/>
+													{/if}
+													{#if ctx.state.isHighlighting && hasTool('highlighter')}
+														<HighlightCanvas
+															bind:isPenMode={ctx.state.isPenMode}
+															pageScale={ctx.state.zoom}
+															highlightSize={ctx.state.highlightSize}
+															highlightColor={ctx.state.highlightColor}
+															onStrokeStart={beginStrokeInteraction}
+															onStrokeEnd={endStrokeInteraction}
+															onStrokeCancel={cancelStrokeInteraction}
+															onFinishHighlight={({
+																originWidth,
+																originHeight,
+																path,
+																brushSize,
+																brushColor,
+																brushOpacity
+															}: {
+																originWidth: number;
+																originHeight: number;
+																path: string;
+																brushSize: number;
+																brushColor: string;
+																brushOpacity: number;
+															}) => {
+																if (isEditorDisabled) return;
+																addDrawing(
+																	originWidth,
+																	originHeight,
+																	path,
+																	1,
+																	brushSize,
+																	brushColor,
+																	brushOpacity,
+																	'highlight'
+																);
+																// Return to selection mode after highlighting
+																ctx.state.isHighlighting = false;
+																requestAnimationFrame(() => {
+																	ctx.state.isHighlighting = true;
+																});
 															}}
 														/>
 													{/if}
