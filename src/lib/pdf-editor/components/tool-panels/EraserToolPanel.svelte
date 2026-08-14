@@ -118,7 +118,7 @@
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
 						onclick={() => {
-							if (erasingBrushSize >= 67) {
+							if (erasingBrushSize >= 50) {
 							} else {
 								onSizeChange(erasingBrushSize + 1);
 							}
