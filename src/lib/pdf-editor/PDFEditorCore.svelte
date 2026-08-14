@@ -4999,7 +4999,7 @@
 																	type="button"
 																	aria-label={`Resize selected annotations from ${handle.anchor}`}
 																	title="Resize"
-																	class="absolute rounded-full border-white bg-blue-500 shadow-sm h-3 w-3 touch-none border-2 pointer-events:auto"
+																	class="absolute h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm touch-none pointer-events-auto"
 																	style="
 																		left: {(selectionResizeBox.x + selectionResizeBox.width * handle.x) * ctx.state.zoom - 6}px;
 																		top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) * ctx.state.zoom - 6}px;
