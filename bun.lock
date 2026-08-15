@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "DMAS-PDF",
+      "name": "sveltekit-pdf-editor",
       "dependencies": {
         "@embedpdf/core": "2.14.4",
         "@embedpdf/engines": "2.14.4",

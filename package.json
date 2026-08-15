@@ -1,5 +1,5 @@
 {
-    "name": "DMAS-PDF",
+    "name": "sveltekit-pdf-editor",
     "version": "0.1.1",
     "private": false,
     "packageManager": "bun@latest",
