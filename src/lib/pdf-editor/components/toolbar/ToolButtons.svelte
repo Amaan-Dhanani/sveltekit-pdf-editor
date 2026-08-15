@@ -131,6 +131,7 @@
             border: string;
             kbd: string;
             iconColor: string;
+            hoverBg: string;
         };
     }
 
@@ -142,22 +143,22 @@
                 icon: LucideUndo2,
                 title: 'Undo',
                 description: 'Remove last annotation',
-                shortcut: 'Ctrl+Z',
+                shortcut: 'Ctrl+Z / ⌘Z',
                 onclick: handleUndo,
                 active: false,
                 disabled: isDisabled,
-                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }
+                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500', hoverBg: 'hover:bg-blue-100' }
             },
             {
                 id: 'redo',
                 icon: LucideRedo2,
                 title: 'Redo',
                 description: 'Restore last removed',
-                shortcut: 'Ctrl+Y',
+                shortcut: 'Ctrl+Y / ⌘Y',
                 onclick: handleRedo,
                 active: false,
                 disabled: isDisabled,
-                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }
+                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500', hoverBg: 'hover:bg-blue-100' }
             }
         ],
         // Group 2: Navigation & Selection
@@ -171,7 +172,7 @@
                 onclick: onSelectionMode,
                 active: isSelectionMode,
                 disabled: selectedPageIndex < 0 || isDisabled,
-                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }
+                theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500', hoverBg: 'hover:bg-blue-100' }
             },
             {
                 id: 'hand',
@@ -182,7 +183,7 @@
                 onclick: onHandMode,
                 active: isHandMode,
                 disabled: selectedPageIndex < 0,
-                theme: { border: 'border-emerald-400', kbd: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-500' }
+                theme: { border: 'border-emerald-400', kbd: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-500', hoverBg: 'hover:bg-emerald-100' }
             }
         ],
         // Group 3: Freehand & Erase
@@ -196,7 +197,7 @@
                 onclick: onAddDrawing,
                 active: addingDrawing,
                 disabled: selectedPageIndex < 0 || isDisabled,
-                theme: { border: 'border-amber-400', kbd: 'bg-amber-100 text-amber-600', iconColor: 'text-amber-500' }
+                theme: { border: 'border-amber-400', kbd: 'bg-amber-100 text-amber-600', iconColor: 'text-amber-500', hoverBg: 'hover:bg-amber-100' }
             },
             {
                 id: 'eraser',
@@ -207,7 +208,7 @@
                 onclick: onErasing,
                 active: isErasing,
                 disabled: isDisabled,
-                theme: { border: 'border-red-400', kbd: 'bg-red-100 text-red-600', iconColor: 'text-red-500' }
+                theme: { border: 'border-red-400', kbd: 'bg-red-100 text-red-600', iconColor: 'text-red-500', hoverBg: 'hover:bg-red-100' }
             }
         ],
         // Group 4: Annotations & Utilities
@@ -221,7 +222,7 @@
                 onclick: onHighlighting,
                 active: isHighlighting,
                 disabled: selectedPageIndex < 0 || isDisabled,
-                theme: { border: 'border-yellow-400', kbd: 'bg-yellow-100 text-yellow-600', iconColor: 'text-yellow-500' }
+                theme: { border: 'border-yellow-400', kbd: 'bg-yellow-100 text-yellow-600', iconColor: 'text-yellow-500', hoverBg: 'hover:bg-yellow-100' }
             },
             {
                 id: 'text',
@@ -233,7 +234,7 @@
                 onclick: onAddTextField,
                 active: isAddingText,
                 disabled: isAddingDisabled || isDisabled,
-                theme: { border: 'border-purple-400', kbd: 'bg-purple-100 text-purple-600', iconColor: 'text-purple-500' }
+                theme: { border: 'border-purple-400', kbd: 'bg-purple-100 text-purple-600', iconColor: 'text-purple-500', hoverBg: 'hover:bg-purple-100' }
             },
             {
                 id: 'line',
@@ -244,7 +245,7 @@
                 onclick: activateLineMode,
                 active: isAddingLine,
                 disabled: selectedPageIndex < 0 || isDisabled,
-                theme: { border: 'border-slate-400', kbd: 'bg-slate-100 text-slate-600', iconColor: 'text-slate-600' }
+                theme: { border: 'border-slate-400', kbd: 'bg-slate-100 text-slate-600', iconColor: 'text-slate-600', hoverBg: 'hover:bg-slate-100' }
             },
             {
                 id: 'teacherMark',
@@ -255,7 +256,7 @@
                 active: false,
                 disabled: selectedPageIndex < 0 || isDisabled,
                 show: allowTeacherMark,
-                theme: { border: 'border-emerald-400', kbd: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-500' }
+                theme: { border: 'border-emerald-400', kbd: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-500', hoverBg: 'hover:bg-emerald-100' }
             },
             {
                 id: 'pointer',
@@ -265,7 +266,7 @@
                 onclick: onPointerMode,
                 active: isPointerMode,
                 disabled: selectedPageIndex < 0 || isDisabled,
-                theme: { border: 'border-orange-400', kbd: 'bg-orange-100 text-orange-600', iconColor: 'text-orange-500' }
+                theme: { border: 'border-orange-400', kbd: 'bg-orange-100 text-orange-600', iconColor: 'text-orange-500', hoverBg: 'hover:bg-orange-100' }
             }
         ]
     ]);
@@ -291,7 +292,7 @@
 
 {#snippet toolButton(tool: ToolConfig)}
     {@const Icon = tool.icon}
-    {@const theme = tool.theme ?? { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }}
+    {@const theme = tool.theme ?? { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500', hoverBg: 'hover:bg-blue-100' }}
 
     <div 
         role="tooltip"
@@ -302,12 +303,9 @@
         <button
             onclick={tool.onclick}
             disabled={tool.disabled}
-            class="flex h-9 w-9 items-center justify-center rounded-lg transition-all hover:bg-gray-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-            class:bg-blue-100={tool.active}
-            class:text-blue-600={tool.active}
-            class:text-gray-700={!tool.active}
+            class="flex h-9 w-9 items-center justify-center rounded-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 {tool.active ? theme.kbd : `${theme.hoverBg}`}"
         >
-            <Icon size={18} class={tool.active ? 'text-blue-600' : theme.iconColor} />
+            <Icon size={18} class={theme.iconColor} />
         </button>
     </div>
 {/snippet}

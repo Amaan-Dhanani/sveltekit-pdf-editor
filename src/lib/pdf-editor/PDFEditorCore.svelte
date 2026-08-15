@@ -1854,7 +1854,7 @@
 	}
 
 	function getObjectVisualBoxCacheKey(obj: Record<string, any>) {
-		if (obj.type === 'drawing') {
+		if (obj.type === 'drawing' || obj.type === 'highlight') {
 			return [
 				obj.type,
 				obj.path,
@@ -1909,7 +1909,7 @@
 
 		let box = null;
 
-		if (obj.type === 'drawing') {
+		if (obj.type === 'drawing' || obj.type === 'highlight') {
 			box = getDrawingVisualBox(obj);
 		} else if (obj.type === 'line') {
 			const strokePadding = Math.max((obj.strokeWidth || 2) / 2, 1);
@@ -2047,7 +2047,7 @@
 
 		if (fitScale >= 1) return candidate;
 
-		if (candidate.type === 'drawing') {
+		if (candidate.type === 'drawing' || candidate.type === 'highlight') {
 			const currentScale =
 				candidate.scale ?? (candidate.originWidth ? candidate.width / candidate.originWidth : 1);
 			const nextScale = Math.max(0.01, currentScale * fitScale);
@@ -2491,14 +2491,17 @@
 				(obj) =>
 					obj &&
 					isObjectEditable(obj) &&
-					['drawing', 'line', 'text', 'teacher-mark'].includes(obj.type)
+					['drawing', 'highlight', 'line', 'text', 'teacher-mark'].includes(obj.type)
 			)
 	);
 
 	let rotatableSelectedDrawingObjects = $derived.by(() =>
 		ctx.state.selectedObjectIds
 			.map((id) => getObjectById(id))
-			.filter((obj) => obj && isObjectEditable(obj) && obj.type === 'drawing')
+			.filter(
+				(obj) =>
+					obj && isObjectEditable(obj) && (obj.type === 'drawing' || obj.type === 'highlight')
+			)
 	);
 
 	let selectionToolbarObjects = $derived.by(() =>
@@ -2700,7 +2703,7 @@
 			const original = entry.object;
 			const bounds = entry.bounds;
 
-			if (original.type === 'drawing') {
+			if (original.type === 'drawing' || original.type === 'highlight') {
 				const pathBBox = getDrawingPathBBox(original);
 				if (!pathBBox) return;
 
@@ -2802,7 +2805,7 @@
 	}
 
 	function getResizeTrackedKeys(type: string) {
-		if (type === 'drawing') return ['x', 'y', 'scale', 'width', 'rotation'];
+		if (type === 'drawing' || type === 'highlight') return ['x', 'y', 'scale', 'width', 'rotation'];
 		if (type === 'line') return ['x', 'y', 'width', 'height'];
 		if (type === 'text') return ['x', 'y', 'width', 'size'];
 		if (type === 'teacher-mark') return ['x', 'width'];

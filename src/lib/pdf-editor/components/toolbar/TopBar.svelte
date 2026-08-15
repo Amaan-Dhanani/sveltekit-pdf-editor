@@ -142,7 +142,7 @@
         icon: Save,
         title: 'Save',
         description: 'Save current annotations',
-        shortcut: 'Ctrl+S',
+        shortcut: 'Ctrl+S / ⌘S',
         theme: {
             border: 'border-amber-400',
             kbd: 'bg-amber-100 text-amber-700',

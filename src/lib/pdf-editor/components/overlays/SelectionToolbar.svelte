@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import {
 		LucideChevronDown,
@@ -6,12 +7,13 @@
 		LucideEye,
 		LucideMousePointer2,
 		LucideMousePointerClick,
-		LucideMinusCircle,
+		CircleMinus,
 		LucideTextCursorInput,
 		LucideTrash2,
 		LucideX
 	} from '@lucide/svelte';
 	import TextToolPanel from '../tool-panels/TextToolPanel.svelte';
+	import { useKeyboardShortcuts } from '../../composables/useKeyboardShortcuts';
 
 	type SelectedObject = {
 		id: string;
@@ -67,6 +69,24 @@
 		onUpdateTextFontFamily = () => {}
 	}: Props = $props();
 
+	// Attach keyboard listener for delete and duplicate shortcuts on mount
+	onMount(() => {
+		const shortcuts = useKeyboardShortcuts(
+			{} as any, // Dummy modes if not used inside the component
+			{
+				onUndo: () => {},
+				onRedo: () => {},
+				onSave: () => {},
+				onDelete: () => onDelete(),
+				onDuplicate: () => onDuplicate()
+			},
+			{ state: { isPageDisabled: false } } as any // Minimal context state check required by the hook
+		);
+
+		shortcuts.attach();
+		return () => shortcuts.detach();
+	});
+
 	let isExpanded = $state(false);
 	let selectedLabel = $derived(
 		selectedTextCount > 0 && selectedTextCount === selectedObjectIds.length
@@ -120,7 +140,9 @@
 		transition:fly={{ x: 10, y: 0, duration: 200 }}
 		class="pointer-events-none fixed top-20 right-3 z-110 w-[min(24rem,calc(100vw-1.5rem))] touch-manipulation select-none"
 	>
-		<div class="pointer-events-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
+		<div
+			class="pointer-events-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
+		>
 			<div class="flex items-center gap-2 px-3 py-2">
 				<div
 					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600"
@@ -136,7 +158,7 @@
 				>
 					<div class="flex min-w-0 flex-1 flex-col">
 						<span class="text-xs font-semibold text-gray-800">{selectedLabel}</span>
-						<span class="truncate text-xs text-gray-500">{selectionHint}</span>
+						<span class="truncate text-[10px] text-gray-500">{selectionHint}</span>
 					</div>
 					<LucideChevronDown
 						size={14}
@@ -156,18 +178,28 @@
 				<button
 					type="button"
 					onclick={onDuplicate}
-					class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200"
-					title="Duplicate selected objects"
+					class="flex flex-col h-auto p-1 shrink-0 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200"
+					title="Duplicate selected objects (Cmd+C / Ctrl+C)"
 				>
 					<LucideCopy size={14} />
+					<span
+						class="text-[9px] leading-tight font-medium text-gray-400 mt-0.5 flex items-center gap-0.5"
+					>
+						Ctrl+C / ⌘C
+					</span>
 				</button>
 				<button
 					type="button"
 					onclick={onDelete}
-					class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 active:bg-red-100"
-					title="Delete selected objects"
+					class="flex flex-col h-auto p-1 shrink-0 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 active:bg-red-100"
+					title="Delete selected objects (Delete / Backspace)"
 				>
 					<LucideTrash2 size={14} />
+					<span
+						class="text-[9px] leading-tight font-medium text-red-400 mt-0.5 flex items-center gap-0.5"
+					>
+						⌫ / Del
+					</span>
 				</button>
 				<button
 					type="button"
@@ -224,7 +256,7 @@
 									class="flex h-7 w-7 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200"
 									title={`Unselect ${object.id}`}
 								>
-									<LucideMinusCircle size={13} />
+									<CircleMinus size={13} />
 								</button>
 								<button
 									type="button"
