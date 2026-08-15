@@ -2,12 +2,17 @@
     import { onMount, onDestroy } from 'svelte';
     import { tapout } from './utils/tapout';
 
+    const ZERO_WIDTH_SPACE = '\u200B';
+
+    // -------------------------------------------------------------------------
     // Props
+    // -------------------------------------------------------------------------
+
     let {
-        size = $bindable(),
-        lineHeight = $bindable(),
-        x = $bindable(),
-        y = $bindable(),
+        size = $bindable(16),
+        lineHeight = $bindable(1.2),
+        x = $bindable(0),
+        y = $bindable(0),
         fontFamily = $bindable(),
         fontColor = $bindable('#000000'),
         pageScale = 1,
@@ -35,7 +40,10 @@
         width?: number;
         onTextSelected?: (info: any) => void;
         onTextUnselected?: () => void;
-        onUpdateText?: (info: { lines: string[]; width: number }) => void;
+        onUpdateText?: (info: {
+            lines: string[];
+            width: number;
+        }) => void;
         viewOnly?: boolean;
         isPenMode?: boolean;
         isSelectionMode?: boolean;
@@ -45,20 +53,44 @@
         shouldStartEditing?: boolean;
     } = $props();
 
-    // State variables
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
+
     let editable = $state<HTMLDivElement>();
     let operation = $state('');
     let debounceTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+
     let showPlaceholder = $state(true);
     let isEditing = $state(false);
+
     let lastRenderedLinesSignature = '';
 
-    // Calculate bounding box dimensions for selection visualization
-    let textHeight = $derived((lines?.length || 1) * (size || 16) * (lineHeight || 1.2));
-    let textWidth = $derived(width || 100);
+    // Editing and normal component selection use the exact same visual box.
+    let showSelectionBox = $derived(isSelected || isEditing);
+
+    // Keep border visually 3px regardless of page scale.
+    let selectionBorderWidth = $derived(
+        3 / Math.max(pageScale || 1, 0.0001)
+    );
+
+    let previewBorderWidth = $derived(
+        2 / Math.max(pageScale || 1, 0.0001)
+    );
+
+    // -------------------------------------------------------------------------
+    // Lines
+    // -------------------------------------------------------------------------
 
     function normalizeLines(value: any = lines): string[] {
-        return Array.isArray(value) ? value.map((line) => String(line ?? '')) : [];
+        return Array.isArray(value)
+            ? value.map((line) =>
+                  String(line ?? '').replaceAll(
+                      ZERO_WIDTH_SPACE,
+                      ''
+                  )
+              )
+            : [];
     }
 
     function getLinesSignature(value: any = lines): string {
@@ -67,23 +99,17 @@
 
     function isEmptyLinesValue(value: any = lines): boolean {
         const normalizedLines = normalizeLines(value);
+
         return (
             normalizedLines.length === 0 ||
-            (normalizedLines.length === 1 && normalizedLines[0].trim() === '')
+            (normalizedLines.length === 1 &&
+                normalizedLines[0].trim() === '')
         );
     }
 
-    function commitTextUpdate() {
-        if (!editable || operation !== 'edit') return;
-
-        sanitize();
-        const extractedLines = extractLines();
-        lastRenderedLinesSignature = getLinesSignature(extractedLines);
-        onUpdateText?.({
-            lines: extractedLines,
-            width: editable.clientWidth || 0
-        });
-    }
+    // -------------------------------------------------------------------------
+    // Saving
+    // -------------------------------------------------------------------------
 
     function clearDebounceTimer() {
         if (!debounceTimer) return;
@@ -92,30 +118,51 @@
         debounceTimer = null;
     }
 
-    // Debounced save function
+    function commitTextUpdate() {
+        if (!editable || operation !== 'edit') return;
+
+        const extractedLines = extractLines();
+
+        lastRenderedLinesSignature =
+            getLinesSignature(extractedLines);
+
+        onUpdateText?.({
+            lines: extractedLines,
+            width: editable.offsetWidth || 0
+        });
+    }
+
     function debouncedSave() {
         clearDebounceTimer();
 
         debounceTimer = setTimeout(() => {
             debounceTimer = null;
             commitTextUpdate();
-        }, 500); // 500ms delay
+        }, 500);
     }
 
-    function onFocus() {
-        // Only allow focus if we're actively editing (from double-click)
-        if (!isEditing) {
-            editable?.blur();
-            return;
-        }
+    // -------------------------------------------------------------------------
+    // Editing
+    // -------------------------------------------------------------------------
 
+    function notifyTextSelected() {
         onTextSelected?.({
             lineHeight,
             size,
             fontFamily,
             fontColor
         });
+    }
+
+    function onFocus() {
+        if (!isEditing) {
+            editable?.blur();
+            return;
+        }
+
         operation = 'edit';
+
+        notifyTextSelected();
         updatePlaceholderVisibility();
     }
 
@@ -126,7 +173,8 @@
         operation = 'edit';
         isSelectionMode = false;
 
-        // Focus after a small delay to ensure state is updated
+        notifyTextSelected();
+
         requestAnimationFrame(() => {
             editable?.focus();
         });
@@ -135,8 +183,8 @@
     function handleDoubleClick(e: MouseEvent) {
         if (viewOnly) return;
 
-        // Prevent the double-click from bubbling to selection handlers
         e.stopPropagation();
+
         startEditing();
     }
 
@@ -146,177 +194,385 @@
         }
     });
 
-    async function onBlur() {
+    function onBlur() {
         if (operation !== 'edit') return;
 
         clearDebounceTimer();
 
-        editable?.blur();
         commitTextUpdate();
+
         operation = '';
         isEditing = false;
-        onTextUnselected?.();
+
         updatePlaceholderVisibility();
+
+        onTextUnselected?.();
     }
+
+    // -------------------------------------------------------------------------
+    // Placeholder
+    // -------------------------------------------------------------------------
+
+    function updatePlaceholderVisibility() {
+        if (!editable) return;
+
+        const text =
+            editable.textContent
+                ?.replaceAll(ZERO_WIDTH_SPACE, '')
+                .trim() ?? '';
+
+        const hasContent = text.length > 0;
+
+        showPlaceholder =
+            !hasContent &&
+            isEmptyLinesValue() &&
+            operation !== 'edit';
+    }
+
+    // -------------------------------------------------------------------------
+    // Input
+    // -------------------------------------------------------------------------
 
     function onInput() {
         updatePlaceholderVisibility();
         debouncedSave();
     }
 
-    function updatePlaceholderVisibility() {
-        if (!editable) return;
+    // -------------------------------------------------------------------------
+    // Selection / caret helpers
+    // -------------------------------------------------------------------------
 
-        const hasContent = editable.textContent && editable.textContent.trim().length > 0;
+    function getEditorSelection(): Range | null {
+        if (!editable) return null;
 
-        showPlaceholder = !hasContent && isEmptyLinesValue() && operation !== 'edit';
-    }
+        const selection = window.getSelection();
 
-    async function onPaste(e: ClipboardEvent) {
-        // Prevent default paste behavior
-        e.preventDefault();
-
-        // Get text only
-        const pastedText = e.clipboardData?.getData('text') || '';
-
-        // Insert pasted text
-        const selection = document.getSelection();
-        const range = selection?.getRangeAt(0);
-        if (range) {
-            range.insertNode(document.createTextNode(pastedText));
+        if (!selection || selection.rangeCount === 0) {
+            return null;
         }
 
-        // Sanitize the inserted text
-        sanitize();
-        updatePlaceholderVisibility();
-        debouncedSave();
+        const range = selection.getRangeAt(0);
+
+        if (!editable.contains(range.commonAncestorContainer)) {
+            return null;
+        }
+
+        return range;
     }
+
+    function placeCaretInTextNode(
+        textNode: Text,
+        offset = textNode.length
+    ) {
+        const selection = window.getSelection();
+
+        if (!selection) return;
+
+        const range = document.createRange();
+
+        range.setStart(
+            textNode,
+            Math.min(offset, textNode.length)
+        );
+
+        range.collapse(true);
+
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    // -------------------------------------------------------------------------
+    // Keyboard
+    // -------------------------------------------------------------------------
 
     function onKeydown(e: KeyboardEvent) {
-        if (!editable) return;
+        if (!editable || !isEditing) return;
 
-        // Only allow Enter key to create new lines
         if (e.key === 'Enter') {
             e.preventDefault();
+            e.stopPropagation();
 
-            const selection = window.getSelection();
-            if (!selection || selection.rangeCount === 0) return;
+            const range = getEditorSelection();
 
-            const range = selection.getRangeAt(0);
+            if (!range) return;
 
-            // Create a line break
-            const br = document.createElement('br');
+            // Delete selected text, if any.
             range.deleteContents();
+
+            // Create the line break.
+            const br = document.createElement('br');
+
+            // A BR alone does not provide a reliable caret position
+            // inside contenteditable. Give the browser a real text node.
+            const caretNode = document.createTextNode(
+                ZERO_WIDTH_SPACE
+            );
+
             range.insertNode(br);
 
-            // Position cursor after the break
-            range.setStartAfter(br);
-            range.setEndAfter(br);
-            selection.removeAllRanges();
-            selection.addRange(range);
+            br.parentNode?.insertBefore(
+                caretNode,
+                br.nextSibling
+            );
+
+            // Put the caret inside the invisible text node.
+            placeCaretInTextNode(caretNode, 1);
+
+            updatePlaceholderVisibility();
+
+            requestAnimationFrame(() => {
+                debouncedSave();
+            });
+
+            return;
         }
 
-        // Trigger placeholder update and save on any key input
         requestAnimationFrame(() => {
             updatePlaceholderVisibility();
             debouncedSave();
         });
     }
 
+    // -------------------------------------------------------------------------
+    // Paste
+    // -------------------------------------------------------------------------
+
+    function onPaste(e: ClipboardEvent) {
+        e.preventDefault();
+
+        if (!editable || !isEditing) return;
+
+        const pastedText =
+            e.clipboardData?.getData('text/plain') || '';
+
+        const range = getEditorSelection();
+
+        if (!range) return;
+
+        range.deleteContents();
+
+        const normalizedText = pastedText.replace(
+            /\r\n/g,
+            '\n'
+        );
+
+        const pastedLines = normalizedText.split('\n');
+
+        let finalCaretNode: Text | null = null;
+
+        for (
+            let index = 0;
+            index < pastedLines.length;
+            index++
+        ) {
+            const line = pastedLines[index];
+
+            if (line.length > 0) {
+                const textNode =
+                    document.createTextNode(line);
+
+                range.insertNode(textNode);
+
+                range.setStartAfter(textNode);
+                range.collapse(true);
+            }
+
+            if (index < pastedLines.length - 1) {
+                const br = document.createElement('br');
+
+                const caretNode =
+                    document.createTextNode(
+                        ZERO_WIDTH_SPACE
+                    );
+
+                range.insertNode(br);
+
+                br.parentNode?.insertBefore(
+                    caretNode,
+                    br.nextSibling
+                );
+
+                finalCaretNode = caretNode;
+
+                range.setStart(
+                    caretNode,
+                    caretNode.length
+                );
+
+                range.collapse(true);
+            }
+        }
+
+        const selection = window.getSelection();
+
+        if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else if (finalCaretNode) {
+            placeCaretInTextNode(finalCaretNode, 1);
+        }
+
+        updatePlaceholderVisibility();
+        debouncedSave();
+    }
+
+    // -------------------------------------------------------------------------
+    // Sanitization
+    // -------------------------------------------------------------------------
+
     function sanitize() {
         if (!editable) return;
 
-        let weirdNode;
+        let weirdNode: ChildNode | undefined;
+
         while (
-            (weirdNode = Array.from(editable.childNodes).find(
-                (node) => !['#text', 'BR'].includes(node.nodeName)
+            (weirdNode = Array.from(
+                editable.childNodes
+            ).find(
+                (node) =>
+                    !['#text', 'BR'].includes(
+                        node.nodeName
+                    )
             ))
         ) {
             editable.removeChild(weirdNode);
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Extract lines
+    // -------------------------------------------------------------------------
+
     function extractLines(): string[] {
         if (!editable) return [];
 
-        const nodes = editable.childNodes;
-        const lines: string[] = [];
+        const extractedLines: string[] = [];
+
         let lineText = '';
-        for (let index = 0; index < nodes.length; index++) {
-            const node = nodes[index];
+
+        for (const node of editable.childNodes) {
             if (node.nodeName === 'BR') {
-                lines.push(lineText);
+                extractedLines.push(
+                    lineText.replaceAll(
+                        ZERO_WIDTH_SPACE,
+                        ''
+                    )
+                );
+
                 lineText = '';
             } else {
                 lineText += node.textContent || '';
             }
         }
-        lines.push(lineText);
-        return lines;
+
+        extractedLines.push(
+            lineText.replaceAll(
+                ZERO_WIDTH_SPACE,
+                ''
+            )
+        );
+
+        return extractedLines;
     }
 
-    const renderLines = () => {
+    // -------------------------------------------------------------------------
+    // Render lines
+    // -------------------------------------------------------------------------
+
+    function renderLines() {
         if (!editable) return;
 
-        const fragment = document.createDocumentFragment();
         const normalizedLines = normalizeLines();
-        lastRenderedLinesSignature = getLinesSignature(normalizedLines);
+
+        lastRenderedLinesSignature =
+            getLinesSignature(normalizedLines);
 
         if (isEmptyLinesValue(normalizedLines)) {
-            // Empty state - let placeholder show
             editable.innerHTML = '';
+
             updatePlaceholderVisibility();
+
             return;
         }
 
-        normalizedLines.forEach((line, index) => {
-            const lineText = document.createTextNode(line);
-            fragment.appendChild(lineText);
+        const fragment =
+            document.createDocumentFragment();
 
-            // Add a <br> element after each line except the last one
-            if (index !== normalizedLines.length - 1) {
-                fragment.appendChild(document.createElement('br'));
+        normalizedLines.forEach((line, index) => {
+            fragment.appendChild(
+                document.createTextNode(line)
+            );
+
+            if (
+                index <
+                normalizedLines.length - 1
+            ) {
+                fragment.appendChild(
+                    document.createElement('br')
+                );
             }
         });
 
-        // Clear the existing content before appending the new lines
         editable.innerHTML = '';
-
-        // Append the new lines to the editable div
         editable.appendChild(fragment);
+
         updatePlaceholderVisibility();
-    };
+    }
 
+    // Never overwrite the DOM while actively editing.
     $effect(() => {
-        const linesSignature = getLinesSignature(lines);
-        if (!editable || operation === 'edit') return;
+        const linesSignature =
+            getLinesSignature(lines);
 
-        if (linesSignature !== lastRenderedLinesSignature) {
+        if (!editable || operation === 'edit') {
+            return;
+        }
+
+        if (
+            linesSignature !==
+            lastRenderedLinesSignature
+        ) {
             renderLines();
         } else {
             updatePlaceholderVisibility();
         }
     });
 
-    // Handle clicking outside to close toolbar
+    // -------------------------------------------------------------------------
+    // Tapout
+    // -------------------------------------------------------------------------
+
     function handleTapout() {
         onBlur();
     }
 
-    // Action helper to attach custom tapout listener without TS HTML attribute issues
     function tapoutEvents(node: HTMLElement) {
-        node.addEventListener('tapout', handleTapout);
+        node.addEventListener(
+            'tapout',
+            handleTapout
+        );
+
         return {
             destroy() {
-                node.removeEventListener('tapout', handleTapout);
+                node.removeEventListener(
+                    'tapout',
+                    handleTapout
+                );
             }
         };
     }
 
-    // Cleanup debounce timer on component destroy
+    // -------------------------------------------------------------------------
+    // Lifecycle
+    // -------------------------------------------------------------------------
+
     function cleanup() {
         clearDebounceTimer();
-        commitTextUpdate();
+
+        if (operation === 'edit') {
+            commitTextUpdate();
+        }
+
         operation = '';
         isEditing = false;
     }
@@ -325,10 +581,16 @@
         renderLines();
         updatePlaceholderVisibility();
 
-        // Auto-enable editing for new empty text fields (not in selection mode)
-        if (!viewOnly && isEmptyLinesValue()) {
+        // New empty text components immediately enter editing mode.
+        if (
+            !viewOnly &&
+            isEmptyLinesValue()
+        ) {
             isEditing = true;
             operation = 'edit';
+
+            notifyTextSelected();
+
             requestAnimationFrame(() => {
                 editable?.focus();
             });
@@ -340,71 +602,114 @@
     });
 </script>
 
+<!--
+    IMPORTANT:
+
+    The wrapper is `relative inline-block`.
+
+    The selection rectangle is absolutely positioned against THIS wrapper,
+    rather than being manually sized from getBoundingClientRect().
+
+    This means:
+      - the text determines the wrapper's natural size
+      - the selection box automatically gets the same size
+      - page/canvas transforms are applied only once
+      - typing cannot progressively multiply the selection width
+-->
 <div
     use:tapout
     use:tapoutEvents
     role="presentation"
-    class="absolute top-0 left-0 inline-block select-none"
-    style="transform: translate({x}px, {y}px);"
+    class="absolute left-0 top-0 inline-block select-none"
+    style:transform={`translate(${x}px, ${y}px)`}
     ondblclick={handleDoubleClick}
 >
-    {#if isSelected}
+    <div class="relative inline-block">
+        <!-- ================================================================
+             Selection box
+
+             Same box for normal selection and text editing.
+             ================================================================ -->
+
+        {#if showSelectionBox}
+            <div
+                aria-hidden="true"
+                class="pointer-events-none absolute -inset-px z-0 rounded border border-blue-500/30"
+                style:border-width={`${selectionBorderWidth}px`}
+            ></div>
+        {/if}
+
+        <!-- ================================================================
+             Preview box
+             ================================================================ -->
+
+        {#if isPreviewed}
+            <div
+                aria-hidden="true"
+                class="pointer-events-none absolute -inset-px z-0 rounded border border-amber-600/80 bg-amber-500/10 animate-pulse"
+                style:border-width={`${previewBorderWidth}px`}
+            ></div>
+        {/if}
+
+        <!-- ================================================================
+             Placeholder
+             ================================================================ -->
+
+        {#if !viewOnly && showPlaceholder}
+            <div
+                aria-hidden="true"
+                class="pointer-events-none absolute inset-0 z-0 inline-block select-none overflow-hidden whitespace-nowrap text-gray-400"
+                style="
+                    font-size: {size}px;
+                    font-family: {fontFamily
+                        ? `'${fontFamily}', serif`
+                        : 'serif'};
+                    color: {fontColor};
+                    line-height: {lineHeight || 1.2};
+                "
+            >
+                {placeholder}
+            </div>
+        {/if}
+
+        <!-- ================================================================
+             Text editor
+             ================================================================ -->
+
         <div
-            class="pointer-events-none absolute -inset-1 rounded"
-            style="border: {1 / pageScale}px solid rgba(59, 130, 246, 0.3); width: {textWidth +
-                8}px; height: {textHeight + 8}px; left: -4px; top: -4px;"
+            aria-label="Text editor"
+            role="textbox"
+            tabindex="-1"
+            bind:this={editable}
+            onfocus={onFocus}
+            onkeydown={onKeydown}
+            onpaste={onPaste}
+            oninput={onInput}
+            contenteditable={!viewOnly && isEditing}
+            spellcheck="false"
+            class="
+                relative
+                z-10
+                inline-block
+                min-w-5
+                whitespace-nowrap
+                p-0
+                m-0
+                outline-none
+            "
+            class:cursor-text={!viewOnly && isEditing}
+            class:cursor-default={viewOnly || !isEditing}
+            style="
+                font-size: {size}px;
+                font-family: {fontFamily
+                    ? `'${fontFamily}', serif`
+                    : 'serif'};
+                color: {fontColor};
+                line-height: {lineHeight || 1.2};
+                -webkit-user-select: {viewOnly || !isEditing
+                    ? 'none'
+                    : 'text'};
+            "
         ></div>
-    {/if}
-
-    {#if isPreviewed}
-        <div
-            class="preview-box pointer-events-none absolute -inset-1 rounded"
-            style="border: {2 / pageScale}px solid rgba(217, 119, 6, 0.8); background: rgba(245, 158, 11, 0.08); width: {textWidth +
-                8}px; height: {textHeight + 8}px; left: -4px; top: -4px;"
-        ></div>
-    {/if}
-
-    {#if !viewOnly && showPlaceholder}
-        <div
-            class="pointer-events-none absolute inset-0 mt-1 inline-block w-25 overflow-hidden whitespace-nowrap text-gray-400 select-none"
-            style="font-size: {size}px; font-family: '{fontFamily}', serif; color: {fontColor}; line-height: {lineHeight};"
-        >
-            {placeholder}
-        </div>
-    {/if}
-
-    <div
-        aria-label="Text editor"
-        role="textbox"
-        tabindex="-1"
-        bind:this={editable}
-        onfocus={onFocus}
-        onkeydown={onKeydown}
-        onpaste={onPaste}
-        oninput={onInput}
-        contenteditable={!viewOnly && isEditing}
-        spellcheck="false"
-        class="relative z-10 inline-block min-w-25 whitespace-nowrap transition-colors outline-none"
-        class:cursor-text={!viewOnly && isEditing}
-        class:cursor-default={viewOnly || !isEditing}
-        style="font-size: {size}px; font-family: '{fontFamily}', serif;color: {fontColor};line-height: {lineHeight}; -webkit-user-select: {viewOnly ||
-        !isEditing
-            ? 'none'
-            : 'text'};"
-    ></div>
+    </div>
 </div>
-
-<style>
-    .preview-box {
-        animation: preview-pulse 0.75s ease-in-out infinite alternate;
-    }
-
-    @keyframes preview-pulse {
-        from {
-            opacity: 0.65;
-        }
-        to {
-            opacity: 1;
-        }
-    }
-</style>

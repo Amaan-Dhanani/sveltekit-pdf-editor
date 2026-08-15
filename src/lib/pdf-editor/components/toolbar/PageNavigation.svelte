@@ -5,7 +5,7 @@
 		LucideChevronLeft,
 		LucideFileText,
 		LucideLoader2
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface Props {
 		internalPage: number;
@@ -54,7 +54,7 @@
 <!-- PAGE NAVIGATION -->
 <div class="relative inline-flex items-center">
 	<div
-		class="flex shrink-0 items-center gap-2 rounded-lg border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 p-1 shadow-sm"
+		class="flex shrink-0 items-center gap-2 rounded-lg border-2 border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50 p-1 shadow-sm"
 	>
 		<button
 			onclick={onPrev}

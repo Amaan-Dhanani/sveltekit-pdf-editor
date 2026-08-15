@@ -12,7 +12,7 @@
 		LucideTextCursorInput,
 		LucideChevronDown,
 		LucideChevronUp
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { presetColors } from '../../utils/colorPresets';
 	import { Fonts } from '../../utils/prepareFonts';
 

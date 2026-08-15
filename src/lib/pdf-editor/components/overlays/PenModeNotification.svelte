@@ -1,7 +1,6 @@
-```svelte
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import { LucidePen, LucideX } from 'lucide-svelte';
+	import { LucidePen, LucideX } from '@lucide/svelte';
 
 	interface Props {
 		isPenMode: boolean;
@@ -11,15 +10,14 @@
 	let { isPenMode, onClose }: Props = $props();
 </script>
 
+```svelte
 {#if isPenMode}
 	<div
 		transition:fly={{ x: -10, y: 0, duration: 200 }}
-		class="fixed top-20 left-4 z-60 max-[640px]:top-32 max-[640px]:left-5"
-		style="touch-action: manipulation; -webkit-user-select: none; user-select: none; pointer-events: none;"
+		class="pointer-events-none fixed top-20 left-4 z-60 touch-manipulation select-none max-[640px]:top-32 max-[640px]:left-5"
 	>
 		<div
-			class="flex items-center gap-2 rounded-lg border border-amber-200 bg-linear-to-r from-amber-50 to-yellow-50 px-3 py-2 shadow-lg max-[640px]:rounded-full max-[640px]:px-2 max-[640px]:py-1.5"
-			style="pointer-events: auto;"
+			class="pointer-events-auto flex items-center gap-2 rounded-lg border border-amber-200 bg-linear-to-r from-amber-50 to-yellow-50 px-3 py-2 shadow-lg max-[640px]:rounded-full max-[640px]:px-2 max-[640px]:py-1.5"
 		>
 			<div
 				class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-600 max-[640px]:h-7 max-[640px]:w-7"
@@ -32,9 +30,7 @@
 				<span class="text-xs text-amber-600">Touch drawing enabled</span>
 			</div>
 
-			<span class="hidden text-xs font-medium text-amber-700 max-[640px]:inline">
-				Touch
-			</span>
+			<span class="hidden text-xs font-medium text-amber-700 max-[640px]:inline"> Touch </span>
 
 			<button
 				onclick={onClose}

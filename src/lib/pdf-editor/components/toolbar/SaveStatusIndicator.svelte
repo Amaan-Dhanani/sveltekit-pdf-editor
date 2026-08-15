@@ -6,7 +6,7 @@
 		LucideHardDrive,
 		LucideCloudLightning,
 		LucidePauseCircle
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import type { SaveState } from '../../context/pdfEditorContext.svelte.ts';
 
 	interface Props {

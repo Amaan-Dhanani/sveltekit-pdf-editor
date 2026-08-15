@@ -176,8 +176,7 @@
 <!-- Invisible overlay that captures cursor events -->
 <div
 	bind:this={container}
-	class="pointer-events-auto absolute top-0 left-0 h-full w-full"
-	style="z-index: 1;"
+	class="pointer-events-auto absolute top-0 left-0 h-full w-full z-1"
 >
 	<!-- Optional debug info -->
 	{#if showDebugInfo && isTracking}
@@ -193,8 +192,8 @@
 	<!-- Optional cursor dot for visual feedback -->
 	{#if isTracking && showDebugInfo}
 		<div
-			class="pointer-events-none absolute h-2 w-2 -translate-x-1 -translate-y-1 transform rounded-full bg-orange-400"
-			style="left: {cursorX}px; top: {cursorY}px; z-index: 10;"
+			class="z-10 pointer-events-none absolute h-2 w-2 -translate-x-1 -translate-y-1 transform rounded-full bg-orange-400"
+			style="left: {cursorX}px; top: {cursorY}px;"
 		></div>
 	{/if}
 </div>

@@ -425,9 +425,8 @@
 </script>
 
 <div
-	bind:this={canvas}
-	class="absolute top-0 left-0 h-full w-full select-none"
-	style="cursor: crosshair;"
+    bind:this={canvas}
+    class="absolute left-0 top-0 h-full w-full cursor-crosshair select-none"
 >
 	<canvas bind:this={previewCanvas} class="pointer-events-none h-full w-full"></canvas>
 </div>

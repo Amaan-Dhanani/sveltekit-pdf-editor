@@ -7,7 +7,7 @@
 		LucidePlus,
 		LucideChevronDown,
 		LucideChevronUp
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 
 	interface Props {
 		erasingBrushSize: number;
@@ -27,7 +27,7 @@
 </script>
 
 <!-- Fixed Top-Right Panel -->
-<div transition:fly={{ x: 10, y: 0, duration: 200 }} class="pdf-editor-touch-controls fixed top-20 right-3 z-[110]">
+<div transition:fly={{ x: 10, y: 0, duration: 200 }} class="pdf-editor-touch-controls fixed top-20 right-3 z-110">
 	<div
 		class="border border-gray-200 bg-white shadow-2xl transition-all duration-200"
 		class:w-64={!isMinimized}
@@ -118,7 +118,7 @@
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
 						onclick={() => {
-							if (erasingBrushSize >= 67) {
+							if (erasingBrushSize >= 50) {
 							} else {
 								onSizeChange(erasingBrushSize + 1);
 							}

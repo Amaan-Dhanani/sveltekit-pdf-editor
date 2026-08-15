@@ -9,7 +9,7 @@
 		LucideMove3D,
 		LucideChevronDown,
 		LucideChevronUp
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { MAX_PDF_ZOOM, MIN_PDF_ZOOM, pdfZoomToPercent } from '../../utils/zoomLimits';
 
 	interface Props {
@@ -37,7 +37,7 @@
 </script>
 
 <!-- Fixed Top-Right Panel -->
-<div transition:fly={{ x: 10, y: 0, duration: 200 }} class="pdf-editor-touch-controls fixed top-20 right-4 z-[110]">
+<div transition:fly={{ x: 10, y: 0, duration: 200 }} class="pdf-editor-touch-controls fixed top-20 right-4 z-110">
 	<div class="w-64 rounded-xl border border-gray-200 bg-white p-4 shadow-2xl">
 		<!-- Header -->
 		<div class="mb-3 flex items-center justify-between">

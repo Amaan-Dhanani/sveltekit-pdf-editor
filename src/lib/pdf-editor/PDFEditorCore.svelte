@@ -6,13 +6,12 @@
 	import { usePdfiumEngine } from '@embedpdf/engines/svelte';
 	import { DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/svelte';
 	import { RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
-	import { LucideArrowRight, LucideRotateCw } from 'lucide-svelte';
+	import { LucideArrowRight, LucideRotateCw } from '@lucide/svelte';
 
 	// Canvas components
 	import PDFDocumentLoader from './PDFDocumentLoader.svelte';
 	import PDFDocumentSync from './PDFDocumentSync.svelte';
 	import PDFPage from './PDFPage.svelte';
-	import Image from './Image.svelte';
 	import Text from './Text.svelte';
 	import Drawing from './Drawing.svelte';
 	import AnnotationCanvasLayer from './AnnotationCanvasLayer.svelte';
@@ -28,7 +27,7 @@
 
 	// New toolbar components
 	import TopBar from './components/toolbar/TopBar.svelte';
-	import BottomToolbar from './components/toolbar/BottomToolbar.svelte';
+	import ToolButtons from './components/toolbar/ToolButtons.svelte';
 	import PagePreviewMenu from './components/toolbar/PagePreviewMenu.svelte';
 
 	// Tool panel components
@@ -354,7 +353,7 @@
 	import { createObjectSpatialIndex } from './utils/spatialIndex';
 
 	let {
-		allObjects,
+		allObjects = $bindable([]),
 		currentPage,
 		pdfBlob,
 		allowPrinting = false,
@@ -416,7 +415,7 @@
 			return isPageLoading;
 		}
 	});
-	
+
 	// Initialize composables
 	const modes = usePDFModes();
 	const resolvedPlugins = $derived(
@@ -1855,7 +1854,7 @@
 	}
 
 	function getObjectVisualBoxCacheKey(obj: Record<string, any>) {
-		if (obj.type === 'drawing') {
+		if (obj.type === 'drawing' || obj.type === 'highlight') {
 			return [
 				obj.type,
 				obj.path,
@@ -1910,7 +1909,7 @@
 
 		let box = null;
 
-		if (obj.type === 'drawing') {
+		if (obj.type === 'drawing' || obj.type === 'highlight') {
 			box = getDrawingVisualBox(obj);
 		} else if (obj.type === 'line') {
 			const strokePadding = Math.max((obj.strokeWidth || 2) / 2, 1);
@@ -2048,7 +2047,7 @@
 
 		if (fitScale >= 1) return candidate;
 
-		if (candidate.type === 'drawing') {
+		if (candidate.type === 'drawing' || candidate.type === 'highlight') {
 			const currentScale =
 				candidate.scale ?? (candidate.originWidth ? candidate.width / candidate.originWidth : 1);
 			const nextScale = Math.max(0.01, currentScale * fitScale);
@@ -2492,14 +2491,17 @@
 				(obj) =>
 					obj &&
 					isObjectEditable(obj) &&
-					['drawing', 'line', 'text', 'teacher-mark'].includes(obj.type)
+					['drawing', 'highlight', 'line', 'text', 'teacher-mark'].includes(obj.type)
 			)
 	);
 
 	let rotatableSelectedDrawingObjects = $derived.by(() =>
 		ctx.state.selectedObjectIds
 			.map((id) => getObjectById(id))
-			.filter((obj) => obj && isObjectEditable(obj) && obj.type === 'drawing')
+			.filter(
+				(obj) =>
+					obj && isObjectEditable(obj) && (obj.type === 'drawing' || obj.type === 'highlight')
+			)
 	);
 
 	let selectionToolbarObjects = $derived.by(() =>
@@ -2701,7 +2703,7 @@
 			const original = entry.object;
 			const bounds = entry.bounds;
 
-			if (original.type === 'drawing') {
+			if (original.type === 'drawing' || original.type === 'highlight') {
 				const pathBBox = getDrawingPathBBox(original);
 				if (!pathBBox) return;
 
@@ -2803,7 +2805,7 @@
 	}
 
 	function getResizeTrackedKeys(type: string) {
-		if (type === 'drawing') return ['x', 'y', 'scale', 'width', 'rotation'];
+		if (type === 'drawing' || type === 'highlight') return ['x', 'y', 'scale', 'width', 'rotation'];
 		if (type === 'line') return ['x', 'y', 'width', 'height'];
 		if (type === 'text') return ['x', 'y', 'width', 'size'];
 		if (type === 'teacher-mark') return ['x', 'width'];
@@ -3925,7 +3927,7 @@
 />
 
 <!-- Bottom Toolbar -->
-<BottomToolbar
+<ToolButtons
 	isAddingText={ctx.state.isAddingText}
 	addingDrawing={ctx.state.addingDrawing}
 	isErasing={ctx.state.isErasing}
@@ -4178,9 +4180,11 @@
 	<!-- Scrollable content area -->
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
-		role="list"
+		role="application"
+		class="overscroll-contain [-webkit-overflow-scrolling:auto]"
 		class:cursor-grab={ctx.state.isHandMode && !ctx.state.isPanning}
 		class:cursor-grabbing={ctx.state.isHandMode && ctx.state.isPanning}
+		style="touch-action: {workspaceTouchAction};"
 		onmousedown={handleWorkspaceMouseDown}
 		use:nonpassiveTouchStart={handleWorkspaceTouchStart}
 		use:nonpassiveTouchMove={handleWorkspaceTouchMove}
@@ -4204,7 +4208,6 @@
 			resetActivePointerLocks();
 		}}
 		onwheel={(e) => zoomPan.handleWheelZoom(e)}
-		style="-webkit-overflow-scrolling: auto; overscroll-behavior: contain; touch-action: {workspaceTouchAction};"
 	>
 		<div class="pdf-workspace-shell w-fit">
 			{#if PDFReady && !pdfEngine.isLoading && pdfEngine.engine && embedPdfPlugins.length}
@@ -4805,6 +4808,49 @@
 															}}
 														/>
 													{/if}
+													{#if ctx.state.isHighlighting && hasTool('highlighter')}
+														<HighlightCanvas
+															bind:isPenMode={ctx.state.isPenMode}
+															pageScale={ctx.state.zoom}
+															highlightSize={ctx.state.highlightSize}
+															highlightColor={ctx.state.highlightColor}
+															onStrokeStart={beginStrokeInteraction}
+															onStrokeEnd={endStrokeInteraction}
+															onStrokeCancel={cancelStrokeInteraction}
+															onFinishHighlight={({
+																originWidth,
+																originHeight,
+																path,
+																brushSize,
+																brushColor,
+																brushOpacity
+															}: {
+																originWidth: number;
+																originHeight: number;
+																path: string;
+																brushSize: number;
+																brushColor: string;
+																brushOpacity: number;
+															}) => {
+																if (isEditorDisabled) return;
+																addDrawing(
+																	originWidth,
+																	originHeight,
+																	path,
+																	1,
+																	brushSize,
+																	brushColor,
+																	brushOpacity,
+																	'highlight'
+																);
+																// Return to selection mode after highlighting
+																ctx.state.isHighlighting = false;
+																requestAnimationFrame(() => {
+																	ctx.state.isHighlighting = true;
+																});
+															}}
+														/>
+													{/if}
 													{#if ctx.state.isErasing}
 														<ErasingCanvas
 															bind:isPenMode={ctx.state.isPenMode}
@@ -4915,17 +4961,14 @@
 												top: {selectionResizeBox.y * ctx.state.zoom}px;
 												width: {selectionResizeBox.width * ctx.state.zoom}px;
 												height: {selectionResizeBox.height * ctx.state.zoom}px;
-												border-width: 1px;
 											"
 															></div>
 															{#if rotatableSelectedDrawingObjects.length > 0}
 																<div
-																	class="pointer-events-none absolute bg-blue-400/50"
+																	class="pointer-events-none absolute w-px h-6 bg-blue-400/50"
 																	style="
 													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom}px;
 													top: {selectionResizeBox.y * ctx.state.zoom - 30}px;
-													width: 1px;
-													height: 24px;
 												"
 																></div>
 																<button
@@ -4934,15 +4977,15 @@
 																	title="Rotate"
 																	class="absolute flex items-center justify-center rounded-full border border-white bg-blue-500 text-white shadow-sm"
 																	style="
-													left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom - 10}px;
-													top: {selectionResizeBox.y * ctx.state.zoom - 42}px;
-													width: 20px;
-													height: 20px;
-													border-width: 2px;
-													cursor: grab;
-													pointer-events: auto;
-													touch-action: none;
-												"
+																		left: {(selectionResizeBox.x + selectionResizeBox.width / 2) * ctx.state.zoom - 10}px;
+																		top: {selectionResizeBox.y * ctx.state.zoom - 42}px;
+																		width: 20px;
+																		height: 20px;
+																		border-width: 2px;
+																		cursor: grab;
+																		pointer-events: auto;
+																		touch-action: none;
+																	"
 																	onpointerdown={handleSelectionRotationStart}
 																	onmousedown={(event) => event.stopPropagation()}
 																	ontouchstart={(event) => event.stopPropagation()}
@@ -4959,17 +5002,12 @@
 																	type="button"
 																	aria-label={`Resize selected annotations from ${handle.anchor}`}
 																	title="Resize"
-																	class="absolute rounded-full border border-white bg-blue-500 shadow-sm"
+																	class="absolute h-3 w-3 rounded-full border-2 border-white bg-blue-500 shadow-sm touch-none pointer-events-auto"
 																	style="
-													left: {(selectionResizeBox.x + selectionResizeBox.width * handle.x) * ctx.state.zoom - 6}px;
-													top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) * ctx.state.zoom - 6}px;
-													width: 12px;
-													height: 12px;
-													border-width: 2px;
-													cursor: {handle.cursor};
-													pointer-events: auto;
-													touch-action: none;
-												"
+																		left: {(selectionResizeBox.x + selectionResizeBox.width * handle.x) * ctx.state.zoom - 6}px;
+																		top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) * ctx.state.zoom - 6}px;
+																		cursor: {handle.cursor};
+																	"
 																	onpointerdown={(event) =>
 																		handleSelectionResizeStart(event, handle.anchor)}
 																	onmousedown={(event) => event.stopPropagation()}

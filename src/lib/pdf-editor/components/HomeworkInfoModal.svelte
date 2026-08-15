@@ -1,6 +1,10 @@
 <script lang="ts">
-	export let homework_info: any = undefined;
-	export let view_homework_info: HTMLDialogElement | undefined = undefined;
+	interface Props {
+		homework_info?: any;
+		view_homework_info?: HTMLDialogElement | undefined;
+	}
+
+	let { homework_info = undefined, view_homework_info = $bindable(undefined) }: Props = $props();
 </script>
 
 <dialog bind:this={view_homework_info} class="rounded-lg border border-gray-200 bg-white p-0 shadow-xl">
@@ -10,7 +14,7 @@
 			<button
 				type="button"
 				class="rounded px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
-				on:click={() => view_homework_info?.close()}
+				onclick={() => view_homework_info?.close()}
 			>
 				Close
 			</button>
