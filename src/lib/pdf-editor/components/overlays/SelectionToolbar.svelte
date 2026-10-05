@@ -94,15 +94,10 @@
 			: `${selectedObjectIds.length} Selected`
 	);
 	let selectionHint = $derived(
-		selectedTextCount > 1
-			? 'Style text, or drag to move'
-			: selectedTextCount === 1
-				? 'Style, edit, or drag to move'
-				: 'Drag to move, or use actions'
+		selectedTextCount > 1 ? 'Style text, or drag to move' : selectedTextCount === 1 ? 'Style, edit, or drag to move' : 'Drag to move, or use actions'
 	);
 
-	const objectTypeLabel = (type: string) =>
-		type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+	const objectTypeLabel = (type: string) => type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
 
 	function handleSelectObject(id: string) {
 		onSelectObject?.(id);
@@ -140,13 +135,9 @@
 		transition:fly={{ x: 10, y: 0, duration: 200 }}
 		class="pointer-events-none fixed top-20 right-3 z-110 w-[min(24rem,calc(100vw-1.5rem))] touch-manipulation select-none"
 	>
-		<div
-			class="pointer-events-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
-		>
+		<div class="pointer-events-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl">
 			<div class="flex items-center gap-2 px-3 py-2">
-				<div
-					class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600"
-				>
+				<div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
 					<LucideMousePointerClick size={12} />
 				</div>
 				<button
@@ -160,10 +151,7 @@
 						<span class="text-xs font-semibold text-gray-800">{selectedLabel}</span>
 						<span class="truncate text-[10px] text-gray-500">{selectionHint}</span>
 					</div>
-					<LucideChevronDown
-						size={14}
-						class={`shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-					/>
+					<LucideChevronDown size={14} class={`shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
 				</button>
 				{#if selectedTextCount === 1 && onEditText}
 					<button
@@ -182,11 +170,7 @@
 					title="Duplicate selected objects (Cmd+C / Ctrl+C)"
 				>
 					<LucideCopy size={14} />
-					<span
-						class="text-[9px] leading-tight font-medium text-gray-400 mt-0.5 flex items-center gap-0.5"
-					>
-						Ctrl+C / ⌘C
-					</span>
+					<span class="text-[9px] leading-tight font-medium text-gray-400 mt-0.5 flex items-center gap-0.5"> Ctrl+C / ⌘C </span>
 				</button>
 				<button
 					type="button"
@@ -195,11 +179,7 @@
 					title="Delete selected objects (Delete / Backspace)"
 				>
 					<LucideTrash2 size={14} />
-					<span
-						class="text-[9px] leading-tight font-medium text-red-400 mt-0.5 flex items-center gap-0.5"
-					>
-						⌫ / Del
-					</span>
+					<span class="text-[9px] leading-tight font-medium text-red-400 mt-0.5 flex items-center gap-0.5"> ⌫ / Del </span>
 				</button>
 				<button
 					type="button"
@@ -220,14 +200,10 @@
 							}`}
 						>
 							<div class="flex min-w-0 flex-1 items-center gap-2 px-1 py-0.5">
-								<span
-									class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600"
-								>
+								<span class="shrink-0 rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
 									{objectTypeLabel(object.type)}
 								</span>
-								<span class="min-w-0 flex-1 break-all text-xs font-medium text-gray-800"
-									>{object.id}</span
-								>
+								<span class="min-w-0 flex-1 break-all text-xs font-medium text-gray-800">{object.id}</span>
 							</div>
 							<div class="flex shrink-0 items-center gap-1">
 								<button
@@ -242,9 +218,7 @@
 									type="button"
 									onclick={() => handlePreviewObject(object.id)}
 									class={`flex h-7 w-7 items-center justify-center rounded-lg hover:bg-amber-50 active:bg-amber-100 ${
-										previewedObjectId === object.id
-											? 'bg-amber-100 text-amber-700'
-											: 'text-amber-600'
+										previewedObjectId === object.id ? 'bg-amber-100 text-amber-700' : 'text-amber-600'
 									}`}
 									title={`Preview ${object.id}`}
 								>

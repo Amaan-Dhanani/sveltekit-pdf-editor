@@ -108,11 +108,7 @@
 				</div>
 				{#if isMinimized}
 					<div class="flex min-w-0 items-center gap-1.5">
-						<span
-							class="h-4 w-4 shrink-0 rounded-full border border-gray-200"
-							style="background-color: {_textColor}"
-							title="Text color"
-						></span>
+						<span class="h-4 w-4 shrink-0 rounded-full border border-gray-200" style="background-color: {_textColor}" title="Text color"></span>
 						<span class="truncate text-xs font-semibold text-gray-700" title="Font size">
 							{displaySize}
 						</span>
@@ -176,9 +172,7 @@
 
 			<!-- Font Family Section -->
 			<div class="mb-4">
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Font Family
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Font Family</div>
 				<select
 					value={_fontFamily}
 					onchange={(e) => onUpdateFontFamily(e.currentTarget.value)}
@@ -192,9 +186,7 @@
 
 			<!-- Font Size Section -->
 			<div class="mb-4">
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Font Size
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Font Size</div>
 				<div class="flex items-center gap-2">
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
@@ -229,9 +221,7 @@
 
 			<!-- Line Height Section -->
 			<div class="mb-4">
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Line Height
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Line Height</div>
 				<div class="flex items-center gap-2">
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
@@ -290,15 +280,11 @@
 							class:border-purple-500={!presetColors.some((c) => c.hex === _textColor)}
 							class:border-gray-200={presetColors.some((c) => c.hex === _textColor)}
 							class:shadow-md={!presetColors.some((c) => c.hex === _textColor)}
-							style="background-color: {!presetColors.some((c) => c.hex === _textColor)
-								? _textColor
-								: '#ffffff'}"
+							style="background-color: {!presetColors.some((c) => c.hex === _textColor) ? _textColor : '#ffffff'}"
 						>
 							<LucidePalette
 								size={20}
-								class={!presetColors.some((c) => c.hex === _textColor)
-									? 'text-white mix-blend-difference'
-									: 'text-gray-600'}
+								class={!presetColors.some((c) => c.hex === _textColor) ? 'text-white mix-blend-difference' : 'text-gray-600'}
 							/>
 						</div>
 						<input

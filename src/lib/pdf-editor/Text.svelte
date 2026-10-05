@@ -1,605 +1,510 @@
 <script lang="ts">
-    import { onMount, onDestroy } from 'svelte';
-    import { tapout } from './utils/tapout';
-
-    const ZERO_WIDTH_SPACE = '\u200B';
-
-    // -------------------------------------------------------------------------
-    // Props
-    // -------------------------------------------------------------------------
-
-    let {
-        size = $bindable(16),
-        lineHeight = $bindable(1.2),
-        x = $bindable(0),
-        y = $bindable(0),
-        fontFamily = $bindable(),
-        fontColor = $bindable('#000000'),
-        pageScale = 1,
-        lines = $bindable(),
-        width = 100,
-        onTextSelected,
-        onTextUnselected,
-        onUpdateText,
-        viewOnly = false,
-        isPenMode = $bindable(false),
-        isSelectionMode = $bindable(false),
-        isSelected = false,
-        isPreviewed = false,
-        placeholder = 'Add text here.',
-        shouldStartEditing = false
-    }: {
-        size?: number;
-        lineHeight?: number;
-        x?: number;
-        y?: number;
-        fontFamily?: string;
-        fontColor?: string;
-        pageScale?: number;
-        lines?: string[];
-        width?: number;
-        onTextSelected?: (info: any) => void;
-        onTextUnselected?: () => void;
-        onUpdateText?: (info: {
-            lines: string[];
-            width: number;
-        }) => void;
-        viewOnly?: boolean;
-        isPenMode?: boolean;
-        isSelectionMode?: boolean;
-        isSelected?: boolean;
-        isPreviewed?: boolean;
-        placeholder?: string;
-        shouldStartEditing?: boolean;
-    } = $props();
-
-    // -------------------------------------------------------------------------
-    // State
-    // -------------------------------------------------------------------------
-
-    let editable = $state<HTMLDivElement>();
-    let operation = $state('');
-    let debounceTimer = $state<ReturnType<typeof setTimeout> | null>(null);
-
-    let showPlaceholder = $state(true);
-    let isEditing = $state(false);
-
-    let lastRenderedLinesSignature = '';
-
-    // Editing and normal component selection use the exact same visual box.
-    let showSelectionBox = $derived(isSelected || isEditing);
-
-    // Keep border visually 3px regardless of page scale.
-    let selectionBorderWidth = $derived(
-        3 / Math.max(pageScale || 1, 0.0001)
-    );
-
-    let previewBorderWidth = $derived(
-        2 / Math.max(pageScale || 1, 0.0001)
-    );
-
-    // -------------------------------------------------------------------------
-    // Lines
-    // -------------------------------------------------------------------------
-
-    function normalizeLines(value: any = lines): string[] {
-        return Array.isArray(value)
-            ? value.map((line) =>
-                  String(line ?? '').replaceAll(
-                      ZERO_WIDTH_SPACE,
-                      ''
-                  )
-              )
-            : [];
-    }
-
-    function getLinesSignature(value: any = lines): string {
-        return JSON.stringify(normalizeLines(value));
-    }
-
-    function isEmptyLinesValue(value: any = lines): boolean {
-        const normalizedLines = normalizeLines(value);
-
-        return (
-            normalizedLines.length === 0 ||
-            (normalizedLines.length === 1 &&
-                normalizedLines[0].trim() === '')
-        );
-    }
+	import { onMount, onDestroy } from 'svelte';
+	import { tapout } from './utils/tapout';
+
+	const ZERO_WIDTH_SPACE = '\u200B';
+
+	// -------------------------------------------------------------------------
+	// Props
+	// -------------------------------------------------------------------------
+
+	let {
+		size = $bindable(16),
+		lineHeight = $bindable(1.2),
+		x = $bindable(0),
+		y = $bindable(0),
+		fontFamily = $bindable(),
+		fontColor = $bindable('#000000'),
+		pageScale = 1,
+		lines = $bindable(),
+		width = 100,
+		onTextSelected,
+		onTextUnselected,
+		onUpdateText,
+		viewOnly = false,
+		isPenMode = $bindable(false),
+		isSelectionMode = $bindable(false),
+		isSelected = false,
+		isPreviewed = false,
+		placeholder = 'Add text here.',
+		shouldStartEditing = false
+	}: {
+		size?: number;
+		lineHeight?: number;
+		x?: number;
+		y?: number;
+		fontFamily?: string;
+		fontColor?: string;
+		pageScale?: number;
+		lines?: string[];
+		width?: number;
+		onTextSelected?: (info: any) => void;
+		onTextUnselected?: () => void;
+		onUpdateText?: (info: { lines: string[]; width: number }) => void;
+		viewOnly?: boolean;
+		isPenMode?: boolean;
+		isSelectionMode?: boolean;
+		isSelected?: boolean;
+		isPreviewed?: boolean;
+		placeholder?: string;
+		shouldStartEditing?: boolean;
+	} = $props();
+
+	// -------------------------------------------------------------------------
+	// State
+	// -------------------------------------------------------------------------
+
+	let editable = $state<HTMLDivElement>();
+	let operation = $state('');
+	let debounceTimer = $state<ReturnType<typeof setTimeout> | null>(null);
+
+	let showPlaceholder = $state(true);
+	let isEditing = $state(false);
+
+	let lastRenderedLinesSignature = '';
+
+	// Editing and normal component selection use the exact same visual box.
+	let showSelectionBox = $derived(isSelected || isEditing);
+
+	// Keep border visually 3px regardless of page scale.
+	let selectionBorderWidth = $derived(3 / Math.max(pageScale || 1, 0.0001));
+
+	let previewBorderWidth = $derived(2 / Math.max(pageScale || 1, 0.0001));
+
+	// -------------------------------------------------------------------------
+	// Lines
+	// -------------------------------------------------------------------------
+
+	function normalizeLines(value: any = lines): string[] {
+		return Array.isArray(value) ? value.map((line) => String(line ?? '').replaceAll(ZERO_WIDTH_SPACE, '')) : [];
+	}
+
+	function getLinesSignature(value: any = lines): string {
+		return JSON.stringify(normalizeLines(value));
+	}
+
+	function isEmptyLinesValue(value: any = lines): boolean {
+		const normalizedLines = normalizeLines(value);
+
+		return normalizedLines.length === 0 || (normalizedLines.length === 1 && normalizedLines[0].trim() === '');
+	}
+
+	// -------------------------------------------------------------------------
+	// Saving
+	// -------------------------------------------------------------------------
+
+	function clearDebounceTimer() {
+		if (!debounceTimer) return;
+
+		clearTimeout(debounceTimer);
+		debounceTimer = null;
+	}
+
+	function commitTextUpdate() {
+		if (!editable || operation !== 'edit') return;
 
-    // -------------------------------------------------------------------------
-    // Saving
-    // -------------------------------------------------------------------------
+		const extractedLines = extractLines();
 
-    function clearDebounceTimer() {
-        if (!debounceTimer) return;
+		lastRenderedLinesSignature = getLinesSignature(extractedLines);
 
-        clearTimeout(debounceTimer);
-        debounceTimer = null;
-    }
+		onUpdateText?.({
+			lines: extractedLines,
+			width: editable.offsetWidth || 0
+		});
+	}
 
-    function commitTextUpdate() {
-        if (!editable || operation !== 'edit') return;
+	function debouncedSave() {
+		clearDebounceTimer();
 
-        const extractedLines = extractLines();
+		debounceTimer = setTimeout(() => {
+			debounceTimer = null;
+			commitTextUpdate();
+		}, 500);
+	}
 
-        lastRenderedLinesSignature =
-            getLinesSignature(extractedLines);
+	// -------------------------------------------------------------------------
+	// Editing
+	// -------------------------------------------------------------------------
 
-        onUpdateText?.({
-            lines: extractedLines,
-            width: editable.offsetWidth || 0
-        });
-    }
+	function notifyTextSelected() {
+		onTextSelected?.({
+			lineHeight,
+			size,
+			fontFamily,
+			fontColor
+		});
+	}
 
-    function debouncedSave() {
-        clearDebounceTimer();
+	function onFocus() {
+		if (!isEditing) {
+			editable?.blur();
+			return;
+		}
 
-        debounceTimer = setTimeout(() => {
-            debounceTimer = null;
-            commitTextUpdate();
-        }, 500);
-    }
+		operation = 'edit';
 
-    // -------------------------------------------------------------------------
-    // Editing
-    // -------------------------------------------------------------------------
+		notifyTextSelected();
+		updatePlaceholderVisibility();
+	}
 
-    function notifyTextSelected() {
-        onTextSelected?.({
-            lineHeight,
-            size,
-            fontFamily,
-            fontColor
-        });
-    }
+	function startEditing() {
+		if (viewOnly) return;
 
-    function onFocus() {
-        if (!isEditing) {
-            editable?.blur();
-            return;
-        }
+		isEditing = true;
+		operation = 'edit';
+		isSelectionMode = false;
 
-        operation = 'edit';
+		notifyTextSelected();
 
-        notifyTextSelected();
-        updatePlaceholderVisibility();
-    }
+		requestAnimationFrame(() => {
+			editable?.focus();
+		});
+	}
 
-    function startEditing() {
-        if (viewOnly) return;
+	function handleDoubleClick(e: MouseEvent) {
+		if (viewOnly) return;
 
-        isEditing = true;
-        operation = 'edit';
-        isSelectionMode = false;
+		e.stopPropagation();
 
-        notifyTextSelected();
+		startEditing();
+	}
 
-        requestAnimationFrame(() => {
-            editable?.focus();
-        });
-    }
+	$effect(() => {
+		if (shouldStartEditing && !viewOnly) {
+			startEditing();
+		}
+	});
 
-    function handleDoubleClick(e: MouseEvent) {
-        if (viewOnly) return;
+	function onBlur() {
+		if (operation !== 'edit') return;
 
-        e.stopPropagation();
+		clearDebounceTimer();
 
-        startEditing();
-    }
+		commitTextUpdate();
 
-    $effect(() => {
-        if (shouldStartEditing && !viewOnly) {
-            startEditing();
-        }
-    });
+		operation = '';
+		isEditing = false;
 
-    function onBlur() {
-        if (operation !== 'edit') return;
+		updatePlaceholderVisibility();
 
-        clearDebounceTimer();
+		onTextUnselected?.();
+	}
 
-        commitTextUpdate();
+	// -------------------------------------------------------------------------
+	// Placeholder
+	// -------------------------------------------------------------------------
 
-        operation = '';
-        isEditing = false;
+	function updatePlaceholderVisibility() {
+		if (!editable) return;
 
-        updatePlaceholderVisibility();
+		const text = editable.textContent?.replaceAll(ZERO_WIDTH_SPACE, '').trim() ?? '';
 
-        onTextUnselected?.();
-    }
+		const hasContent = text.length > 0;
 
-    // -------------------------------------------------------------------------
-    // Placeholder
-    // -------------------------------------------------------------------------
+		showPlaceholder = !hasContent && isEmptyLinesValue() && operation !== 'edit';
+	}
 
-    function updatePlaceholderVisibility() {
-        if (!editable) return;
+	// -------------------------------------------------------------------------
+	// Input
+	// -------------------------------------------------------------------------
 
-        const text =
-            editable.textContent
-                ?.replaceAll(ZERO_WIDTH_SPACE, '')
-                .trim() ?? '';
+	function onInput() {
+		updatePlaceholderVisibility();
+		debouncedSave();
+	}
 
-        const hasContent = text.length > 0;
+	// -------------------------------------------------------------------------
+	// Selection / caret helpers
+	// -------------------------------------------------------------------------
 
-        showPlaceholder =
-            !hasContent &&
-            isEmptyLinesValue() &&
-            operation !== 'edit';
-    }
+	function getEditorSelection(): Range | null {
+		if (!editable) return null;
 
-    // -------------------------------------------------------------------------
-    // Input
-    // -------------------------------------------------------------------------
+		const selection = window.getSelection();
 
-    function onInput() {
-        updatePlaceholderVisibility();
-        debouncedSave();
-    }
+		if (!selection || selection.rangeCount === 0) {
+			return null;
+		}
 
-    // -------------------------------------------------------------------------
-    // Selection / caret helpers
-    // -------------------------------------------------------------------------
+		const range = selection.getRangeAt(0);
 
-    function getEditorSelection(): Range | null {
-        if (!editable) return null;
+		if (!editable.contains(range.commonAncestorContainer)) {
+			return null;
+		}
 
-        const selection = window.getSelection();
+		return range;
+	}
 
-        if (!selection || selection.rangeCount === 0) {
-            return null;
-        }
+	function placeCaretInTextNode(textNode: Text, offset = textNode.length) {
+		const selection = window.getSelection();
 
-        const range = selection.getRangeAt(0);
+		if (!selection) return;
 
-        if (!editable.contains(range.commonAncestorContainer)) {
-            return null;
-        }
+		const range = document.createRange();
 
-        return range;
-    }
+		range.setStart(textNode, Math.min(offset, textNode.length));
 
-    function placeCaretInTextNode(
-        textNode: Text,
-        offset = textNode.length
-    ) {
-        const selection = window.getSelection();
+		range.collapse(true);
 
-        if (!selection) return;
+		selection.removeAllRanges();
+		selection.addRange(range);
+	}
 
-        const range = document.createRange();
+	// -------------------------------------------------------------------------
+	// Keyboard
+	// -------------------------------------------------------------------------
 
-        range.setStart(
-            textNode,
-            Math.min(offset, textNode.length)
-        );
+	function onKeydown(e: KeyboardEvent) {
+		if (!editable || !isEditing) return;
 
-        range.collapse(true);
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			e.stopPropagation();
 
-        selection.removeAllRanges();
-        selection.addRange(range);
-    }
+			const range = getEditorSelection();
 
-    // -------------------------------------------------------------------------
-    // Keyboard
-    // -------------------------------------------------------------------------
+			if (!range) return;
 
-    function onKeydown(e: KeyboardEvent) {
-        if (!editable || !isEditing) return;
+			// Delete selected text, if any.
+			range.deleteContents();
 
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
+			// Create the line break.
+			const br = document.createElement('br');
 
-            const range = getEditorSelection();
+			// A BR alone does not provide a reliable caret position
+			// inside contenteditable. Give the browser a real text node.
+			const caretNode = document.createTextNode(ZERO_WIDTH_SPACE);
 
-            if (!range) return;
+			range.insertNode(br);
 
-            // Delete selected text, if any.
-            range.deleteContents();
+			br.parentNode?.insertBefore(caretNode, br.nextSibling);
 
-            // Create the line break.
-            const br = document.createElement('br');
+			// Put the caret inside the invisible text node.
+			placeCaretInTextNode(caretNode, 1);
 
-            // A BR alone does not provide a reliable caret position
-            // inside contenteditable. Give the browser a real text node.
-            const caretNode = document.createTextNode(
-                ZERO_WIDTH_SPACE
-            );
+			updatePlaceholderVisibility();
 
-            range.insertNode(br);
+			requestAnimationFrame(() => {
+				debouncedSave();
+			});
 
-            br.parentNode?.insertBefore(
-                caretNode,
-                br.nextSibling
-            );
+			return;
+		}
 
-            // Put the caret inside the invisible text node.
-            placeCaretInTextNode(caretNode, 1);
+		requestAnimationFrame(() => {
+			updatePlaceholderVisibility();
+			debouncedSave();
+		});
+	}
 
-            updatePlaceholderVisibility();
+	// -------------------------------------------------------------------------
+	// Paste
+	// -------------------------------------------------------------------------
 
-            requestAnimationFrame(() => {
-                debouncedSave();
-            });
+	function onPaste(e: ClipboardEvent) {
+		e.preventDefault();
 
-            return;
-        }
+		if (!editable || !isEditing) return;
 
-        requestAnimationFrame(() => {
-            updatePlaceholderVisibility();
-            debouncedSave();
-        });
-    }
+		const pastedText = e.clipboardData?.getData('text/plain') || '';
 
-    // -------------------------------------------------------------------------
-    // Paste
-    // -------------------------------------------------------------------------
+		const range = getEditorSelection();
 
-    function onPaste(e: ClipboardEvent) {
-        e.preventDefault();
+		if (!range) return;
 
-        if (!editable || !isEditing) return;
+		range.deleteContents();
 
-        const pastedText =
-            e.clipboardData?.getData('text/plain') || '';
+		const normalizedText = pastedText.replace(/\r\n/g, '\n');
 
-        const range = getEditorSelection();
+		const pastedLines = normalizedText.split('\n');
 
-        if (!range) return;
+		let finalCaretNode: Text | null = null;
 
-        range.deleteContents();
+		for (let index = 0; index < pastedLines.length; index++) {
+			const line = pastedLines[index];
 
-        const normalizedText = pastedText.replace(
-            /\r\n/g,
-            '\n'
-        );
+			if (line.length > 0) {
+				const textNode = document.createTextNode(line);
 
-        const pastedLines = normalizedText.split('\n');
+				range.insertNode(textNode);
 
-        let finalCaretNode: Text | null = null;
+				range.setStartAfter(textNode);
+				range.collapse(true);
+			}
 
-        for (
-            let index = 0;
-            index < pastedLines.length;
-            index++
-        ) {
-            const line = pastedLines[index];
+			if (index < pastedLines.length - 1) {
+				const br = document.createElement('br');
 
-            if (line.length > 0) {
-                const textNode =
-                    document.createTextNode(line);
+				const caretNode = document.createTextNode(ZERO_WIDTH_SPACE);
 
-                range.insertNode(textNode);
+				range.insertNode(br);
 
-                range.setStartAfter(textNode);
-                range.collapse(true);
-            }
+				br.parentNode?.insertBefore(caretNode, br.nextSibling);
 
-            if (index < pastedLines.length - 1) {
-                const br = document.createElement('br');
+				finalCaretNode = caretNode;
 
-                const caretNode =
-                    document.createTextNode(
-                        ZERO_WIDTH_SPACE
-                    );
+				range.setStart(caretNode, caretNode.length);
 
-                range.insertNode(br);
+				range.collapse(true);
+			}
+		}
 
-                br.parentNode?.insertBefore(
-                    caretNode,
-                    br.nextSibling
-                );
+		const selection = window.getSelection();
 
-                finalCaretNode = caretNode;
+		if (selection) {
+			selection.removeAllRanges();
+			selection.addRange(range);
+		} else if (finalCaretNode) {
+			placeCaretInTextNode(finalCaretNode, 1);
+		}
 
-                range.setStart(
-                    caretNode,
-                    caretNode.length
-                );
+		updatePlaceholderVisibility();
+		debouncedSave();
+	}
 
-                range.collapse(true);
-            }
-        }
+	// -------------------------------------------------------------------------
+	// Sanitization
+	// -------------------------------------------------------------------------
 
-        const selection = window.getSelection();
+	function sanitize() {
+		if (!editable) return;
 
-        if (selection) {
-            selection.removeAllRanges();
-            selection.addRange(range);
-        } else if (finalCaretNode) {
-            placeCaretInTextNode(finalCaretNode, 1);
-        }
+		let weirdNode: ChildNode | undefined;
 
-        updatePlaceholderVisibility();
-        debouncedSave();
-    }
+		while ((weirdNode = Array.from(editable.childNodes).find((node) => !['#text', 'BR'].includes(node.nodeName)))) {
+			editable.removeChild(weirdNode);
+		}
+	}
 
-    // -------------------------------------------------------------------------
-    // Sanitization
-    // -------------------------------------------------------------------------
+	// -------------------------------------------------------------------------
+	// Extract lines
+	// -------------------------------------------------------------------------
 
-    function sanitize() {
-        if (!editable) return;
+	function extractLines(): string[] {
+		if (!editable) return [];
 
-        let weirdNode: ChildNode | undefined;
+		const extractedLines: string[] = [];
 
-        while (
-            (weirdNode = Array.from(
-                editable.childNodes
-            ).find(
-                (node) =>
-                    !['#text', 'BR'].includes(
-                        node.nodeName
-                    )
-            ))
-        ) {
-            editable.removeChild(weirdNode);
-        }
-    }
+		let lineText = '';
 
-    // -------------------------------------------------------------------------
-    // Extract lines
-    // -------------------------------------------------------------------------
+		for (const node of editable.childNodes) {
+			if (node.nodeName === 'BR') {
+				extractedLines.push(lineText.replaceAll(ZERO_WIDTH_SPACE, ''));
 
-    function extractLines(): string[] {
-        if (!editable) return [];
+				lineText = '';
+			} else {
+				lineText += node.textContent || '';
+			}
+		}
 
-        const extractedLines: string[] = [];
+		extractedLines.push(lineText.replaceAll(ZERO_WIDTH_SPACE, ''));
 
-        let lineText = '';
+		return extractedLines;
+	}
 
-        for (const node of editable.childNodes) {
-            if (node.nodeName === 'BR') {
-                extractedLines.push(
-                    lineText.replaceAll(
-                        ZERO_WIDTH_SPACE,
-                        ''
-                    )
-                );
+	// -------------------------------------------------------------------------
+	// Render lines
+	// -------------------------------------------------------------------------
 
-                lineText = '';
-            } else {
-                lineText += node.textContent || '';
-            }
-        }
+	function renderLines() {
+		if (!editable) return;
 
-        extractedLines.push(
-            lineText.replaceAll(
-                ZERO_WIDTH_SPACE,
-                ''
-            )
-        );
+		const normalizedLines = normalizeLines();
 
-        return extractedLines;
-    }
+		lastRenderedLinesSignature = getLinesSignature(normalizedLines);
 
-    // -------------------------------------------------------------------------
-    // Render lines
-    // -------------------------------------------------------------------------
+		if (isEmptyLinesValue(normalizedLines)) {
+			editable.innerHTML = '';
 
-    function renderLines() {
-        if (!editable) return;
+			updatePlaceholderVisibility();
 
-        const normalizedLines = normalizeLines();
+			return;
+		}
 
-        lastRenderedLinesSignature =
-            getLinesSignature(normalizedLines);
+		const fragment = document.createDocumentFragment();
 
-        if (isEmptyLinesValue(normalizedLines)) {
-            editable.innerHTML = '';
+		normalizedLines.forEach((line, index) => {
+			fragment.appendChild(document.createTextNode(line));
 
-            updatePlaceholderVisibility();
+			if (index < normalizedLines.length - 1) {
+				fragment.appendChild(document.createElement('br'));
+			}
+		});
 
-            return;
-        }
+		editable.innerHTML = '';
+		editable.appendChild(fragment);
 
-        const fragment =
-            document.createDocumentFragment();
+		updatePlaceholderVisibility();
+	}
 
-        normalizedLines.forEach((line, index) => {
-            fragment.appendChild(
-                document.createTextNode(line)
-            );
+	// Never overwrite the DOM while actively editing.
+	$effect(() => {
+		const linesSignature = getLinesSignature(lines);
 
-            if (
-                index <
-                normalizedLines.length - 1
-            ) {
-                fragment.appendChild(
-                    document.createElement('br')
-                );
-            }
-        });
+		if (!editable || operation === 'edit') {
+			return;
+		}
 
-        editable.innerHTML = '';
-        editable.appendChild(fragment);
+		if (linesSignature !== lastRenderedLinesSignature) {
+			renderLines();
+		} else {
+			updatePlaceholderVisibility();
+		}
+	});
 
-        updatePlaceholderVisibility();
-    }
+	// -------------------------------------------------------------------------
+	// Tapout
+	// -------------------------------------------------------------------------
 
-    // Never overwrite the DOM while actively editing.
-    $effect(() => {
-        const linesSignature =
-            getLinesSignature(lines);
+	function handleTapout() {
+		onBlur();
+	}
 
-        if (!editable || operation === 'edit') {
-            return;
-        }
+	function tapoutEvents(node: HTMLElement) {
+		node.addEventListener('tapout', handleTapout);
 
-        if (
-            linesSignature !==
-            lastRenderedLinesSignature
-        ) {
-            renderLines();
-        } else {
-            updatePlaceholderVisibility();
-        }
-    });
+		return {
+			destroy() {
+				node.removeEventListener('tapout', handleTapout);
+			}
+		};
+	}
 
-    // -------------------------------------------------------------------------
-    // Tapout
-    // -------------------------------------------------------------------------
+	// -------------------------------------------------------------------------
+	// Lifecycle
+	// -------------------------------------------------------------------------
 
-    function handleTapout() {
-        onBlur();
-    }
+	function cleanup() {
+		clearDebounceTimer();
 
-    function tapoutEvents(node: HTMLElement) {
-        node.addEventListener(
-            'tapout',
-            handleTapout
-        );
+		if (operation === 'edit') {
+			commitTextUpdate();
+		}
 
-        return {
-            destroy() {
-                node.removeEventListener(
-                    'tapout',
-                    handleTapout
-                );
-            }
-        };
-    }
+		operation = '';
+		isEditing = false;
+	}
 
-    // -------------------------------------------------------------------------
-    // Lifecycle
-    // -------------------------------------------------------------------------
+	onMount(() => {
+		renderLines();
+		updatePlaceholderVisibility();
 
-    function cleanup() {
-        clearDebounceTimer();
+		// New empty text components immediately enter editing mode.
+		if (!viewOnly && isEmptyLinesValue()) {
+			isEditing = true;
+			operation = 'edit';
 
-        if (operation === 'edit') {
-            commitTextUpdate();
-        }
+			notifyTextSelected();
 
-        operation = '';
-        isEditing = false;
-    }
+			requestAnimationFrame(() => {
+				editable?.focus();
+			});
+		}
+	});
 
-    onMount(() => {
-        renderLines();
-        updatePlaceholderVisibility();
-
-        // New empty text components immediately enter editing mode.
-        if (
-            !viewOnly &&
-            isEmptyLinesValue()
-        ) {
-            isEditing = true;
-            operation = 'edit';
-
-            notifyTextSelected();
-
-            requestAnimationFrame(() => {
-                editable?.focus();
-            });
-        }
-    });
-
-    onDestroy(() => {
-        cleanup();
-    });
+	onDestroy(() => {
+		cleanup();
+	});
 </script>
 
 <!--
@@ -617,77 +522,75 @@
       - typing cannot progressively multiply the selection width
 -->
 <div
-    use:tapout
-    use:tapoutEvents
-    role="presentation"
-    class="absolute left-0 top-0 inline-block select-none"
-    style:transform={`translate(${x}px, ${y}px)`}
-    ondblclick={handleDoubleClick}
+	use:tapout
+	use:tapoutEvents
+	role="presentation"
+	class="absolute left-0 top-0 inline-block select-none"
+	style:transform={`translate(${x}px, ${y}px)`}
+	ondblclick={handleDoubleClick}
 >
-    <div class="relative inline-block">
-        <!-- ================================================================
+	<div class="relative inline-block">
+		<!-- ================================================================
              Selection box
 
              Same box for normal selection and text editing.
              ================================================================ -->
 
-        {#if showSelectionBox}
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute -inset-px z-0 rounded border border-blue-500/30"
-                style:border-width={`${selectionBorderWidth}px`}
-            ></div>
-        {/if}
+		{#if showSelectionBox}
+			<div
+				aria-hidden="true"
+				class="pointer-events-none absolute -inset-px z-0 rounded border border-blue-500/30"
+				style:border-width={`${selectionBorderWidth}px`}
+			></div>
+		{/if}
 
-        <!-- ================================================================
+		<!-- ================================================================
              Preview box
              ================================================================ -->
 
-        {#if isPreviewed}
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute -inset-px z-0 rounded border border-amber-600/80 bg-amber-500/10 animate-pulse"
-                style:border-width={`${previewBorderWidth}px`}
-            ></div>
-        {/if}
+		{#if isPreviewed}
+			<div
+				aria-hidden="true"
+				class="pointer-events-none absolute -inset-px z-0 rounded border border-amber-600/80 bg-amber-500/10 animate-pulse"
+				style:border-width={`${previewBorderWidth}px`}
+			></div>
+		{/if}
 
-        <!-- ================================================================
+		<!-- ================================================================
              Placeholder
              ================================================================ -->
 
-        {#if !viewOnly && showPlaceholder}
-            <div
-                aria-hidden="true"
-                class="pointer-events-none absolute inset-0 z-0 inline-block select-none overflow-hidden whitespace-nowrap text-gray-400"
-                style="
+		{#if !viewOnly && showPlaceholder}
+			<div
+				aria-hidden="true"
+				class="pointer-events-none absolute inset-0 z-0 inline-block select-none overflow-hidden whitespace-nowrap text-gray-400"
+				style="
                     font-size: {size}px;
-                    font-family: {fontFamily
-                        ? `'${fontFamily}', serif`
-                        : 'serif'};
+                    font-family: {fontFamily ? `'${fontFamily}', serif` : 'serif'};
                     color: {fontColor};
                     line-height: {lineHeight || 1.2};
                 "
-            >
-                {placeholder}
-            </div>
-        {/if}
+			>
+				{placeholder}
+			</div>
+		{/if}
 
-        <!-- ================================================================
+		<!-- ================================================================
              Text editor
              ================================================================ -->
 
-        <div
-            aria-label="Text editor"
-            role="textbox"
-            tabindex="-1"
-            bind:this={editable}
-            onfocus={onFocus}
-            onkeydown={onKeydown}
-            onpaste={onPaste}
-            oninput={onInput}
-            contenteditable={!viewOnly && isEditing}
-            spellcheck="false"
-            class="
+		<div
+			aria-label="Text editor"
+			role="textbox"
+			tabindex="-1"
+			bind:this={editable}
+			onfocus={onFocus}
+			onkeydown={onKeydown}
+			onpaste={onPaste}
+			oninput={onInput}
+			contenteditable={!viewOnly && isEditing}
+			spellcheck="false"
+			class="
                 relative
                 z-10
                 inline-block
@@ -697,19 +600,15 @@
                 m-0
                 outline-none
             "
-            class:cursor-text={!viewOnly && isEditing}
-            class:cursor-default={viewOnly || !isEditing}
-            style="
+			class:cursor-text={!viewOnly && isEditing}
+			class:cursor-default={viewOnly || !isEditing}
+			style="
                 font-size: {size}px;
-                font-family: {fontFamily
-                    ? `'${fontFamily}', serif`
-                    : 'serif'};
+                font-family: {fontFamily ? `'${fontFamily}', serif` : 'serif'};
                 color: {fontColor};
                 line-height: {lineHeight || 1.2};
-                -webkit-user-select: {viewOnly || !isEditing
-                    ? 'none'
-                    : 'text'};
+                -webkit-user-select: {viewOnly || !isEditing ? 'none' : 'text'};
             "
-        ></div>
-    </div>
+		></div>
+	</div>
 </div>

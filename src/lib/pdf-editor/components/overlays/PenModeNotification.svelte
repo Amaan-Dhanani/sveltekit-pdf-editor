@@ -19,9 +19,7 @@
 		<div
 			class="pointer-events-auto flex items-center gap-2 rounded-lg border border-amber-200 bg-linear-to-r from-amber-50 to-yellow-50 px-3 py-2 shadow-lg max-[640px]:rounded-full max-[640px]:px-2 max-[640px]:py-1.5"
 		>
-			<div
-				class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-600 max-[640px]:h-7 max-[640px]:w-7"
-			>
+			<div class="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-600 max-[640px]:h-7 max-[640px]:w-7">
 				<LucidePen size={14} />
 			</div>
 

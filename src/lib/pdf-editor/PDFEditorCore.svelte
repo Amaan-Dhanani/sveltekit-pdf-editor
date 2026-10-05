@@ -46,11 +46,7 @@
 	import MinimapZoomControl from './components/overlays/MinimapZoomControl.svelte';
 
 	// Context and composables
-	import {
-		setPDFEditorContext,
-		type RenderQualityMode,
-		type SaveState
-	} from './context/pdfEditorContext.svelte';
+	import { setPDFEditorContext, type RenderQualityMode, type SaveState } from './context/pdfEditorContext.svelte';
 	import { usePDFModes } from './composables/usePDFModes';
 	import { useZoomAndPan } from './composables/useZoomAndPan';
 	import { useKeyboardShortcuts } from './composables/useKeyboardShortcuts';
@@ -173,13 +169,7 @@
 		allObjects: any[];
 		onUpdate: () => void;
 
-		constructor(
-			objectId: string,
-			oldState: any,
-			newState: any,
-			allObjects: any[],
-			onUpdate: () => void
-		) {
+		constructor(objectId: string, oldState: any, newState: any, allObjects: any[], onUpdate: () => void) {
 			this.objectId = objectId;
 			this.oldState = oldState;
 			this.newState = newState;
@@ -209,11 +199,7 @@
 		allObjects: any[];
 		onUpdate: () => void;
 
-		constructor(
-			updates: Array<{ objectId: string; oldState: any; newState: any }>,
-			allObjects: any[],
-			onUpdate: () => void
-		) {
+		constructor(updates: Array<{ objectId: string; oldState: any; newState: any }>, allObjects: any[], onUpdate: () => void) {
 			this.updates = updates;
 			this.allObjects = allObjects;
 			this.onUpdate = onUpdate;
@@ -314,11 +300,7 @@
 		allObjects: any[];
 		onUpdate: () => void;
 
-		constructor(
-			deletedObjects: Array<{ object: any; index: number }>,
-			allObjects: any[],
-			onUpdate: () => void
-		) {
+		constructor(deletedObjects: Array<{ object: any; index: number }>, allObjects: any[], onUpdate: () => void) {
 			this.deletedObjects = deletedObjects;
 			this.allObjects = allObjects;
 			this.onUpdate = onUpdate;
@@ -418,9 +400,7 @@
 
 	// Initialize composables
 	const modes = usePDFModes();
-	const resolvedPlugins = $derived(
-		resolvePdfEditorPlugins(plugins as PdfEditorPlugin[] | undefined)
-	);
+	const resolvedPlugins = $derived(resolvePdfEditorPlugins(plugins as PdfEditorPlugin[] | undefined));
 	const enabledTools = $derived(resolvedPlugins.enabledTools);
 	const enabledToolMap = $derived(resolvedPlugins.enabledToolMap);
 	const embedPdfPluginRegistrations = $derived(resolvedPlugins.embedPdfRegistrations);
@@ -441,10 +421,7 @@
 		const viewport = getEditorViewportMetrics();
 		const availableWidth = Math.max(120, viewport.width - 64);
 		const availableHeight = Math.max(120, viewport.height - 144);
-		const fitZoom = clampPdfZoom(
-			Math.min(availableWidth / currentPageWidth, availableHeight / currentPageHeight),
-			SOFT_MIN_PDF_ZOOM
-		);
+		const fitZoom = clampPdfZoom(Math.min(availableWidth / currentPageWidth, availableHeight / currentPageHeight), SOFT_MIN_PDF_ZOOM);
 
 		zoomPan.zoomAtPoint(fitZoom, undefined, undefined, true);
 		tick().then(() => requestAnimationFrame(centerEditablePageInViewport));
@@ -505,11 +482,7 @@
 	}
 
 	function findObjectsAtPoint(point: { x: number; y: number }) {
-		const candidates = objectSpatialIndex.queryPoint(
-			point.x,
-			point.y,
-			6 / Math.max(ctx.state.zoom || 1, 0.1)
-		);
+		const candidates = objectSpatialIndex.queryPoint(point.x, point.y, 6 / Math.max(ctx.state.zoom || 1, 0.1));
 		return findDrawingsAtPoint(point, allObjects, ctx.state.zoom, candidates);
 	}
 
@@ -668,18 +641,10 @@
 	let adjacentPagePreviewLayout = $state<'row' | 'column'>('row');
 	let scaledPagePreviewWidth = $derived(currentPageWidth * ctx.state.zoom);
 	let useCompactPageTabs = $derived(
-		ctx.state.zoom <= 0.75 ||
-			scaledPagePreviewWidth <= 280 ||
-			(adjacentPagePreviewEnabled && adjacentPagePreviewLayout === 'column')
+		ctx.state.zoom <= 0.75 || scaledPagePreviewWidth <= 280 || (adjacentPagePreviewEnabled && adjacentPagePreviewLayout === 'column')
 	);
 	let useMinimalPageTabs = $derived(ctx.state.zoom <= 0.45 || scaledPagePreviewWidth <= 170);
-	let columnPageTabWidth = $derived(
-		adjacentPagePreviewEnabled && adjacentPagePreviewLayout === 'column'
-			? useMinimalPageTabs
-				? 112
-				: 152
-			: 0
-	);
+	let columnPageTabWidth = $derived(adjacentPagePreviewEnabled && adjacentPagePreviewLayout === 'column' ? (useMinimalPageTabs ? 112 : 152) : 0);
 	let pageStackWidth = $derived(scaledPagePreviewWidth + columnPageTabWidth);
 	let visiblePageRect = $derived({
 		x: 0,
@@ -701,9 +666,7 @@
 		attempts: number;
 	} | null = $state(null);
 	let cameraIsLive = $derived(ctx.state.isPanning || ctx.state.isZooming);
-	let annotationRenderZoom = $derived(
-		cameraIsLive || ctx.state.isDrawingStroke ? settledRenderZoom : ctx.state.zoom
-	);
+	let annotationRenderZoom = $derived(cameraIsLive || ctx.state.isDrawingStroke ? settledRenderZoom : ctx.state.zoom);
 	let drawingInputActive = $derived(
 		ctx.state.addingDrawing ||
 			ctx.state.isHighlighting ||
@@ -712,9 +675,7 @@
 			ctx.state.isAddingLine ||
 			ctx.state.isDrawingStroke
 	);
-	let scrollRootTouchAction = $derived(
-		ctx.state.isHandMode || drawingInputActive ? 'none' : 'pan-x pan-y'
-	);
+	let scrollRootTouchAction = $derived(ctx.state.isHandMode || drawingInputActive ? 'none' : 'pan-x pan-y');
 	let workspaceTouchAction = $derived(ctx.state.isHandMode || drawingInputActive ? 'none' : 'auto');
 
 	$effect(() => {
@@ -1000,11 +961,7 @@
 
 	function scrollEditorBy(left: number, top: number, behavior: ScrollBehavior = 'auto') {
 		if (editorScrollRoot) {
-			scrollEditorTo(
-				editorScrollRoot.scrollLeft + left,
-				editorScrollRoot.scrollTop + top,
-				behavior
-			);
+			scrollEditorTo(editorScrollRoot.scrollLeft + left, editorScrollRoot.scrollTop + top, behavior);
 			return;
 		}
 
@@ -1019,14 +976,8 @@
 		const viewportY = viewport.top + viewport.height / 2;
 		const zoom = Math.max(ctx.state.zoom || 1, 0.1);
 		const rect = editablePageFrame?.getBoundingClientRect();
-		const pageX =
-			rect && rect.width > 0
-				? clampNumber((viewportX - rect.left) / zoom, 0, currentPageWidth)
-				: currentPageWidth / 2;
-		const pageY =
-			rect && rect.height > 0
-				? clampNumber((viewportY - rect.top) / zoom, 0, currentPageHeight)
-				: currentPageHeight / 2;
+		const pageX = rect && rect.width > 0 ? clampNumber((viewportX - rect.left) / zoom, 0, currentPageWidth) : currentPageWidth / 2;
+		const pageY = rect && rect.height > 0 ? clampNumber((viewportY - rect.top) / zoom, 0, currentPageHeight) : currentPageHeight / 2;
 
 		pendingPageCamera = {
 			targetPage,
@@ -1100,10 +1051,7 @@
 
 		if (rect.top < viewport.top + toolbarOffset) {
 			verticalDelta = rect.top - (viewport.top + toolbarOffset);
-		} else if (
-			rect.bottom < viewport.top + toolbarOffset + 160 ||
-			rect.top > viewport.bottom - 160
-		) {
+		} else if (rect.bottom < viewport.top + toolbarOffset + 160 || rect.top > viewport.bottom - 160) {
 			verticalDelta = rect.top - (viewport.top + toolbarOffset);
 		}
 
@@ -1131,8 +1079,7 @@
 
 			const rect = editablePageFrame.getBoundingClientRect();
 			const viewport = getEditorViewportMetrics();
-			const isHorizontallyCentered =
-				Math.abs(rect.left + rect.width / 2 - (viewport.left + viewport.width / 2)) < 2;
+			const isHorizontallyCentered = Math.abs(rect.left + rect.width / 2 - (viewport.left + viewport.width / 2)) < 2;
 			const canRetry = initialCenterAttempts < 8;
 			initialCenterAttempts += 1;
 
@@ -1185,10 +1132,7 @@
 			if (hasNotified || !observedPage) return;
 			hasNotified = true;
 			Promise.resolve(onAdjacentPageVisible?.(observedPage)).catch((error) => {
-				toast.push(
-					`Failed to load adjacent page annotations: ${error instanceof Error ? error.message : String(error)}`,
-					{ theme: TOAST_ERROR }
-				);
+				toast.push(`Failed to load adjacent page annotations: ${error instanceof Error ? error.message : String(error)}`, { theme: TOAST_ERROR });
 			});
 		};
 
@@ -1334,9 +1278,7 @@
 	onMount(() => {
 		let disposed = false;
 
-		const savedVisibleObjectRendering = localStorage.getItem(
-			'pdf-editor-visible-object-rendering-enabled'
-		);
+		const savedVisibleObjectRendering = localStorage.getItem('pdf-editor-visible-object-rendering-enabled');
 		if (savedVisibleObjectRendering !== null) {
 			useVisibleObjectRendering = savedVisibleObjectRendering === 'true';
 		}
@@ -1346,23 +1288,17 @@
 			minimapAnnotationsEnabled = savedMinimapAnnotations === 'true';
 		}
 
-		const savedAdjacentPagePreview = localStorage.getItem(
-			'pdf-editor-adjacent-page-preview-enabled'
-		);
+		const savedAdjacentPagePreview = localStorage.getItem('pdf-editor-adjacent-page-preview-enabled');
 		if (savedAdjacentPagePreview !== null) {
 			adjacentPagePreviewEnabled = savedAdjacentPagePreview === 'true';
 		}
 
-		const savedAdjacentPagePreviewCount = Number(
-			localStorage.getItem('pdf-editor-adjacent-page-preview-count') || ''
-		);
+		const savedAdjacentPagePreviewCount = Number(localStorage.getItem('pdf-editor-adjacent-page-preview-count') || '');
 		if (!Number.isNaN(savedAdjacentPagePreviewCount)) {
 			adjacentPagePreviewCount = clampAdjacentPagePreviewCount(savedAdjacentPagePreviewCount);
 		}
 
-		const savedAdjacentPagePreviewLayout = localStorage.getItem(
-			'pdf-editor-adjacent-page-preview-layout'
-		);
+		const savedAdjacentPagePreviewLayout = localStorage.getItem('pdf-editor-adjacent-page-preview-layout');
 		if (savedAdjacentPagePreviewLayout === 'row' || savedAdjacentPagePreviewLayout === 'column') {
 			adjacentPagePreviewLayout = savedAdjacentPagePreviewLayout;
 		} else if (savedAdjacentPagePreviewLayout === 'grid') {
@@ -1418,8 +1354,7 @@
 		try {
 			pdfName = file?.name || 'document.pdf';
 			const blob = file instanceof Blob ? file : new Blob([file], { type: 'application/pdf' });
-			pdfFile =
-				blob instanceof File ? blob : new File([blob], pdfName, { type: 'application/pdf' });
+			pdfFile = blob instanceof File ? blob : new File([blob], pdfName, { type: 'application/pdf' });
 			pdfBuffer = await blob.arrayBuffer();
 			pdfDocumentId = `pdf-editor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 			internalPage = currentPage;
@@ -1577,11 +1512,7 @@
 		brushOpacity: number,
 		type: 'drawing' | 'highlight' = 'drawing'
 	) {
-		if (
-			(type === 'highlight' && !hasTool('highlighter')) ||
-			(type === 'drawing' && !hasTool('pen'))
-		)
-			return;
+		if ((type === 'highlight' && !hasTool('highlighter')) || (type === 'drawing' && !hasTool('pen'))) return;
 		const id = genID();
 		const safePath = clampPathToPage(path, Math.max(brushSize || 1, 1) / 2);
 		const opacity = Number(brushOpacity);
@@ -1599,11 +1530,7 @@
 			rotation: 0,
 			brushSize,
 			brushColor,
-			opacity: Number.isFinite(opacity)
-				? Math.max(0, Math.min(opacity, 1))
-				: type === 'highlight'
-					? 0.5
-					: 1
+			opacity: Number.isFinite(opacity) ? Math.max(0, Math.min(opacity, 1)) : type === 'highlight' ? 0.5 : 1
 		});
 
 		allObjects.push(object);
@@ -1640,12 +1567,7 @@
 		invalidateObjectVisualBoxCache(id);
 
 		// Add to history
-		const command = new DeleteObjectCommand(
-			removedObject,
-			index,
-			allObjects,
-			handleAnnotationChange
-		);
+		const command = new DeleteObjectCommand(removedObject, index, allObjects, handleAnnotationChange);
 		history.push(command);
 
 		handleAnnotationChange();
@@ -1661,16 +1583,7 @@
 			const nextObject = confineObjectToPage({ ...oldObject, ...payload });
 			const oldState: Record<string, any> = {};
 			const newState: Record<string, any> = {};
-			const trackedKeys = new Set([
-				...Object.keys(payload),
-				'x',
-				'y',
-				'width',
-				'height',
-				'scale',
-				'size',
-				'rotation'
-			]);
+			const trackedKeys = new Set([...Object.keys(payload), 'x', 'y', 'width', 'height', 'scale', 'size', 'rotation']);
 
 			// Only track the properties that are being changed
 			trackedKeys.forEach((key) => {
@@ -1688,13 +1601,7 @@
 
 			// Add to history (unless explicitly skipped, e.g., during undo/redo)
 			if (!skipHistory) {
-				const command = new UpdateObjectCommand(
-					objectId,
-					oldState,
-					newState,
-					allObjects,
-					handleAnnotationChange
-				);
+				const command = new UpdateObjectCommand(objectId, oldState, newState, allObjects, handleAnnotationChange);
 				history.push(command);
 			}
 
@@ -1710,12 +1617,7 @@
 			invalidateObjectVisualBoxCache(objectId);
 
 			// Add to history
-			const command = new DeleteObjectCommand(
-				removedObject,
-				index,
-				allObjects,
-				handleAnnotationChange
-			);
+			const command = new DeleteObjectCommand(removedObject, index, allObjects, handleAnnotationChange);
 			history.push(command);
 
 			handleAnnotationChange();
@@ -1803,13 +1705,8 @@
 	let selectedPageIndex = $derived(currentPage - 1);
 
 	// Check page disabled
-	function isPageDisabledFunction(
-		disabled_pages: Array<{ from_page: number; to_page: number }>,
-		currentPage: number
-	): boolean {
-		return disabled_pages.some(
-			(range) => currentPage >= range.from_page && currentPage <= range.to_page
-		);
+	function isPageDisabledFunction(disabled_pages: Array<{ from_page: number; to_page: number }>, currentPage: number): boolean {
+		return disabled_pages.some((range) => currentPage >= range.from_page && currentPage <= range.to_page);
 	}
 
 	let isPageDisabled = $derived(isPageDisabledFunction(disabled_pages, currentPage));
@@ -1855,18 +1752,7 @@
 
 	function getObjectVisualBoxCacheKey(obj: Record<string, any>) {
 		if (obj.type === 'drawing' || obj.type === 'highlight') {
-			return [
-				obj.type,
-				obj.path,
-				obj.x,
-				obj.y,
-				obj.width,
-				obj.scale,
-				obj.rotation,
-				obj.brushSize,
-				obj.originWidth,
-				obj.originHeight
-			].join('|');
+			return [obj.type, obj.path, obj.x, obj.y, obj.width, obj.scale, obj.rotation, obj.brushSize, obj.originWidth, obj.originHeight].join('|');
 		}
 
 		if (obj.type === 'line') {
@@ -1874,25 +1760,13 @@
 		}
 
 		if (obj.type === 'text') {
-			return [obj.type, obj.x, obj.y, obj.width, obj.size, obj.lineHeight, obj.lines?.length].join(
-				'|'
-			);
+			return [obj.type, obj.x, obj.y, obj.width, obj.size, obj.lineHeight, obj.lines?.length].join('|');
 		}
 
 		if (obj.type === 'teacher-mark') {
-			return [
-				obj.type,
-				obj.x,
-				obj.y,
-				obj.width,
-				obj.height,
-				obj.markedBy,
-				obj.markedAt,
-				obj.label,
-				obj.stampColor,
-				obj.stampIcon,
-				obj.fontSize
-			].join('|');
+			return [obj.type, obj.x, obj.y, obj.width, obj.height, obj.markedBy, obj.markedAt, obj.label, obj.stampColor, obj.stampIcon, obj.fontSize].join(
+				'|'
+			);
 		}
 
 		return [obj.type, obj.x, obj.y, obj.width, obj.height].join('|');
@@ -1948,9 +1822,7 @@
 	}
 
 	function boxesIntersect(a: Record<string, any>, b: Record<string, any>) {
-		return (
-			a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y
-		);
+		return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y;
 	}
 
 	function clampNumber(value: number, min: number, max: number) {
@@ -1971,9 +1843,7 @@
 		const maxY = Math.max(currentPageHeight - padding, minY);
 
 		return path.replace(/([ML])(-?\d*\.?\d+),(-?\d*\.?\d+)/gi, (_match, command, x, y) => {
-			return `${command}${roundPageValue(clampNumber(parseFloat(x), minX, maxX))},${roundPageValue(
-				clampNumber(parseFloat(y), minY, maxY)
-			)}`;
+			return `${command}${roundPageValue(clampNumber(parseFloat(x), minX, maxX))},${roundPageValue(clampNumber(parseFloat(y), minY, maxY))}`;
 		});
 	}
 
@@ -1998,14 +1868,8 @@
 	function getBoxConfinementDelta(box: any) {
 		if (!box) return { x: 0, y: 0 };
 
-		const targetX =
-			box.width > currentPageWidth
-				? (currentPageWidth - box.width) / 2
-				: clampNumber(box.x, 0, currentPageWidth - box.width);
-		const targetY =
-			box.height > currentPageHeight
-				? (currentPageHeight - box.height) / 2
-				: clampNumber(box.y, 0, currentPageHeight - box.height);
+		const targetX = box.width > currentPageWidth ? (currentPageWidth - box.width) / 2 : clampNumber(box.x, 0, currentPageWidth - box.width);
+		const targetY = box.height > currentPageHeight ? (currentPageHeight - box.height) / 2 : clampNumber(box.y, 0, currentPageHeight - box.height);
 
 		return {
 			x: targetX - box.x,
@@ -2039,17 +1903,12 @@
 			return candidate;
 		}
 
-		const fitScale = Math.min(
-			1,
-			box.width > 0 ? currentPageWidth / box.width : 1,
-			box.height > 0 ? currentPageHeight / box.height : 1
-		);
+		const fitScale = Math.min(1, box.width > 0 ? currentPageWidth / box.width : 1, box.height > 0 ? currentPageHeight / box.height : 1);
 
 		if (fitScale >= 1) return candidate;
 
 		if (candidate.type === 'drawing' || candidate.type === 'highlight') {
-			const currentScale =
-				candidate.scale ?? (candidate.originWidth ? candidate.width / candidate.originWidth : 1);
+			const currentScale = candidate.scale ?? (candidate.originWidth ? candidate.width / candidate.originWidth : 1);
 			const nextScale = Math.max(0.01, currentScale * fitScale);
 			candidate.scale = nextScale;
 			candidate.width = candidate.originWidth * nextScale;
@@ -2095,18 +1954,13 @@
 	function getTeacherMarkContentSize(object: Record<string, any>, fontSize: number) {
 		const label = String(object?.label || 'Marked correct').toUpperCase();
 		const markedBy = `Stamped by ${capitalizeFirstLetter(object?.markedBy || 'Teacher')}`;
-		const markedAt = getTeacherMarkDisplayDate(
-			object?.markedAt || object?.updatedAt || new Date().toISOString()
-		);
+		const markedAt = getTeacherMarkDisplayDate(object?.markedAt || object?.updatedAt || new Date().toISOString());
 		const metaFontSize = fontSize * 0.68;
 		const labelWidth = label.length * fontSize * 0.62;
 		const nameWidth = markedBy.length * metaFontSize * 0.5;
 		const timeWidth = markedAt.length * metaFontSize * 0.5;
 		const iconWidth = object?.stampIcon && object.stampIcon !== 'none' ? fontSize * 1.8 + 2 : 0;
-		const width = Math.max(
-			30,
-			Math.ceil(Math.max(labelWidth, nameWidth, timeWidth) + iconWidth + 8)
-		);
+		const width = Math.max(30, Math.ceil(Math.max(labelWidth, nameWidth, timeWidth) + iconWidth + 8));
 		const height = Math.max(16, Math.ceil(fontSize + metaFontSize * 2.1 + 4));
 
 		return { width, height };
@@ -2187,20 +2041,12 @@
 		const dpr = getCappedDevicePixelRatio();
 		const targetScale = dpr * Math.max(annotationRenderZoom || 1, 0.1);
 		const maxBackingScale = getAnnotationCanvasMaxBackingScale();
-		const backingScale = getAnnotationCanvasBackingScale(
-			currentPageWidth,
-			currentPageHeight,
-			annotationRenderZoom,
-			dpr
-		);
+		const backingScale = getAnnotationCanvasBackingScale(currentPageWidth, currentPageHeight, annotationRenderZoom, dpr);
 
 		return backingScale < Math.min(targetScale, maxBackingScale) * 0.9;
 	}
 
-	function shouldRenderObjectOnCanvas(
-		object: any,
-		backingScaleCapped = isAnnotationCanvasBackingScaleCapped()
-	) {
+	function shouldRenderObjectOnCanvas(object: any, backingScaleCapped = isAnnotationCanvasBackingScaleCapped()) {
 		if (object.type !== 'drawing' && object.type !== 'highlight') return false;
 		if (object._eraserHighlight) return false;
 		if (backingScaleCapped) return false;
@@ -2214,9 +2060,7 @@
 	}
 
 	let visibleObjectGroups = $derived.by(() => {
-		const visibleObjects = useVisibleObjectRendering
-			? currentPageObjects.filter(isObjectVisible)
-			: currentPageObjects;
+		const visibleObjects = useVisibleObjectRendering ? currentPageObjects.filter(isObjectVisible) : currentPageObjects;
 		const canvasObjects: any[] = [];
 		const interactiveObjects: any[] = [];
 		const screenObjects: any[] = [];
@@ -2313,10 +2157,7 @@
 
 	function handleAdjacentPagePreviewCountChange(value: number) {
 		adjacentPagePreviewCount = clampAdjacentPagePreviewCount(value);
-		localStorage.setItem(
-			'pdf-editor-adjacent-page-preview-count',
-			String(adjacentPagePreviewCount)
-		);
+		localStorage.setItem('pdf-editor-adjacent-page-preview-count', String(adjacentPagePreviewCount));
 		scheduleVisiblePageRectUpdate();
 		if (adjacentPagePreviewLayout === 'column') {
 			tick().then(() => requestAnimationFrame(centerEditablePageInViewport));
@@ -2332,19 +2173,13 @@
 
 	function handleToggleVisibleObjectRendering() {
 		useVisibleObjectRendering = !useVisibleObjectRendering;
-		localStorage.setItem(
-			'pdf-editor-visible-object-rendering-enabled',
-			String(useVisibleObjectRendering)
-		);
+		localStorage.setItem('pdf-editor-visible-object-rendering-enabled', String(useVisibleObjectRendering));
 		scheduleVisiblePageRectUpdate();
 	}
 
 	function handleToggleMinimapAnnotations() {
 		minimapAnnotationsEnabled = !minimapAnnotationsEnabled;
-		localStorage.setItem(
-			'pdf-editor-minimap-annotations-enabled',
-			String(minimapAnnotationsEnabled)
-		);
+		localStorage.setItem('pdf-editor-minimap-annotations-enabled', String(minimapAnnotationsEnabled));
 	}
 
 	async function handleToggleAdjacentPagePreview() {
@@ -2353,24 +2188,13 @@
 		const willHaveLeftPreview = nextEnabled && currentPage > minPage;
 
 		adjacentPagePreviewEnabled = nextEnabled;
-		localStorage.setItem(
-			'pdf-editor-adjacent-page-preview-enabled',
-			String(adjacentPagePreviewEnabled)
-		);
+		localStorage.setItem('pdf-editor-adjacent-page-preview-enabled', String(adjacentPagePreviewEnabled));
 
 		await tick();
 
-		if (
-			typeof window !== 'undefined' &&
-			adjacentPagePreviewLayout === 'row' &&
-			hadLeftPreview !== willHaveLeftPreview
-		) {
+		if (typeof window !== 'undefined' && adjacentPagePreviewLayout === 'row' && hadLeftPreview !== willHaveLeftPreview) {
 			const direction = willHaveLeftPreview ? 1 : -1;
-			scrollEditorBy(
-				direction * (currentPageWidth * ctx.state.zoom + ADJACENT_PAGE_GAP_PX),
-				0,
-				'instant' as ScrollBehavior
-			);
+			scrollEditorBy(direction * (currentPageWidth * ctx.state.zoom + ADJACENT_PAGE_GAP_PX), 0, 'instant' as ScrollBehavior);
 		}
 
 		if (adjacentPagePreviewLayout === 'column') {
@@ -2383,11 +2207,7 @@
 	function isWorkspacePanIgnoredTarget(target: EventTarget | null) {
 		if (typeof Element === 'undefined' || !(target instanceof Element)) return false;
 
-		return Boolean(
-			target.closest(
-				'button, a, input, textarea, select, [role="button"], [contenteditable="true"], [data-pan-ignore="true"]'
-			)
-		);
+		return Boolean(target.closest('button, a, input, textarea, select, [role="button"], [contenteditable="true"], [data-pan-ignore="true"]'));
 	}
 
 	function handleWorkspaceMouseDown(event: MouseEvent) {
@@ -2487,21 +2307,13 @@
 	let resizableSelectedObjects = $derived.by(() =>
 		ctx.state.selectedObjectIds
 			.map((id) => getObjectById(id))
-			.filter(
-				(obj) =>
-					obj &&
-					isObjectEditable(obj) &&
-					['drawing', 'highlight', 'line', 'text', 'teacher-mark'].includes(obj.type)
-			)
+			.filter((obj) => obj && isObjectEditable(obj) && ['drawing', 'highlight', 'line', 'text', 'teacher-mark'].includes(obj.type))
 	);
 
 	let rotatableSelectedDrawingObjects = $derived.by(() =>
 		ctx.state.selectedObjectIds
 			.map((id) => getObjectById(id))
-			.filter(
-				(obj) =>
-					obj && isObjectEditable(obj) && (obj.type === 'drawing' || obj.type === 'highlight')
-			)
+			.filter((obj) => obj && isObjectEditable(obj) && (obj.type === 'drawing' || obj.type === 'highlight'))
 	);
 
 	let selectionToolbarObjects = $derived.by(() =>
@@ -2528,8 +2340,7 @@
 	});
 
 	let selectionResizeBox = $derived.by(() => {
-		if (!ctx.state.isSelectionMode || isLassoSelecting || resizableSelectedObjects.length === 0)
-			return null;
+		if (!ctx.state.isSelectionMode || isLassoSelecting || resizableSelectedObjects.length === 0) return null;
 		return combineBoxes(resizableSelectedObjects.map(getObjectVisualBox).filter(Boolean));
 	});
 
@@ -2572,18 +2383,11 @@
 		{ anchor: 'right', cursor: 'ew-resize', x: 1, y: 0.5 }
 	];
 
-	let resizeHandleConfigs = $derived(
-		selectedTeacherMark ? horizontalResizeHandleConfigs : defaultResizeHandleConfigs
-	);
+	let resizeHandleConfigs = $derived(selectedTeacherMark ? horizontalResizeHandleConfigs : defaultResizeHandleConfigs);
 
 	function getResizeHandlePoint(box: Record<string, any>, anchor: string) {
 		const x = anchor.includes('right') ? box.x + box.width : box.x;
-		const y =
-			anchor === 'left' || anchor === 'right'
-				? box.y + box.height / 2
-				: anchor.includes('bottom')
-					? box.y + box.height
-					: box.y;
+		const y = anchor === 'left' || anchor === 'right' ? box.y + box.height / 2 : anchor.includes('bottom') ? box.y + box.height : box.y;
 		return { x, y };
 	}
 
@@ -2605,10 +2409,7 @@
 			return clampSelectionScale(currentDistance / startDistance);
 		}
 
-		const startDistance = Math.max(
-			Math.hypot(state.startPoint.x - fixedPoint.x, state.startPoint.y - fixedPoint.y),
-			1
-		);
+		const startDistance = Math.max(Math.hypot(state.startPoint.x - fixedPoint.x, state.startPoint.y - fixedPoint.y), 1);
 		const currentDistance = Math.max(Math.hypot(point.x - fixedPoint.x, point.y - fixedPoint.y), 1);
 		return clampSelectionScale(currentDistance / startDistance);
 	}
@@ -2617,11 +2418,7 @@
 		return origin + (value - origin) * scale;
 	}
 
-	function getScaledBoxFromFixedPoint(
-		box: Record<string, any>,
-		fixedPoint: Record<string, any>,
-		scale: number
-	) {
+	function getScaledBoxFromFixedPoint(box: Record<string, any>, fixedPoint: Record<string, any>, scale: number) {
 		const x1 = getScaledPoint(box.x, fixedPoint.x, scale);
 		const y1 = getScaledPoint(box.y, fixedPoint.y, scale);
 		const x2 = getScaledPoint(box.x + box.width, fixedPoint.x, scale);
@@ -2635,11 +2432,7 @@
 		};
 	}
 
-	function getHorizontallyScaledBoxFromFixedPoint(
-		box: Record<string, any>,
-		fixedPoint: Record<string, any>,
-		scale: number
-	) {
+	function getHorizontallyScaledBoxFromFixedPoint(box: Record<string, any>, fixedPoint: Record<string, any>, scale: number) {
 		const x1 = getScaledPoint(box.x, fixedPoint.x, scale);
 		const x2 = getScaledPoint(box.x + box.width, fixedPoint.x, scale);
 
@@ -2652,12 +2445,7 @@
 	}
 
 	function doesBoxFitPage(box: Record<string, any>) {
-		return (
-			box.x >= 0 &&
-			box.y >= 0 &&
-			box.x + box.width <= currentPageWidth &&
-			box.y + box.height <= currentPageHeight
-		);
+		return box.x >= 0 && box.y >= 0 && box.x + box.width <= currentPageWidth && box.y + box.height <= currentPageHeight;
 	}
 
 	function clampResizeScaleToPage(scale: number, state: Record<string, any>) {
@@ -2707,16 +2495,9 @@
 				const pathBBox = getDrawingPathBBox(original);
 				if (!pathBBox) return;
 
-				const originalScale =
-					original.scale ??
-					(original.width && original.originWidth ? original.width / original.originWidth : 1);
+				const originalScale = original.scale ?? (original.width && original.originWidth ? original.width / original.originWidth : 1);
 				const nextScale = originalScale * scale;
-				const localBox = getTransformedDrawingBBox(
-					{ ...original, x: 0, y: 0, scale: nextScale },
-					pathBBox,
-					nextScale,
-					original.rotation || 0
-				);
+				const localBox = getTransformedDrawingBBox({ ...original, x: 0, y: 0, scale: nextScale }, pathBBox, nextScale, original.rotation || 0);
 				const nextVisualX = getScaledPoint(bounds.x, fixedPoint.x, scale);
 				const nextVisualY = getScaledPoint(bounds.y, fixedPoint.y, scale);
 
@@ -2749,10 +2530,7 @@
 					size: nextSize
 				});
 				candidates.push({ index, object: candidate });
-				if (
-					ctx.state.selectedObjectIds.length === 1 &&
-					ctx.state.selectedObjectIds[0] === original.id
-				) {
+				if (ctx.state.selectedObjectIds.length === 1 && ctx.state.selectedObjectIds[0] === original.id) {
 					ctx.state._size = candidate.size;
 				}
 				didResize = true;
@@ -2770,9 +2548,7 @@
 		});
 
 		if (didResize) {
-			const delta = getBoxesConfinementDelta(
-				candidates.map(({ object }) => getObjectBoundaryBox(object))
-			);
+			const delta = getBoxesConfinementDelta(candidates.map(({ object }) => getObjectBoundaryBox(object)));
 
 			candidates.forEach(({ index, object }) => {
 				invalidateObjectVisualBoxCache(object.id);
@@ -2876,14 +2652,8 @@
 			activeResize?.pointerTarget?.releasePointerCapture?.(activeResize.pointerId);
 		} catch {}
 		activeResize?.pointerTarget?.removeEventListener?.('pointerup', handleSelectionResizeEnd);
-		activeResize?.pointerTarget?.removeEventListener?.(
-			'pointercancel',
-			handleSelectionResizeCancel
-		);
-		activeResize?.pointerTarget?.removeEventListener?.(
-			'lostpointercapture',
-			handleSelectionResizeLostCapture
-		);
+		activeResize?.pointerTarget?.removeEventListener?.('pointercancel', handleSelectionResizeCancel);
+		activeResize?.pointerTarget?.removeEventListener?.('lostpointercapture', handleSelectionResizeLostCapture);
 		if (typeof document === 'undefined') return;
 		document.removeEventListener('pointermove', handleSelectionResizeMove);
 		document.removeEventListener('pointerup', handleSelectionResizeEnd);
@@ -2903,11 +2673,7 @@
 		return (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
 	}
 
-	function rotatePointAroundCenter(
-		point: Record<string, any>,
-		center: Record<string, any>,
-		rotation: number
-	) {
+	function rotatePointAroundCenter(point: Record<string, any>, center: Record<string, any>, rotation: number) {
 		const angle = (rotation * Math.PI) / 180;
 		const cos = Math.cos(angle);
 		const sin = Math.sin(angle);
@@ -2951,11 +2717,7 @@
 			if (index === -1) return;
 
 			const originalRotation = Number(entry.object.rotation || 0);
-			const nextCenter = rotatePointAroundCenter(
-				entry.center,
-				selectionRotationState.center,
-				deltaRotation
-			);
+			const nextCenter = rotatePointAroundCenter(entry.center, selectionRotationState.center, deltaRotation);
 
 			const candidate = limitObjectSizeToPage({
 				...allObjects[index],
@@ -2968,9 +2730,7 @@
 		});
 
 		if (didRotate) {
-			const delta = getBoxesConfinementDelta(
-				candidates.map(({ object }) => getObjectBoundaryBox(object))
-			);
+			const delta = getBoxesConfinementDelta(candidates.map(({ object }) => getObjectBoundaryBox(object)));
 
 			candidates.forEach(({ index, object }) => {
 				invalidateObjectVisualBoxCache(object.id);
@@ -3038,14 +2798,8 @@
 			activeRotation?.pointerTarget?.releasePointerCapture?.(activeRotation.pointerId);
 		} catch {}
 		activeRotation?.pointerTarget?.removeEventListener?.('pointerup', handleSelectionRotationEnd);
-		activeRotation?.pointerTarget?.removeEventListener?.(
-			'pointercancel',
-			handleSelectionRotationCancel
-		);
-		activeRotation?.pointerTarget?.removeEventListener?.(
-			'lostpointercapture',
-			handleSelectionRotationLostCapture
-		);
+		activeRotation?.pointerTarget?.removeEventListener?.('pointercancel', handleSelectionRotationCancel);
+		activeRotation?.pointerTarget?.removeEventListener?.('lostpointercapture', handleSelectionRotationLostCapture);
 		if (typeof document === 'undefined') return;
 		document.removeEventListener('pointermove', handleSelectionRotationMove);
 		document.removeEventListener('pointerup', handleSelectionRotationEnd);
@@ -3230,8 +2984,7 @@
 	let selectedTextStyleObject = $derived(selectedTextObjects[0] ?? null);
 
 	$effect(() => {
-		if (!ctx.state.isSelectionMode || !selectedTextStyleObject || ctx.state.showingAddingText)
-			return;
+		if (!ctx.state.isSelectionMode || !selectedTextStyleObject || ctx.state.showingAddingText) return;
 
 		ctx.state._size = normalizeFontSize(selectedTextStyleObject.size);
 		ctx.state._lineHeight = selectedTextStyleObject.lineHeight || 1;
@@ -3375,14 +3128,7 @@
 			const oldState: Record<string, any> = {};
 			const newState: Record<string, any> = {};
 
-			const trackedKeys = new Set<string>([
-				...Object.keys(updates),
-				'x',
-				'y',
-				'width',
-				'height',
-				'strokeWidth'
-			]);
+			const trackedKeys = new Set<string>([...Object.keys(updates), 'x', 'y', 'width', 'height', 'strokeWidth']);
 
 			trackedKeys.forEach((key) => {
 				if (oldObject[key] !== nextObject[key]) {
@@ -3395,13 +3141,7 @@
 
 			allObjects[index] = nextObject;
 
-			const command = new UpdateObjectCommand(
-				lineId,
-				oldState,
-				newState,
-				allObjects,
-				handleAnnotationChange
-			);
+			const command = new UpdateObjectCommand(lineId, oldState, newState, allObjects, handleAnnotationChange);
 			history.push(command);
 
 			handleAnnotationChange();
@@ -3414,12 +3154,7 @@
 			const removedObject = allObjects.splice(index, 1)[0];
 
 			// Add to history
-			const command = new DeleteObjectCommand(
-				removedObject,
-				index,
-				allObjects,
-				handleAnnotationChange
-			);
+			const command = new DeleteObjectCommand(removedObject, index, allObjects, handleAnnotationChange);
 			history.push(command);
 
 			ctx.state.selectedLineId = null;
@@ -3492,9 +3227,7 @@
 		if (!object || object.owner !== user || isEditorDisabled) return;
 
 		batchDeleteObjectsByIds([objectId]);
-		ctx.state.selectedObjectIds = ctx.state.selectedObjectIds.filter(
-			(id) => id !== objectId && getObjectById(id)
-		);
+		ctx.state.selectedObjectIds = ctx.state.selectedObjectIds.filter((id) => id !== objectId && getObjectById(id));
 
 		if (ctx.state.selectedLineId === objectId) {
 			ctx.state.selectedLineId = null;
@@ -3528,9 +3261,7 @@
 	}
 
 	function isSelectionControlEvent(event: Event) {
-		return (
-			event.target instanceof Element && Boolean(event.target.closest('[data-selection-control]'))
-		);
+		return event.target instanceof Element && Boolean(event.target.closest('[data-selection-control]'));
 	}
 
 	function startEditingSelectedText(textId: string) {
@@ -3576,9 +3307,7 @@
 
 		if (event.shiftKey || event.ctrlKey || event.metaKey) {
 			if (isSelectedObjectId(topDrawingId)) {
-				ctx.state.selectedObjectIds = ctx.state.selectedObjectIds.filter(
-					(id) => id !== topDrawingId
-				);
+				ctx.state.selectedObjectIds = ctx.state.selectedObjectIds.filter((id) => id !== topDrawingId);
 			} else {
 				ctx.state.selectedObjectIds = [...ctx.state.selectedObjectIds, topDrawingId];
 			}
@@ -3591,13 +3320,7 @@
 	}
 
 	function startDraggingSelection(event: any) {
-		if (
-			ctx.state.selectedObjectIds.length === 0 ||
-			isEditorDisabled ||
-			selectionResizeState ||
-			selectionRotationState
-		)
-			return;
+		if (ctx.state.selectedObjectIds.length === 0 || isEditorDisabled || selectionResizeState || selectionRotationState) return;
 
 		const canvasRect = event.currentTarget.getBoundingClientRect();
 		ctx.state.dragStartPoint = {
@@ -3622,13 +3345,7 @@
 	}
 
 	function dragSelection(event: any) {
-		if (
-			!ctx.state.isDraggingSelection ||
-			ctx.state.selectedObjectIds.length === 0 ||
-			selectionResizeState ||
-			selectionRotationState
-		)
-			return;
+		if (!ctx.state.isDraggingSelection || ctx.state.selectedObjectIds.length === 0 || selectionResizeState || selectionRotationState) return;
 
 		const canvasRect = event.currentTarget.getBoundingClientRect();
 		const currentX = (event.clientX - canvasRect.left) / ctx.state.zoom;
@@ -3910,8 +3627,7 @@
 	onViewHomeworkInfo={() => view_homework_info?.showModal()}
 	onPrint={savePDF}
 	onToggleFullscreen={toggleFullScreen}
-	onStrokeVisibilityChange={(value) =>
-		(ctx.state.stroke_visibility = value as 'all' | 'self' | 'others')}
+	onStrokeVisibilityChange={(value) => (ctx.state.stroke_visibility = value as 'all' | 'self' | 'others')}
 	onToggleZoom={zoomPan.handleZoomToggle}
 	onToggleDoubleTapZoom={() => (ctx.state.doubleTapZoomEnabled = !ctx.state.doubleTapZoomEnabled)}
 	onToggleAutoSave={() => (ctx.state.autoSaveEnabled = !ctx.state.autoSaveEnabled)}
@@ -4097,10 +3813,7 @@
 {/if}
 
 <!-- Overlays -->
-<PenModeNotification
-	isPenMode={ctx.state.isPenMode}
-	onClose={() => (ctx.state.isPenMode = false)}
-/>
+<PenModeNotification isPenMode={ctx.state.isPenMode} onClose={() => (ctx.state.isPenMode = false)} />
 
 {#if !selectedTeacherMark}
 	<SelectionToolbar
@@ -4213,18 +3926,10 @@
 			{#if PDFReady && !pdfEngine.isLoading && pdfEngine.engine && embedPdfPlugins.length}
 				<EmbedPDF engine={pdfEngine.engine} plugins={embedPdfPlugins}>
 					{#snippet children()}
-						<PDFDocumentLoader
-							documentId={pdfDocumentId}
-							buffer={pdfBuffer}
-							name={pdfName || 'document.pdf'}
-						>
+						<PDFDocumentLoader documentId={pdfDocumentId} buffer={pdfBuffer} name={pdfName || 'document.pdf'}>
 							{#snippet children(documentContent: Record<string, any>)}
 								{#if documentContent.isLoaded && documentContent.documentState.document}
-									<PDFDocumentSync
-										document={documentContent.documentState.document}
-										{currentPage}
-										onSync={syncEmbedPDFDocumentState}
-									/>
+									<PDFDocumentSync document={documentContent.documentState.document} {currentPage} onSync={syncEmbedPDFDocumentState} />
 									{#if isPagePreviewOpen}
 										<PagePreviewMenu
 											documentId={pdfDocumentId}
@@ -4278,19 +3983,11 @@
 															</div>
 														{/if}
 														{#if !useMinimalPageTabs}
-															<button
-																type="button"
-																class="pdf-page-tab-open"
-																aria-label={`Open page ${pageNo}`}
-																onclick={() => goToPage(pageNo)}
-															>
+															<button type="button" class="pdf-page-tab-open" aria-label={`Open page ${pageNo}`} onclick={() => goToPage(pageNo)}>
 																{#if !useCompactPageTabs}
 																	<span>Open</span>
 																{/if}
-																<LucideArrowRight
-																	size={useCompactPageTabs ? 16 : 14}
-																	strokeWidth={2.4}
-																/>
+																<LucideArrowRight size={useCompactPageTabs ? 16 : 14} strokeWidth={2.4} />
 															</button>
 														{/if}
 													</div>
@@ -4298,16 +3995,14 @@
 													<div
 														class="pdf-side-page pointer-events-none relative overflow-hidden rounded-sm bg-white shadow-md ring-1 ring-black/10"
 														data-minimap-page={pageNo}
-														style="width: {currentPageWidth *
-															ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+														style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
 														aria-hidden="true"
 													>
 														{#if isAdjacentPagePreviewVisible(pageNo)}
 															<div
 																class="absolute top-0 left-0 origin-top-left"
 																class:smooth-zoom={zoomPan.smoothTransition}
-																style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx
-																	.state.zoom});"
+																style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx.state.zoom});"
 															>
 																{#key `${pdfDocumentId}-side-left-${pageNo}`}
 																	<PDFPage
@@ -4435,16 +4130,11 @@
 													class:cursor-move={ctx.state.isDraggingSelection}
 													class:cursor-grab={ctx.state.isHandMode}
 													class:page-transition={isChangingPage}
-													style="width: {currentPageWidth *
-														ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+													style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
 													ontouchstart={(e) => {
 														if (isSelectionControlEvent(e)) return;
 
-														if (
-															ctx.state.isSelectionMode &&
-															e.touches.length === 1 &&
-															ctx.state.selectedObjectIds.length > 0
-														) {
+														if (ctx.state.isSelectionMode && e.touches.length === 1 && ctx.state.selectedObjectIds.length > 0) {
 															const touch = e.touches[0];
 															const canvasRect = e.currentTarget.getBoundingClientRect();
 															const clickPoint = {
@@ -4452,39 +4142,24 @@
 																y: (touch.clientY - canvasRect.top) / ctx.state.zoom
 															};
 
-															const hitDrawingIds = filterSelectableObjectIds(
-																findObjectsAtPoint(clickPoint)
-															);
-															const clickedOnSelected = hitDrawingIds.some((id) =>
-																isSelectedObjectId(id)
-															);
+															const hitDrawingIds = filterSelectableObjectIds(findObjectsAtPoint(clickPoint));
+															const clickedOnSelected = hitDrawingIds.some((id) => isSelectedObjectId(id));
 
 															if (clickedOnSelected) {
 																// Find the top-most selected object that was touched
-																const topSelectedId = hitDrawingIds
-																	.reverse()
-																	.find((id) => isSelectedObjectId(id));
+																const topSelectedId = hitDrawingIds.reverse().find((id) => isSelectedObjectId(id));
 
 																if (topSelectedId) {
 																	const currentTime = Date.now();
 																	const timeDiff = currentTime - lastTouchTime;
-																	const distance = Math.sqrt(
-																		(clickPoint.x - lastTouchPosition.x) ** 2 +
-																			(clickPoint.y - lastTouchPosition.y) ** 2
-																	);
+																	const distance = Math.sqrt((clickPoint.x - lastTouchPosition.x) ** 2 + (clickPoint.y - lastTouchPosition.y) ** 2);
 
 																	// Check if this is a double-touch
 																	const isSameObject = lastTouchedObjectId === topSelectedId;
-																	const isWithinTimeThreshold =
-																		timeDiff <= TOUCH_DOUBLE_CLICK_TIME_THRESHOLD;
-																	const isWithinPositionThreshold =
-																		distance <= TOUCH_DOUBLE_CLICK_POSITION_THRESHOLD;
+																	const isWithinTimeThreshold = timeDiff <= TOUCH_DOUBLE_CLICK_TIME_THRESHOLD;
+																	const isWithinPositionThreshold = distance <= TOUCH_DOUBLE_CLICK_POSITION_THRESHOLD;
 
-																	if (
-																		isSameObject &&
-																		isWithinTimeThreshold &&
-																		isWithinPositionThreshold
-																	) {
+																	if (isSameObject && isWithinTimeThreshold && isWithinPositionThreshold) {
 																		// Trigger double-click handler based on object type
 																		const obj = getObjectById(topSelectedId);
 																		if (obj) {
@@ -4517,11 +4192,7 @@
 														}
 													}}
 													ontouchmove={(e) => {
-														if (
-															ctx.state.isSelectionMode &&
-															e.touches.length === 1 &&
-															ctx.state.isDraggingSelection
-														) {
+														if (ctx.state.isSelectionMode && e.touches.length === 1 && ctx.state.isDraggingSelection) {
 															const touch = e.touches[0];
 															const fakeEvent = {
 																currentTarget: e.currentTarget,
@@ -4563,22 +4234,15 @@
 													onmousedown={(e) => {
 														if (isSelectionControlEvent(e)) return;
 
-														if (
-															ctx.state.isSelectionMode &&
-															ctx.state.selectedObjectIds.length > 0
-														) {
+														if (ctx.state.isSelectionMode && ctx.state.selectedObjectIds.length > 0) {
 															const canvasRect = e.currentTarget.getBoundingClientRect();
 															const clickPoint = {
 																x: (e.clientX - canvasRect.left) / ctx.state.zoom,
 																y: (e.clientY - canvasRect.top) / ctx.state.zoom
 															};
 
-															const hitDrawingIds = filterSelectableObjectIds(
-																findObjectsAtPoint(clickPoint)
-															);
-															const clickedOnSelected = hitDrawingIds.some((id) =>
-																isSelectedObjectId(id)
-															);
+															const hitDrawingIds = filterSelectableObjectIds(findObjectsAtPoint(clickPoint));
+															const clickedOnSelected = hitDrawingIds.some((id) => isSelectedObjectId(id));
 
 															if (clickedOnSelected) {
 																e.preventDefault();
@@ -4609,8 +4273,7 @@
 														bind:this={pageContentLayer}
 														class="absolute top-0 left-0 origin-top-left transform"
 														class:smooth-zoom={zoomPan.smoothTransition}
-														style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx
-															.state.zoom});"
+														style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx.state.zoom});"
 													>
 														<PDFPage
 															documentId={pdfDocumentId}
@@ -4690,9 +4353,7 @@
 																		brushSize={object.brushSize}
 																		brushColor={object.brushColor}
 																		pageScale={ctx.state.zoom}
-																		isSelected={ctx.state.selectedObjectIds.length > 1 &&
-																			isObjectSelected(object.id) &&
-																			!selectionRotationState}
+																		isSelected={ctx.state.selectedObjectIds.length > 1 && isObjectSelected(object.id) && !selectionRotationState}
 																		isPreviewed={isObjectPreviewed(object.id)}
 																	/>
 																{:else if object.type === 'line'}
@@ -4711,10 +4372,8 @@
 																		originWidth={object.originWidth}
 																		originHeight={object.originHeight}
 																		pageScale={ctx.state.zoom}
-																		isSelected={ctx.state.selectedLineId === object.id &&
-																			!ctx.state.isSelectionMode}
-																		isObjectSelected={isObjectSelected(object.id) &&
-																			!ctx.state.isSelectionMode}
+																		isSelected={ctx.state.selectedLineId === object.id && !ctx.state.isSelectionMode}
+																		isObjectSelected={isObjectSelected(object.id) && !ctx.state.isSelectionMode}
 																		isPreviewed={isObjectPreviewed(object.id)}
 																		onSelect={selectLine}
 																		onUpdate={updateLine}
@@ -4754,8 +4413,7 @@
 													{#if screenCurrentPageObjects.length > 0}
 														<div
 															class="pointer-events-none absolute top-0 left-0"
-															style="width: {currentPageWidth *
-																ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+															style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
 															aria-hidden="true"
 														>
 															{#each screenCurrentPageObjects as object (object.id)}
@@ -4775,9 +4433,7 @@
 																	brushColor={object.brushColor}
 																	pageScale={ctx.state.zoom}
 																	screenScale={ctx.state.zoom}
-																	isSelected={ctx.state.selectedObjectIds.length > 1 &&
-																		isObjectSelected(object.id) &&
-																		!selectionRotationState}
+																	isSelected={ctx.state.selectedObjectIds.length > 1 && isObjectSelected(object.id) && !selectionRotationState}
 																	isPreviewed={isObjectPreviewed(object.id)}
 																/>
 															{/each}
@@ -4796,15 +4452,7 @@
 															onStrokeCancel={cancelStrokeInteraction}
 															onFinishDrawing={(e: any) => {
 																if (isEditorDisabled) return;
-																addDrawing(
-																	e.originWidth,
-																	e.originHeight,
-																	e.path,
-																	1,
-																	e.brushSize,
-																	e.brushColor,
-																	e.brushOpacity
-																);
+																addDrawing(e.originWidth, e.originHeight, e.path, 1, e.brushSize, e.brushColor, e.brushOpacity);
 															}}
 														/>
 													{/if}
@@ -4833,16 +4481,7 @@
 																brushOpacity: number;
 															}) => {
 																if (isEditorDisabled) return;
-																addDrawing(
-																	originWidth,
-																	originHeight,
-																	path,
-																	1,
-																	brushSize,
-																	brushColor,
-																	brushOpacity,
-																	'highlight'
-																);
+																addDrawing(originWidth, originHeight, path, 1, brushSize, brushColor, brushOpacity, 'highlight');
 																// Return to selection mode after highlighting
 																ctx.state.isHighlighting = false;
 																requestAnimationFrame(() => {
@@ -4901,22 +4540,16 @@
 																	createdAt: Date.now()
 																};
 
-																ctx.state.temporaryStrokes = [
-																	...ctx.state.temporaryStrokes,
-																	stroke
-																];
+																ctx.state.temporaryStrokes = [...ctx.state.temporaryStrokes, stroke];
 
 																const fadeStart = POINTER_DURATION - 500;
 																const fadeInterval = setInterval(() => {
 																	const elapsed = Date.now() - stroke.createdAt;
 																	if (elapsed >= fadeStart) {
 																		const fadeProgress = (elapsed - fadeStart) / 500;
-																		const strokeIndex = ctx.state.temporaryStrokes.findIndex(
-																			(s: any) => s.id === id
-																		);
+																		const strokeIndex = ctx.state.temporaryStrokes.findIndex((s: any) => s.id === id);
 																		if (strokeIndex !== -1) {
-																			(ctx.state.temporaryStrokes[strokeIndex] as any).opacity =
-																				Math.max(0, 1 - fadeProgress);
+																			(ctx.state.temporaryStrokes[strokeIndex] as any).opacity = Math.max(0, 1 - fadeProgress);
 																			ctx.state.temporaryStrokes = [...ctx.state.temporaryStrokes];
 																		}
 																	}
@@ -4924,9 +4557,7 @@
 
 																setTimeout(() => {
 																	clearInterval(fadeInterval);
-																	ctx.state.temporaryStrokes = ctx.state.temporaryStrokes.filter(
-																		(s: any) => s.id !== id
-																	);
+																	ctx.state.temporaryStrokes = ctx.state.temporaryStrokes.filter((s: any) => s.id !== id);
 																}, POINTER_DURATION);
 															}}
 														/>
@@ -4951,9 +4582,7 @@
 														/>
 													{/if}
 													{#if selectionResizeBox && !selectionRotationState}
-														<div
-															class="pointer-events-none absolute top-0 left-0 z-30 h-full w-full"
-														>
+														<div class="pointer-events-none absolute top-0 left-0 z-30 h-full w-full">
 															<div
 																class="pointer-events-none absolute border border-blue-500/40"
 																style="
@@ -5008,8 +4637,7 @@
 																		top: {(selectionResizeBox.y + selectionResizeBox.height * handle.y) * ctx.state.zoom - 6}px;
 																		cursor: {handle.cursor};
 																	"
-																	onpointerdown={(event) =>
-																		handleSelectionResizeStart(event, handle.anchor)}
+																	onpointerdown={(event) => handleSelectionResizeStart(event, handle.anchor)}
 																	onmousedown={(event) => event.stopPropagation()}
 																	ontouchstart={(event) => event.stopPropagation()}
 																	ontouchmove={(event) => event.stopPropagation()}
@@ -5047,19 +4675,11 @@
 															</div>
 														{/if}
 														{#if !useMinimalPageTabs}
-															<button
-																type="button"
-																class="pdf-page-tab-open"
-																aria-label={`Open page ${pageNo}`}
-																onclick={() => goToPage(pageNo)}
-															>
+															<button type="button" class="pdf-page-tab-open" aria-label={`Open page ${pageNo}`} onclick={() => goToPage(pageNo)}>
 																{#if !useCompactPageTabs}
 																	<span>Open</span>
 																{/if}
-																<LucideArrowRight
-																	size={useCompactPageTabs ? 16 : 14}
-																	strokeWidth={2.4}
-																/>
+																<LucideArrowRight size={useCompactPageTabs ? 16 : 14} strokeWidth={2.4} />
 															</button>
 														{/if}
 													</div>
@@ -5067,16 +4687,14 @@
 													<div
 														class="pdf-side-page pointer-events-none relative overflow-hidden rounded-sm bg-white shadow-md ring-1 ring-black/10"
 														data-minimap-page={pageNo}
-														style="width: {currentPageWidth *
-															ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
+														style="width: {currentPageWidth * ctx.state.zoom}px; height: {currentPageHeight * ctx.state.zoom}px;"
 														aria-hidden="true"
 													>
 														{#if isAdjacentPagePreviewVisible(pageNo)}
 															<div
 																class="absolute top-0 left-0 origin-top-left"
 																class:smooth-zoom={zoomPan.smoothTransition}
-																style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx
-																	.state.zoom});"
+																style="width: {currentPageWidth}px; height: {currentPageHeight}px; transform: scale({ctx.state.zoom});"
 															>
 																{#key `${pdfDocumentId}-side-right-${pageNo}`}
 																	<PDFPage
@@ -5174,18 +4792,14 @@
 									</div>
 								{:else if documentContent.isError}
 									<div class="flex h-64 w-full items-center justify-center">
-										<div
-											class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-										>
+										<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
 											Failed to open PDF document.
 										</div>
 									</div>
 								{:else}
 									<div class="flex h-64 w-full items-center justify-center">
 										<div class="flex flex-col items-center space-y-3">
-											<div
-												class="loading h-10 w-10 rounded-full border-4 border-amber-200 border-t-amber-500"
-											></div>
+											<div class="loading h-10 w-10 rounded-full border-4 border-amber-200 border-t-amber-500"></div>
 											<p class="text-sm font-medium text-gray-600">Opening PDF document...</p>
 										</div>
 									</div>
@@ -5196,18 +4810,12 @@
 				</EmbedPDF>
 			{:else if pdfEngine.error}
 				<div class="flex h-64 w-full items-center justify-center">
-					<div
-						class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-					>
-						Failed to load PDF engine.
-					</div>
+					<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Failed to load PDF engine.</div>
 				</div>
 			{:else}
 				<div class="flex h-64 w-full items-center justify-center">
 					<div class="flex flex-col items-center space-y-4">
-						<div
-							class="loading h-10 w-10 rounded-full border-4 border-amber-200 border-t-amber-500"
-						></div>
+						<div class="loading h-10 w-10 rounded-full border-4 border-amber-200 border-t-amber-500"></div>
 						<p class="text-base font-medium text-gray-600">Loading PDF...</p>
 						<p class="text-xs font-medium text-gray-400">Refresh the page if it takes too long</p>
 					</div>

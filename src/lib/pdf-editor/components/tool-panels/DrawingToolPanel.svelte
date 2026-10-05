@@ -1,14 +1,6 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import {
-		LucideX,
-		LucideBrush,
-		LucideMinus,
-		LucidePlus,
-		LucidePalette,
-		LucideChevronDown,
-		LucideChevronUp
-	} from '@lucide/svelte';
+	import { LucideX, LucideBrush, LucideMinus, LucidePlus, LucidePalette, LucideChevronDown, LucideChevronUp } from '@lucide/svelte';
 	import { presetColors } from '../../utils/colorPresets';
 
 	interface Props {
@@ -20,14 +12,7 @@
 		onColorChange: (color: string) => void;
 	}
 
-	let {
-		brushSize,
-		brushColor,
-		isMinimized = $bindable(false),
-		onClose,
-		onBrushSizeChange,
-		onColorChange
-	}: Props = $props();
+	let { brushSize, brushColor, isMinimized = $bindable(false), onClose, onBrushSizeChange, onColorChange }: Props = $props();
 </script>
 
 <!-- Fixed Top-Right Panel -->
@@ -55,11 +40,7 @@
 				</div>
 				{#if isMinimized}
 					<div class="flex min-w-0 items-center gap-1.5">
-						<span
-							class="h-4 w-4 shrink-0 rounded-full border border-gray-200"
-							style="background-color: {brushColor}"
-							title="Pen color"
-						></span>
+						<span class="h-4 w-4 shrink-0 rounded-full border border-gray-200" style="background-color: {brushColor}" title="Pen color"></span>
 						<span class="truncate text-xs font-semibold text-gray-700" title="Pen size">
 							{Math.round(brushSize * 10) / 10}
 						</span>
@@ -101,9 +82,7 @@
 		{#if !isMinimized}
 			<!-- Brush Size Section -->
 			<div class="mb-4">
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Brush Size
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Brush Size</div>
 				<div class="flex items-center gap-2">
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
@@ -166,15 +145,11 @@
 							class:border-blue-500={!presetColors.some((c) => c.hex === brushColor)}
 							class:border-gray-200={presetColors.some((c) => c.hex === brushColor)}
 							class:shadow-md={!presetColors.some((c) => c.hex === brushColor)}
-							style="background-color: {!presetColors.some((c) => c.hex === brushColor)
-								? brushColor
-								: '#ffffff'}"
+							style="background-color: {!presetColors.some((c) => c.hex === brushColor) ? brushColor : '#ffffff'}"
 						>
 							<LucidePalette
 								size={20}
-								class={!presetColors.some((c) => c.hex === brushColor)
-									? 'text-white mix-blend-difference'
-									: 'text-gray-600'}
+								class={!presetColors.some((c) => c.hex === brushColor) ? 'text-white mix-blend-difference' : 'text-gray-600'}
 							/>
 						</div>
 						<input

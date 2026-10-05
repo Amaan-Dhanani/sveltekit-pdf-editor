@@ -1,14 +1,6 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import {
-		LucideX,
-		LucideBrush,
-		LucideMinus,
-		LucidePlus,
-		LucidePalette,
-		LucideChevronDown,
-		LucideChevronUp
-	} from '@lucide/svelte';
+	import { LucideX, LucideBrush, LucideMinus, LucidePlus, LucidePalette, LucideChevronDown, LucideChevronUp } from '@lucide/svelte';
 	import { presetColors } from '../../utils/colorPresets';
 
 	interface Props {
@@ -59,11 +51,7 @@
 				</div>
 				{#if isMinimized}
 					<div class="flex min-w-0 items-center gap-1.5">
-						<span
-							class="h-4 w-4 shrink-0 rounded-full border border-gray-200"
-							style="background-color: {lineStrokeColor}"
-							title="Line color"
-						></span>
+						<span class="h-4 w-4 shrink-0 rounded-full border border-gray-200" style="background-color: {lineStrokeColor}" title="Line color"></span>
 						<span class="truncate text-xs font-semibold text-gray-700" title="Line width">
 							{lineStrokeWidth}
 						</span>
@@ -105,9 +93,7 @@
 		{#if !isMinimized}
 			<!-- Stroke Width Section -->
 			<div class="mb-4">
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Line Width
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Line Width</div>
 				<div class="flex items-center gap-2">
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
@@ -142,9 +128,7 @@
 
 			<!-- Line Type Section -->
 			<div class="mb-4">
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Line Style
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Line Style</div>
 				<div class="grid grid-cols-3 gap-2">
 					<button
 						type="button"
@@ -170,15 +154,7 @@
 						title="Dotted line"
 					>
 						<svg width="32" height="4" class="overflow-visible">
-							<line
-								x1="0"
-								y1="2"
-								x2="32"
-								y2="2"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-dasharray="4,4"
-							/>
+							<line x1="0" y1="2" x2="32" y2="2" stroke="currentColor" stroke-width="2" stroke-dasharray="4,4" />
 						</svg>
 						<span class="text-xs text-gray-600">Dotted</span>
 					</button>
@@ -192,15 +168,7 @@
 						title="Dashed line"
 					>
 						<svg width="32" height="4" class="overflow-visible">
-							<line
-								x1="0"
-								y1="2"
-								x2="32"
-								y2="2"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-dasharray="8,4"
-							/>
+							<line x1="0" y1="2" x2="32" y2="2" stroke="currentColor" stroke-width="2" stroke-dasharray="8,4" />
 						</svg>
 						<span class="text-xs text-gray-600">Dashed</span>
 					</button>
@@ -233,15 +201,11 @@
 							class:border-gray-600={!presetColors.some((c) => c.hex === lineStrokeColor)}
 							class:border-gray-200={presetColors.some((c) => c.hex === lineStrokeColor)}
 							class:shadow-md={!presetColors.some((c) => c.hex === lineStrokeColor)}
-							style="background-color: {!presetColors.some((c) => c.hex === lineStrokeColor)
-								? lineStrokeColor
-								: '#ffffff'}"
+							style="background-color: {!presetColors.some((c) => c.hex === lineStrokeColor) ? lineStrokeColor : '#ffffff'}"
 						>
 							<LucidePalette
 								size={20}
-								class={!presetColors.some((c) => c.hex === lineStrokeColor)
-									? 'text-white mix-blend-difference'
-									: 'text-gray-600'}
+								class={!presetColors.some((c) => c.hex === lineStrokeColor) ? 'text-white mix-blend-difference' : 'text-gray-600'}
 							/>
 						</div>
 						<input

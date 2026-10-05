@@ -16,11 +16,7 @@
 		LucideSettings,
 		LucideRefreshCw
 	} from '@lucide/svelte';
-	import {
-		getPDFEditorContext,
-		type RenderQualityMode,
-		type ToolbarPosition
-	} from '../../context/pdfEditorContext.svelte';
+	import { getPDFEditorContext, type RenderQualityMode, type ToolbarPosition } from '../../context/pdfEditorContext.svelte';
 	import { requestPdfEditorRefreshBypass } from '../../utils/refreshNavigationBypass';
 
 	interface Props {
@@ -98,14 +94,8 @@
 	let settingsModal: HTMLDialogElement | undefined = $state();
 	const SAVE_WAIT_TIMEOUT_MS = 30000;
 	const SAVE_WAIT_POLL_MS = 100;
-	const refreshButtonDisabled = $derived(
-		saving || isRefreshingPage || ctx.state.saveState.status === 'saving'
-	);
-	const refreshButtonLabel = $derived(
-		saving || isRefreshingPage || ctx.state.saveState.status === 'saving'
-			? 'Saving...'
-			: 'Refresh page'
-	);
+	const refreshButtonDisabled = $derived(saving || isRefreshingPage || ctx.state.saveState.status === 'saving');
+	const refreshButtonLabel = $derived(saving || isRefreshingPage || ctx.state.saveState.status === 'saving' ? 'Saving...' : 'Refresh page');
 
 	// Load settings from localStorage on mount
 	onMount(() => {
@@ -115,9 +105,7 @@
 		const savedRenderQualityMode = localStorage.getItem('pdf-editor-render-quality-mode');
 		const savedAdaptiveRender = localStorage.getItem('pdf-editor-adaptive-render-enabled');
 		const savedToolbarPosition = localStorage.getItem('pdf-editor-toolbar-position');
-		const savedRememberDrawingSettings = localStorage.getItem(
-			'pdf-editor-remember-drawing-settings'
-		);
+		const savedRememberDrawingSettings = localStorage.getItem('pdf-editor-remember-drawing-settings');
 		const savedDrawingBrushSize = localStorage.getItem('pdf-editor-drawing-brush-size');
 		const savedDrawingBrushColor = localStorage.getItem('pdf-editor-drawing-brush-color');
 
@@ -249,10 +237,7 @@
 	function handleToggleDoubleTapZoom() {
 		onToggleDoubleTapZoom();
 		// Read the updated value directly from context state after toggle
-		localStorage.setItem(
-			'pdf-editor-doubletap-zoom-enabled',
-			String(ctx.state.doubleTapZoomEnabled)
-		);
+		localStorage.setItem('pdf-editor-doubletap-zoom-enabled', String(ctx.state.doubleTapZoomEnabled));
 	}
 
 	function handleToggleAutoSave() {
@@ -289,10 +274,7 @@
 
 	function handleToggleRememberDrawingSettings() {
 		ctx.state.rememberDrawingSettings = !ctx.state.rememberDrawingSettings;
-		localStorage.setItem(
-			'pdf-editor-remember-drawing-settings',
-			String(ctx.state.rememberDrawingSettings)
-		);
+		localStorage.setItem('pdf-editor-remember-drawing-settings', String(ctx.state.rememberDrawingSettings));
 
 		if (ctx.state.rememberDrawingSettings) {
 			localStorage.setItem('pdf-editor-drawing-brush-size', String(ctx.state.brushSize));
@@ -316,8 +298,7 @@
 		{
 			value: 'performance',
 			label: 'Low',
-			description:
-				'For slower devices. The PDF may look softer while moving, but panning should feel lighter.'
+			description: 'For slower devices. The PDF may look softer while moving, but panning should feel lighter.'
 		},
 		{
 			value: 'default',
@@ -327,8 +308,7 @@
 		{
 			value: 'sharp',
 			label: 'Sharp',
-			description:
-				'Prioritizes PDF detail while keeping render size within a safe limit for the device.'
+			description: 'Prioritizes PDF detail while keeping render size within a safe limit for the device.'
 		}
 	];
 	const toolbarPositionOptions: Array<{ value: ToolbarPosition; label: string }> = [
@@ -337,8 +317,7 @@
 		{ value: 'right', label: 'Right' }
 	];
 	const selectedRenderQualityDescription = $derived(
-		renderQualityModes.find((mode) => mode.value === renderQualityMode)?.description ||
-			renderQualityModes[1].description
+		renderQualityModes.find((mode) => mode.value === renderQualityMode)?.description || renderQualityModes[1].description
 	);
 </script>
 
@@ -398,9 +377,7 @@
 						</div>
 						<div>
 							<div>More Settings</div>
-							<div class="text-xs font-normal text-gray-500">
-								Zoom, performance, toolbar and pen options
-							</div>
+							<div class="text-xs font-normal text-gray-500">Zoom, performance, toolbar and pen options</div>
 						</div>
 					</button>
 
@@ -412,12 +389,7 @@
 							disabled={refreshButtonDisabled}
 							class="mt-2 inline-flex items-center gap-2 rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
 						>
-							<LucideRefreshCw
-								size={13}
-								class={saving || isRefreshingPage || ctx.state.saveState.status === 'saving'
-									? 'animate-spin'
-									: ''}
-							/>
+							<LucideRefreshCw size={13} class={saving || isRefreshingPage || ctx.state.saveState.status === 'saving' ? 'animate-spin' : ''} />
 							<span>{refreshButtonLabel}</span>
 						</button>
 					</div>
@@ -470,9 +442,7 @@
 								}}
 								class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50"
 							>
-								<div
-									class="flex h-8 w-8 items-center justify-center rounded-md bg-amber-50 shadow-sm"
-								>
+								<div class="flex h-8 w-8 items-center justify-center rounded-md bg-amber-50 shadow-sm">
 									<span class="text-base">📋</span>
 								</div>
 								<span>Homework Info</span>
@@ -502,23 +472,15 @@
 	{/if}
 </div>
 
-<dialog
-	bind:this={settingsModal}
-	class="pdf-editor-touch-controls modal modal-bottom sm:modal-middle"
-	aria-labelledby="pdf-editor-settings-title"
->
+<dialog bind:this={settingsModal} class="pdf-editor-touch-controls modal modal-bottom sm:modal-middle" aria-labelledby="pdf-editor-settings-title">
 	<div
 		class="settings-modal-box modal-box flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white p-0 shadow-2xl"
 		use:stopTouchPropagation
 	>
 		<div class="flex items-start justify-between gap-4 border-b border-gray-100 px-4 py-4 sm:px-5">
 			<div>
-				<h2 id="pdf-editor-settings-title" class="text-lg font-semibold text-gray-900">
-					Editor Settings
-				</h2>
-				<p class="mt-1 text-sm leading-snug text-gray-500">
-					Control saving, touch behavior, performance, page previews and drawing preferences.
-				</p>
+				<h2 id="pdf-editor-settings-title" class="text-lg font-semibold text-gray-900">Editor Settings</h2>
+				<p class="mt-1 text-sm leading-snug text-gray-500">Control saving, touch behavior, performance, page previews and drawing preferences.</p>
 			</div>
 			<button
 				type="button"
@@ -547,16 +509,9 @@
 					class:hover:bg-gray-100={!autoSaveEnabled}
 				>
 					<div>
-						<div
-							class="text-sm font-medium"
-							class:text-emerald-900={autoSaveEnabled}
-							class:text-gray-800={!autoSaveEnabled}
-						>
-							Auto Save
-						</div>
+						<div class="text-sm font-medium" class:text-emerald-900={autoSaveEnabled} class:text-gray-800={!autoSaveEnabled}>Auto Save</div>
 						<p class="mt-1 text-xs leading-snug text-gray-500">
-							Saves changes in the background after edits. Turn this off when you want to control
-							exactly when the PDF uploads.
+							Saves changes in the background after edits. Turn this off when you want to control exactly when the PDF uploads.
 						</p>
 					</div>
 					<div class="relative h-6 w-11 shrink-0">
@@ -592,16 +547,9 @@
 						class:hover:bg-gray-100={!zoomEnabled}
 					>
 						<div>
-							<div
-								class="text-sm font-medium"
-								class:text-indigo-900={zoomEnabled}
-								class:text-gray-800={!zoomEnabled}
-							>
-								Pinch Zoom
-							</div>
+							<div class="text-sm font-medium" class:text-indigo-900={zoomEnabled} class:text-gray-800={!zoomEnabled}>Pinch Zoom</div>
 							<p class="mt-1 text-xs leading-snug text-gray-500">
-								Allows two-finger zooming and panning on touch devices. Disable it if it gets in the
-								way while drawing.
+								Allows two-finger zooming and panning on touch devices. Disable it if it gets in the way while drawing.
 							</p>
 						</div>
 						<div class="relative h-6 w-11 shrink-0">
@@ -630,11 +578,7 @@
 						class:hover:bg-gray-100={!doubleTapZoomEnabled}
 					>
 						<div>
-							<div
-								class="text-sm font-medium"
-								class:text-indigo-900={doubleTapZoomEnabled}
-								class:text-gray-800={!doubleTapZoomEnabled}
-							>
+							<div class="text-sm font-medium" class:text-indigo-900={doubleTapZoomEnabled} class:text-gray-800={!doubleTapZoomEnabled}>
 								Double Tap Zoom
 							</div>
 							<p class="mt-1 text-xs leading-snug text-gray-500">
@@ -682,8 +626,8 @@
 								Smart Rendering
 							</div>
 							<p class="mt-1 text-xs leading-snug text-gray-500">
-								Draws only the visible annotation objects while you move around the PDF. This can
-								make large homework files feel lighter on slower devices.
+								Draws only the visible annotation objects while you move around the PDF. This can make large homework files feel lighter on slower
+								devices.
 							</p>
 						</div>
 						<div class="relative h-6 w-11 shrink-0">
@@ -711,16 +655,11 @@
 						class:hover:bg-gray-100={!minimapAnnotationsEnabled}
 					>
 						<div>
-							<div
-								class="text-sm font-medium"
-								class:text-teal-900={minimapAnnotationsEnabled}
-								class:text-gray-800={!minimapAnnotationsEnabled}
-							>
+							<div class="text-sm font-medium" class:text-teal-900={minimapAnnotationsEnabled} class:text-gray-800={!minimapAnnotationsEnabled}>
 								Minimap Annotations
 							</div>
 							<p class="mt-1 text-xs leading-snug text-gray-500">
-								Shows tiny annotation marks in the minimap. Turn this off to reduce minimap memory
-								and layout work on slower devices.
+								Shows tiny annotation marks in the minimap. Turn this off to reduce minimap memory and layout work on slower devices.
 							</p>
 						</div>
 						<div class="relative h-6 w-11 shrink-0">
@@ -742,8 +681,7 @@
 							<div>
 								<div class="text-sm font-medium text-gray-800">Render Quality</div>
 								<p class="mt-1 text-xs leading-snug text-gray-500">
-									Controls how sharp the PDF stays during movement. Lower quality improves
-									responsiveness; sharper quality uses more device resources.
+									Controls how sharp the PDF stays during movement. Lower quality improves responsiveness; sharper quality uses more device resources.
 								</p>
 							</div>
 							<LucideMonitor size={18} class="mt-0.5 shrink-0 text-sky-600" />
@@ -775,11 +713,7 @@
 					<LucidePanelLeft size={18} class="text-orange-600" />
 					<h3 class="text-sm font-semibold text-gray-900">Side Page Preview</h3>
 				</div>
-				<div
-					class="rounded-lg transition-colors"
-					class:bg-orange-50={adjacentPagePreviewEnabled}
-					class:bg-gray-50={!adjacentPagePreviewEnabled}
-				>
+				<div class="rounded-lg transition-colors" class:bg-orange-50={adjacentPagePreviewEnabled} class:bg-gray-50={!adjacentPagePreviewEnabled}>
 					<button
 						type="button"
 						onclick={onToggleAdjacentPagePreview}
@@ -789,16 +723,12 @@
 						class:hover:bg-gray-100={!adjacentPagePreviewEnabled}
 					>
 						<div>
-							<div
-								class="text-sm font-medium"
-								class:text-orange-900={adjacentPagePreviewEnabled}
-								class:text-gray-800={!adjacentPagePreviewEnabled}
-							>
+							<div class="text-sm font-medium" class:text-orange-900={adjacentPagePreviewEnabled} class:text-gray-800={!adjacentPagePreviewEnabled}>
 								Show Side Pages
 							</div>
 							<p class="mt-1 text-xs leading-snug text-gray-500">
-								Keeps nearby pages visible as reference while editing. Higher counts are useful for
-								checking context, but may slow down weaker devices.
+								Keeps nearby pages visible as reference while editing. Higher counts are useful for checking context, but may slow down weaker
+								devices.
 							</p>
 						</div>
 						<div class="relative h-6 w-11 shrink-0">
@@ -824,10 +754,7 @@
 								aria-expanded={sidePageSettingsOpen}
 							>
 								<span class="text-xs font-semibold text-orange-950">Preview options</span>
-								<LucideChevronDown
-									size={16}
-									class={`text-orange-700 transition-transform ${sidePageSettingsOpen ? 'rotate-180' : ''}`}
-								/>
+								<LucideChevronDown size={16} class={`text-orange-700 transition-transform ${sidePageSettingsOpen ? 'rotate-180' : ''}`} />
 							</button>
 
 							{#if sidePageSettingsOpen}
@@ -838,14 +765,10 @@
 												<div class="text-xs font-semibold text-orange-950">Preview pages</div>
 												<div class="text-[11px] text-orange-800/75">
 													{adjacentPagePreviewCount}
-													{adjacentPagePreviewCount === 1
-														? ' page before the current page'
-														: ' extra pages around the current page'}
+													{adjacentPagePreviewCount === 1 ? ' page before the current page' : ' extra pages around the current page'}
 												</div>
 											</div>
-											<div
-												class="rounded-full bg-white px-2 py-1 text-xs font-bold text-orange-700 shadow-sm"
-											>
+											<div class="rounded-full bg-white px-2 py-1 text-xs font-bold text-orange-700 shadow-sm">
 												{adjacentPagePreviewCount}
 											</div>
 										</div>
@@ -856,10 +779,7 @@
 											step="1"
 											value={adjacentPagePreviewCount}
 											class="h-2 w-full cursor-pointer accent-orange-600"
-											oninput={(event) =>
-												onAdjacentPagePreviewCountChange(
-													Number((event.currentTarget as HTMLInputElement).value)
-												)}
+											oninput={(event) => onAdjacentPagePreviewCountChange(Number((event.currentTarget as HTMLInputElement).value))}
 										/>
 									</div>
 
@@ -911,8 +831,7 @@
 							<div>
 								<div class="text-sm font-medium text-gray-800">Toolbar Position</div>
 								<p class="mt-1 text-xs leading-snug text-gray-500">
-									Dock the drawing tools to the side or bottom so the controls stay out of your
-									working area.
+									Dock the drawing tools to the side or bottom so the controls stay out of your working area.
 								</p>
 							</div>
 							{#if ctx.state.toolbarPosition === 'left'}
@@ -958,9 +877,7 @@
 							>
 								Remember Pen
 							</div>
-							<p class="mt-1 text-xs leading-snug text-gray-500">
-								Keeps your last drawing color and brush size for the next editor session.
-							</p>
+							<p class="mt-1 text-xs leading-snug text-gray-500">Keeps your last drawing color and brush size for the next editor session.</p>
 						</div>
 						<div class="relative h-6 w-11 shrink-0">
 							<div

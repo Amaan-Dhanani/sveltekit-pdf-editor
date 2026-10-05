@@ -1,15 +1,6 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import {
-		LucideX,
-		LucideZoomIn,
-		LucideMinus,
-		LucidePlus,
-		LucideRotateCcw,
-		LucideMove3D,
-		LucideChevronDown,
-		LucideChevronUp
-	} from '@lucide/svelte';
+	import { LucideX, LucideZoomIn, LucideMinus, LucidePlus, LucideRotateCcw, LucideMove3D, LucideChevronDown, LucideChevronUp } from '@lucide/svelte';
 	import { MAX_PDF_ZOOM, MIN_PDF_ZOOM, pdfZoomToPercent } from '../../utils/zoomLimits';
 
 	interface Props {
@@ -24,16 +15,7 @@
 		onToggleZoom: () => void;
 	}
 
-	let {
-		zoom,
-		zoomEnabled,
-		isMinimized = $bindable(false),
-		onClose,
-		onZoomIn,
-		onZoomOut,
-		onResetZoom,
-		onToggleZoom
-	}: Props = $props();
+	let { zoom, zoomEnabled, isMinimized = $bindable(false), onClose, onZoomIn, onZoomOut, onResetZoom, onToggleZoom }: Props = $props();
 </script>
 
 <!-- Fixed Top-Right Panel -->
@@ -42,9 +24,7 @@
 		<!-- Header -->
 		<div class="mb-3 flex items-center justify-between">
 			<div class="flex items-center gap-2">
-				<div
-					class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600"
-				>
+				<div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
 					<LucideZoomIn size={16} />
 				</div>
 				<span class="text-sm font-semibold text-gray-800">Zoom</span>
@@ -74,9 +54,7 @@
 		{#if !isMinimized}
 			<!-- Zoom Controls -->
 			<div class="mb-4">
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Zoom Level
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Zoom Level</div>
 				<div class="flex items-center gap-2">
 					<button
 						onclick={onZoomOut}

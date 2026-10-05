@@ -61,7 +61,7 @@ export const presetColors: PresetColor[] = [
 		hex: '#266DF0',
 		outline: 'rgba(38, 109, 240, 0.4)',
 		name: undefined
-	},
+	}
 	// {
 	// 	label: 'Purple',
 	// 	hex: '#9162F9',

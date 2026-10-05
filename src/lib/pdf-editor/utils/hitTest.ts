@@ -45,12 +45,7 @@ function isPathAnnotation(obj: { type?: string } | null | undefined) {
  * Sample points along a quadratic Bezier curve
  * Q command: Q x1,y1 x,y (control point, end point)
  */
-function sampleQuadraticBezier(
-	start: Point,
-	control: Point,
-	end: Point,
-	segments: number = 10
-): Point[] {
+function sampleQuadraticBezier(start: Point, control: Point, end: Point, segments: number = 10): Point[] {
 	const points: Point[] = [];
 
 	for (let i = 0; i <= segments; i++) {
@@ -71,13 +66,7 @@ function sampleQuadraticBezier(
  * Sample points along a cubic Bezier curve
  * C command: C x1,y1 x2,y2 x,y (first control point, second control point, end point)
  */
-function sampleCubicBezier(
-	start: Point,
-	control1: Point,
-	control2: Point,
-	end: Point,
-	segments: number = 15
-): Point[] {
+function sampleCubicBezier(start: Point, control1: Point, control2: Point, end: Point, segments: number = 15): Point[] {
 	const points: Point[] = [];
 
 	for (let i = 0; i <= segments; i++) {
@@ -85,16 +74,8 @@ function sampleCubicBezier(
 		const t1 = 1 - t;
 
 		// Cubic Bezier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
-		const x =
-			t1 * t1 * t1 * start.x +
-			3 * t1 * t1 * t * control1.x +
-			3 * t1 * t * t * control2.x +
-			t * t * t * end.x;
-		const y =
-			t1 * t1 * t1 * start.y +
-			3 * t1 * t1 * t * control1.y +
-			3 * t1 * t * t * control2.y +
-			t * t * t * end.y;
+		const x = t1 * t1 * t1 * start.x + 3 * t1 * t1 * t * control1.x + 3 * t1 * t * t * control2.x + t * t * t * end.x;
+		const y = t1 * t1 * t1 * start.y + 3 * t1 * t1 * t * control1.y + 3 * t1 * t * t * control2.y + t * t * t * end.y;
 
 		points.push({ x, y });
 	}
@@ -290,11 +271,7 @@ function getSafePageScale(pageScale: number): number {
 	return Math.max(Math.abs(pageScale || 1), 0.1);
 }
 
-function getVisualStrokePadding(
-	drawing: DrawingObject,
-	scale: number = getDrawingScale(drawing),
-	pageScale: number = 1
-): number {
+function getVisualStrokePadding(drawing: DrawingObject, scale: number = getDrawingScale(drawing), pageScale: number = 1): number {
 	const brushSize = drawing.brushSize || 2;
 	const scaledStrokePadding = (brushSize * Math.abs(scale)) / 2;
 	const pointerPadding = 3 / getSafePageScale(pageScale);
@@ -302,12 +279,7 @@ function getVisualStrokePadding(
 	return Math.max(scaledStrokePadding, 1) + pointerPadding;
 }
 
-function transformLocalDrawingPoint(
-	point: Point,
-	anchor: Point,
-	scale: number,
-	rotation: number
-): Point {
+function transformLocalDrawingPoint(point: Point, anchor: Point, scale: number, rotation: number): Point {
 	const angle = degreesToRadians(rotation);
 	const cos = Math.cos(angle);
 	const sin = Math.sin(angle);
@@ -339,12 +311,7 @@ function transformDrawingPointToPage(
 	};
 }
 
-function inverseTransformLocalDrawingPoint(
-	point: Point,
-	anchor: Point,
-	scale: number,
-	rotation: number
-): Point {
+function inverseTransformLocalDrawingPoint(point: Point, anchor: Point, scale: number, rotation: number): Point {
 	const angle = degreesToRadians(-rotation);
 	const cos = Math.cos(angle);
 	const sin = Math.sin(angle);
@@ -444,11 +411,7 @@ export function pointNearPath(point: Point, pathPoints: Point[], threshold: numb
  * Transform point from screen coordinates to drawing local coordinates
  * Accounts for the drawing's position, scale, and viewBox
  */
-export function screenToDrawingCoords(
-	screenPoint: Point,
-	drawing: DrawingObject,
-	_pageScale: number
-): Point {
+export function screenToDrawingCoords(screenPoint: Point, drawing: DrawingObject, _pageScale: number): Point {
 	// Remove the drawing's position offset
 	const relativeX = screenPoint.x - drawing.x;
 	const relativeY = screenPoint.y - drawing.y;
@@ -469,23 +432,14 @@ export function screenToDrawingCoords(
 	};
 
 	// Transform to path coordinate space
-	return inverseTransformLocalDrawingPoint(
-		{ x: relativeX, y: relativeY },
-		anchor,
-		scale,
-		getDrawingRotation(drawing)
-	);
+	return inverseTransformLocalDrawingPoint({ x: relativeX, y: relativeY }, anchor, scale, getDrawingRotation(drawing));
 }
 
 /**
  * Main hit-test function for drawings
  * Returns true if the point hits the drawing
  */
-export function hitTestDrawing(
-	screenPoint: Point,
-	drawing: DrawingObject,
-	pageScale: number = 1
-): boolean {
+export function hitTestDrawing(screenPoint: Point, drawing: DrawingObject, pageScale: number = 1): boolean {
 	const { points: pathPoints, bbox: pathBBox } = getPathGeometry(drawing.path);
 
 	if (pathPoints.length === 0) return false;
@@ -546,9 +500,7 @@ export function hitTestDrawingWithBox(selectionBox: BBox, drawing: DrawingObject
 		width: selectionBox.width + padding * 2,
 		height: selectionBox.height + padding * 2
 	};
-	const transformedPoints = pathPoints.map((point) =>
-		transformDrawingPointToPage(point, drawing, pathBBox, scale)
-	);
+	const transformedPoints = pathPoints.map((point) => transformDrawingPointToPage(point, drawing, pathBBox, scale));
 
 	if (transformedPoints.length === 1) {
 		return pointInBBox(transformedPoints[0], paddedSelectionBox);
@@ -561,14 +513,7 @@ export function hitTestDrawingWithBox(selectionBox: BBox, drawing: DrawingObject
 		if (
 			pointInBBox(start, paddedSelectionBox) ||
 			pointInBBox(end, paddedSelectionBox) ||
-			lineIntersectsBox(
-				start.x,
-				start.y,
-				end.x - start.x,
-				end.y - start.y,
-				paddedSelectionBox,
-				0
-			)
+			lineIntersectsBox(start.x, start.y, end.x - start.x, end.y - start.y, paddedSelectionBox, 0)
 		) {
 			return true;
 		}
@@ -581,26 +526,14 @@ export function hitTestDrawingWithBox(selectionBox: BBox, drawing: DrawingObject
  * Check if two bounding boxes intersect
  */
 export function boxesIntersect(box1: BBox, box2: BBox): boolean {
-	return !(
-		box1.x + box1.width < box2.x ||
-		box2.x + box2.width < box1.x ||
-		box1.y + box1.height < box2.y ||
-		box2.y + box2.height < box1.y
-	);
+	return !(box1.x + box1.width < box2.x || box2.x + box2.width < box1.x || box1.y + box1.height < box2.y || box2.y + box2.height < box1.y);
 }
 
 /**
  * Check if a line segment intersects with a bounding box
  * Line is defined by start point (x, y) and offset (width, height)
  */
-export function lineIntersectsBox(
-	lineX: number,
-	lineY: number,
-	lineWidth: number,
-	lineHeight: number,
-	box: BBox,
-	strokeWidth: number = 2
-): boolean {
+export function lineIntersectsBox(lineX: number, lineY: number, lineWidth: number, lineHeight: number, box: BBox, strokeWidth: number = 2): boolean {
 	const lineStart: Point = { x: lineX, y: lineY };
 	const lineEnd: Point = { x: lineX + lineWidth, y: lineY + lineHeight };
 
@@ -660,12 +593,7 @@ function lineSegmentsIntersect(p1: Point, p2: Point, p3: Point, p4: Point): bool
  * Returns array of object IDs sorted by z-index (last drawn on top)
  * Handles drawings, text, line, and teacher mark objects
  */
-export function findDrawingsAtPoint(
-	screenPoint: Point,
-	objects: any[],
-	pageScale: number = 1,
-	candidateObjects?: any[]
-): string[] {
+export function findDrawingsAtPoint(screenPoint: Point, objects: any[], pageScale: number = 1, candidateObjects?: any[]): string[] {
 	const hits: string[] = [];
 
 	for (const obj of candidateObjects || objects) {

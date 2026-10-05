@@ -51,13 +51,9 @@ export const teacherMarkColorPresets: TeacherMarkColorPreset[] = [
 ];
 
 export function getTeacherMarkColorPreset(value: unknown): TeacherMarkColorPreset {
-	return (
-		teacherMarkColorPresets.find((preset) => preset.value === value) ?? teacherMarkColorPresets[0]
-	);
+	return teacherMarkColorPresets.find((preset) => preset.value === value) ?? teacherMarkColorPresets[0];
 }
 
 export function getTeacherMarkIcon(value: unknown): TeacherMarkIcon {
-	return teacherMarkIconPresets.some((preset) => preset.value === value)
-		? (value as TeacherMarkIcon)
-		: 'none';
+	return teacherMarkIconPresets.some((preset) => preset.value === value) ? (value as TeacherMarkIcon) : 'none';
 }

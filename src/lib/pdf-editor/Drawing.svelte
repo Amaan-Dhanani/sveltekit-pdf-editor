@@ -1,174 +1,161 @@
 <script lang="ts">
-    import { getPathGeometry } from './utils/hitTest';
-    import { isIOSLikeDevice } from './utils/liveStroke';
+	import { getPathGeometry } from './utils/hitTest';
+	import { isIOSLikeDevice } from './utils/liveStroke';
 
-    let {
-        originWidth,
-        originHeight,
-        width,
-        x,
-        y,
-        path,
-        scale: objectScale,
-        rotation: objectRotation,
-        brushSize,
-        brushColor,
-        object,
-        user,
-        pageScale = 1,
-        screenScale = 1,
-        stroke_visibility = $bindable('all'), // 'all', 'self', or 'others'
-        isSelected = false,
-        isPreviewed = false
-    } = $props();
+	let {
+		originWidth,
+		originHeight,
+		width,
+		x,
+		y,
+		path,
+		scale: objectScale,
+		rotation: objectRotation,
+		brushSize,
+		brushColor,
+		object,
+		user,
+		pageScale = 1,
+		screenScale = 1,
+		stroke_visibility = $bindable('all'), // 'all', 'self', or 'others'
+		isSelected = false,
+		isPreviewed = false
+	} = $props();
 
-    let boundingBox = $derived.by(() => getPathGeometry(path || '').bbox);
-    let scale = $derived(objectScale ?? object?.scale ?? (originWidth ? width / originWidth : 1));
-    let rotation = $derived(objectRotation ?? object?.rotation ?? 0);
+	let boundingBox = $derived.by(() => getPathGeometry(path || '').bbox);
+	let scale = $derived(objectScale ?? object?.scale ?? (originWidth ? width / originWidth : 1));
+	let rotation = $derived(objectRotation ?? object?.rotation ?? 0);
 
-    // Check if this drawing is highlighted for erasure (Moved up before renderedStrokeOpacity)
-    let isHighlighted = $derived(object?._eraserHighlight === true);
+	// Check if this drawing is highlighted for erasure (Moved up before renderedStrokeOpacity)
+	let isHighlighted = $derived(object?._eraserHighlight === true);
 
-    let strokeOpacity = $derived.by(() => {
-        const opacity = Number(object?.opacity);
-        if (Number.isFinite(opacity)) return Math.max(0, Math.min(opacity, 1));
-        return object?.type === 'highlight' ? 0.5 : 1;
-    });
-    let renderedStrokeOpacity = $derived(isHighlighted ? strokeOpacity * 0.3 : strokeOpacity);
-    let anchorX = $derived(boundingBox ? boundingBox.x + boundingBox.width / 2 : 0);
+	let strokeOpacity = $derived.by(() => {
+		const opacity = Number(object?.opacity);
+		if (Number.isFinite(opacity)) return Math.max(0, Math.min(opacity, 1));
+		return object?.type === 'highlight' ? 0.5 : 1;
+	});
+	let renderedStrokeOpacity = $derived(isHighlighted ? strokeOpacity * 0.3 : strokeOpacity);
+	let anchorX = $derived(boundingBox ? boundingBox.x + boundingBox.width / 2 : 0);
 
-    let anchorY = $derived(boundingBox ? boundingBox.y + boundingBox.height / 2 : 0);
-    let safePageScale = $derived(Math.max(Math.abs(Number(pageScale) || 1), 0.1));
-    let safeScreenScale = $derived(Math.max(Math.abs(Number(screenScale) || 1), 0.1));
-    let useIOSSharpSvg = $derived(
-        isIOSLikeDevice() && safeScreenScale === 1 && safePageScale > 1.01
-    );
-    let svgPreScale = $derived(useIOSSharpSvg ? Math.max(1, safePageScale) : safeScreenScale);
-    let inverseSvgPreScale = $derived(1 / svgPreScale);
-    let baseSvgWidth = $derived(Math.max(1, Number(originWidth) || 1));
-    let baseSvgHeight = $derived(Math.max(1, Number(originHeight) || 1));
-    let svgWidth = $derived(baseSvgWidth * svgPreScale);
-    let svgHeight = $derived(baseSvgHeight * svgPreScale);
-    let drawingX = $derived(Number.isFinite(Number(x)) ? Number(x) : 0);
-    let drawingY = $derived(Number.isFinite(Number(y)) ? Number(y) : 0);
-    let drawingContainerStyle = $derived(
-        safeScreenScale !== 1
-            ? `transform: translate(${drawingX * safeScreenScale}px, ${drawingY * safeScreenScale}px);`
-            : useIOSSharpSvg
-            ? `left: ${drawingX}px; top: ${drawingY}px; width: ${svgWidth}px; height: ${svgHeight}px; transform: scale(${inverseSvgPreScale});`
-            : `transform: translate(${drawingX}px, ${drawingY}px);`
-    );
-    let drawingTransform = $derived(`
+	let anchorY = $derived(boundingBox ? boundingBox.y + boundingBox.height / 2 : 0);
+	let safePageScale = $derived(Math.max(Math.abs(Number(pageScale) || 1), 0.1));
+	let safeScreenScale = $derived(Math.max(Math.abs(Number(screenScale) || 1), 0.1));
+	let useIOSSharpSvg = $derived(isIOSLikeDevice() && safeScreenScale === 1 && safePageScale > 1.01);
+	let svgPreScale = $derived(useIOSSharpSvg ? Math.max(1, safePageScale) : safeScreenScale);
+	let inverseSvgPreScale = $derived(1 / svgPreScale);
+	let baseSvgWidth = $derived(Math.max(1, Number(originWidth) || 1));
+	let baseSvgHeight = $derived(Math.max(1, Number(originHeight) || 1));
+	let svgWidth = $derived(baseSvgWidth * svgPreScale);
+	let svgHeight = $derived(baseSvgHeight * svgPreScale);
+	let drawingX = $derived(Number.isFinite(Number(x)) ? Number(x) : 0);
+	let drawingY = $derived(Number.isFinite(Number(y)) ? Number(y) : 0);
+	let drawingContainerStyle = $derived(
+		safeScreenScale !== 1
+			? `transform: translate(${drawingX * safeScreenScale}px, ${drawingY * safeScreenScale}px);`
+			: useIOSSharpSvg
+				? `left: ${drawingX}px; top: ${drawingY}px; width: ${svgWidth}px; height: ${svgHeight}px; transform: scale(${inverseSvgPreScale});`
+				: `transform: translate(${drawingX}px, ${drawingY}px);`
+	);
+	let drawingTransform = $derived(`
         translate(${anchorX} ${anchorY})
         rotate(${rotation})
         scale(${scale})
         translate(${-anchorX} ${-anchorY})
     `);
-    function transformPoint(pointX: number, pointY: number) {
-        const angle = (rotation * Math.PI) / 180;
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        const scaledX = (pointX - anchorX) * scale;
-        const scaledY = (pointY - anchorY) * scale;
+	function transformPoint(pointX: number, pointY: number) {
+		const angle = (rotation * Math.PI) / 180;
+		const cos = Math.cos(angle);
+		const sin = Math.sin(angle);
+		const scaledX = (pointX - anchorX) * scale;
+		const scaledY = (pointY - anchorY) * scale;
 
-        return {
-            x: anchorX + scaledX * cos - scaledY * sin,
-            y: anchorY + scaledX * sin + scaledY * cos
-        };
-    }
+		return {
+			x: anchorX + scaledX * cos - scaledY * sin,
+			y: anchorY + scaledX * sin + scaledY * cos
+		};
+	}
 
-    let scaledBoundingBox = $derived.by(() => {
-        if (!boundingBox) return null;
+	let scaledBoundingBox = $derived.by(() => {
+		if (!boundingBox) return null;
 
-        const corners = [
-            transformPoint(boundingBox.x, boundingBox.y),
-            transformPoint(boundingBox.x + boundingBox.width, boundingBox.y),
-            transformPoint(boundingBox.x + boundingBox.width, boundingBox.y + boundingBox.height),
-            transformPoint(boundingBox.x, boundingBox.y + boundingBox.height)
-        ];
-        const left = Math.min(...corners.map((corner) => corner.x));
-        const top = Math.min(...corners.map((corner) => corner.y));
-        const right = Math.max(...corners.map((corner) => corner.x));
-        const bottom = Math.max(...corners.map((corner) => corner.y));
+		const corners = [
+			transformPoint(boundingBox.x, boundingBox.y),
+			transformPoint(boundingBox.x + boundingBox.width, boundingBox.y),
+			transformPoint(boundingBox.x + boundingBox.width, boundingBox.y + boundingBox.height),
+			transformPoint(boundingBox.x, boundingBox.y + boundingBox.height)
+		];
+		const left = Math.min(...corners.map((corner) => corner.x));
+		const top = Math.min(...corners.map((corner) => corner.y));
+		const right = Math.max(...corners.map((corner) => corner.x));
+		const bottom = Math.max(...corners.map((corner) => corner.y));
 
-        return {
-            x: left,
-            y: top,
-            width: right - left,
-            height: bottom - top
-        };
-    });
+		return {
+			x: left,
+			y: top,
+			width: right - left,
+			height: bottom - top
+		};
+	});
 
-    let shouldRenderStroke = $derived(
-        stroke_visibility === 'all' ||
-            (stroke_visibility === 'self' &&
-                (object?.owner === user || object?.owner === `global-${user}`)) ||
-            (stroke_visibility === 'others' &&
-                object?.owner !== user &&
-                object?.owner !== `global-${user}`)
-    );
+	let shouldRenderStroke = $derived(
+		stroke_visibility === 'all' ||
+			(stroke_visibility === 'self' && (object?.owner === user || object?.owner === `global-${user}`)) ||
+			(stroke_visibility === 'others' && object?.owner !== user && object?.owner !== `global-${user}`)
+	);
 </script>
 
-<div
-    class="pointer-events-none absolute left-0 top-0 origin-top-left"
-    style={drawingContainerStyle}
->
-    <svg
-        class="pointer-events-none overflow-visible"
-        width={svgWidth}
-        height={svgHeight}
-        viewBox={`0 0 ${baseSvgWidth} ${baseSvgHeight}`}
-    >
-        {#if isSelected && scaledBoundingBox}
-            <rect
-                x={scaledBoundingBox.x}
-                y={scaledBoundingBox.y}
-                width={scaledBoundingBox.width}
-                height={scaledBoundingBox.height}
-                fill="none"
-                stroke="rgba(59, 130, 246, 0.3)"
-                stroke-width={1 / safePageScale}
-                class="transition-[stroke-width] duration-150 ease-out [shape-rendering:geometricPrecision]"
-            />
-        {/if}
+<div class="pointer-events-none absolute left-0 top-0 origin-top-left" style={drawingContainerStyle}>
+	<svg class="pointer-events-none overflow-visible" width={svgWidth} height={svgHeight} viewBox={`0 0 ${baseSvgWidth} ${baseSvgHeight}`}>
+		{#if isSelected && scaledBoundingBox}
+			<rect
+				x={scaledBoundingBox.x}
+				y={scaledBoundingBox.y}
+				width={scaledBoundingBox.width}
+				height={scaledBoundingBox.height}
+				fill="none"
+				stroke="rgba(59, 130, 246, 0.3)"
+				stroke-width={1 / safePageScale}
+				class="transition-[stroke-width] duration-150 ease-out [shape-rendering:geometricPrecision]"
+			/>
+		{/if}
 
-        {#if isPreviewed && scaledBoundingBox}
-            <rect
-                x={scaledBoundingBox.x}
-                y={scaledBoundingBox.y}
-                width={scaledBoundingBox.width}
-                height={scaledBoundingBox.height}
-                fill="rgba(245, 158, 11, 0.08)"
-                stroke="rgba(217, 119, 6, 0.8)"
-                stroke-width={2 / safePageScale}
-                class="animate-[pulse_0.75s_ease-in-out_infinite_alternate] [shape-rendering:geometricPrecision]"
-            />
-        {/if}
+		{#if isPreviewed && scaledBoundingBox}
+			<rect
+				x={scaledBoundingBox.x}
+				y={scaledBoundingBox.y}
+				width={scaledBoundingBox.width}
+				height={scaledBoundingBox.height}
+				fill="rgba(245, 158, 11, 0.08)"
+				stroke="rgba(217, 119, 6, 0.8)"
+				stroke-width={2 / safePageScale}
+				class="animate-[pulse_0.75s_ease-in-out_infinite_alternate] [shape-rendering:geometricPrecision]"
+			/>
+		{/if}
 
-        {#if isHighlighted && scaledBoundingBox}
-            <rect
-                x={scaledBoundingBox.x}
-                y={scaledBoundingBox.y}
-                width={scaledBoundingBox.width}
-                height={scaledBoundingBox.height}
-                fill="rgba(239, 68, 68, 0.1)"
-                stroke="rgba(239, 68, 68, 0.5)"
-                stroke-width={2 / safePageScale}
-                class="animate-[pulse_0.5s_ease-in-out_infinite_alternate]"
-            />
-        {/if}
+		{#if isHighlighted && scaledBoundingBox}
+			<rect
+				x={scaledBoundingBox.x}
+				y={scaledBoundingBox.y}
+				width={scaledBoundingBox.width}
+				height={scaledBoundingBox.height}
+				fill="rgba(239, 68, 68, 0.1)"
+				stroke="rgba(239, 68, 68, 0.5)"
+				stroke-width={2 / safePageScale}
+				class="animate-[pulse_0.5s_ease-in-out_infinite_alternate]"
+			/>
+		{/if}
 
-        {#if shouldRenderStroke}
-            <path
-                stroke-width={brushSize}
-                stroke-linejoin="round"
-                stroke-linecap="round"
-                stroke={brushColor}
-                fill="none"
-                d={path}
-                transform={drawingTransform}
-                opacity={renderedStrokeOpacity}
-            />
-        {/if}
-    </svg>
+		{#if shouldRenderStroke}
+			<path
+				stroke-width={brushSize}
+				stroke-linejoin="round"
+				stroke-linecap="round"
+				stroke={brushColor}
+				fill="none"
+				d={path}
+				transform={drawingTransform}
+				opacity={renderedStrokeOpacity}
+			/>
+		{/if}
+	</svg>
 </div>

@@ -12,7 +12,6 @@
 import { getPDFEditorContext, type PDFObject } from '../context/pdfEditorContext.svelte';
 import { toast, TOAST_WARNING } from '../utils/toast';
 
-
 // Type order for rendering (higher number renders on top)
 const TYPE_ORDER = {
 	drawing: 1,
@@ -224,9 +223,7 @@ export function usePDFObjects(allObjects: PDFObject[], genID: () => string) {
 	 * Update a line
 	 */
 	function updateLine(lineId: string, updates: Partial<PDFObject>) {
-		allObjects = allObjects.map((obj) =>
-			obj.id === lineId && obj.type === 'line' ? { ...obj, ...updates } : obj
-		);
+		allObjects = allObjects.map((obj) => (obj.id === lineId && obj.type === 'line' ? { ...obj, ...updates } : obj));
 		// Binding automatically syncs changes
 	}
 
@@ -244,9 +241,7 @@ export function usePDFObjects(allObjects: PDFObject[], genID: () => string) {
 	 */
 	function getSelectedLine() {
 		if (!ctx.state.selectedLineId) return null;
-		return allObjects.find(
-			(obj) => obj.id === ctx.state.selectedLineId && obj.type === 'line'
-		);
+		return allObjects.find((obj) => obj.id === ctx.state.selectedLineId && obj.type === 'line');
 	}
 
 	/**
@@ -310,5 +305,3 @@ export function usePDFObjects(allObjects: PDFObject[], genID: () => string) {
 		isObjectSelected
 	};
 }
-
-

@@ -1,21 +1,9 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import {
-		LucidePlus,
-		LucideMinus,
-		LucideMaximize2,
-		LucideChevronLeft,
-		LucideChevronRight
-	} from '@lucide/svelte';
+	import { LucidePlus, LucideMinus, LucideMaximize2, LucideChevronLeft, LucideChevronRight } from '@lucide/svelte';
 	import { fly } from 'svelte/transition';
 	import { getPDFEditorContext } from '../../context/pdfEditorContext.svelte';
-	import {
-		MAX_PDF_ZOOM,
-		MIN_PDF_ZOOM,
-		PDF_ZOOM_STEP,
-		pdfZoomFromPercent,
-		pdfZoomToPercent
-	} from '../../utils/zoomLimits';
+	import { MAX_PDF_ZOOM, MIN_PDF_ZOOM, PDF_ZOOM_STEP, pdfZoomFromPercent, pdfZoomToPercent } from '../../utils/zoomLimits';
 	import { getPathGeometry, getTransformedDrawingBBox } from '../../utils/hitTest';
 	import { createRenderSignature, mixRenderSignature } from '../../utils/renderSignature';
 	import { getCappedDevicePixelRatio } from '../../utils/annotationRendering';
@@ -147,8 +135,7 @@
 	}
 
 	function getDocumentScrollHeight() {
-		if (scrollRoot)
-			return Math.max(scrollRoot.scrollHeight, scrollRoot.clientHeight, viewportHeight);
+		if (scrollRoot) return Math.max(scrollRoot.scrollHeight, scrollRoot.clientHeight, viewportHeight);
 		if (typeof document === 'undefined') return viewportHeight;
 		const root = document.documentElement;
 		const body = document.body;
@@ -190,10 +177,7 @@
 	};
 
 	function getMinimapMetrics(width: number, height: number, padding: number): MinimapMetrics {
-		const scale = Math.min(
-			(width - padding * 2) / Math.max(sceneBounds.width, 1),
-			(height - padding * 2) / Math.max(sceneBounds.height, 1)
-		);
+		const scale = Math.min((width - padding * 2) / Math.max(sceneBounds.width, 1), (height - padding * 2) / Math.max(sceneBounds.height, 1));
 		const contentWidth = sceneBounds.width * scale;
 		const contentHeight = sceneBounds.height * scale;
 
@@ -209,27 +193,13 @@
 		};
 	}
 
-	let expandedMinimapMetrics = $derived(
-		getMinimapMetrics(MINIMAP_WIDTH, MINIMAP_HEIGHT, MINIMAP_PADDING)
-	);
-	let miniMinimapMetrics = $derived(
-		getMinimapMetrics(MINI_MINIMAP_WIDTH, MINI_MINIMAP_HEIGHT, MINI_MINIMAP_PADDING)
-	);
+	let expandedMinimapMetrics = $derived(getMinimapMetrics(MINIMAP_WIDTH, MINIMAP_HEIGHT, MINIMAP_PADDING));
+	let miniMinimapMetrics = $derived(getMinimapMetrics(MINI_MINIMAP_WIDTH, MINI_MINIMAP_HEIGHT, MINI_MINIMAP_PADDING));
 	let maxScrollX = $derived(
-		typeof document === 'undefined'
-			? 0
-			: Math.max(
-					0,
-					Math.max(getDocumentScrollWidth(), sceneBounds.x + sceneBounds.width) - viewportWidth
-				)
+		typeof document === 'undefined' ? 0 : Math.max(0, Math.max(getDocumentScrollWidth(), sceneBounds.x + sceneBounds.width) - viewportWidth)
 	);
 	let maxScrollY = $derived(
-		typeof document === 'undefined'
-			? 0
-			: Math.max(
-					0,
-					Math.max(getDocumentScrollHeight(), sceneBounds.y + sceneBounds.height) - viewportHeight
-				)
+		typeof document === 'undefined' ? 0 : Math.max(0, Math.max(getDocumentScrollHeight(), sceneBounds.y + sceneBounds.height) - viewportHeight)
 	);
 	let scrollXRatio = $derived(maxScrollX > 0 ? scrollX / maxScrollX : 0);
 	let scrollYRatio = $derived(maxScrollY > 0 ? scrollY / maxScrollY : 0);
@@ -279,14 +249,8 @@
 
 				return {
 					pageNo,
-					x:
-						scrollRoot && rootRect
-							? scrollRoot.scrollLeft + rect.left - rootRect.left
-							: rect.left + window.scrollX,
-					y:
-						scrollRoot && rootRect
-							? scrollRoot.scrollTop + rect.top - rootRect.top
-							: rect.top + window.scrollY,
+					x: scrollRoot && rootRect ? scrollRoot.scrollLeft + rect.left - rootRect.left : rect.left + window.scrollX,
+					y: scrollRoot && rootRect ? scrollRoot.scrollTop + rect.top - rootRect.top : rect.top + window.scrollY,
 					width: rect.width,
 					height: rect.height,
 					isCurrent: node.dataset.minimapCurrent === 'true'
@@ -298,16 +262,8 @@
 
 		const left = Math.min(...nextPages.map((page) => page.x), scrollX);
 		const top = Math.min(...nextPages.map((page) => page.y), scrollY);
-		const right = Math.max(
-			...nextPages.map((page) => page.x + page.width),
-			scrollX + viewportWidth,
-			documentScrollWidth
-		);
-		const bottom = Math.max(
-			...nextPages.map((page) => page.y + page.height),
-			scrollY + viewportHeight,
-			documentScrollHeight
-		);
+		const right = Math.max(...nextPages.map((page) => page.x + page.width), scrollX + viewportWidth, documentScrollWidth);
+		const bottom = Math.max(...nextPages.map((page) => page.y + page.height), scrollY + viewportHeight, documentScrollHeight);
 
 		sceneBounds = {
 			x: Math.min(0, left),
@@ -318,17 +274,9 @@
 		minimapPages = nextPages;
 	}
 
-	function getScrollFromMinimapPoint(
-		x: number,
-		y: number,
-		metrics: MinimapMetrics,
-		centerViewport = true
-	) {
+	function getScrollFromMinimapPoint(x: number, y: number, metrics: MinimapMetrics, centerViewport = true) {
 		const boundedX = Math.max(metrics.offsetX, Math.min(metrics.offsetX + metrics.contentWidth, x));
-		const boundedY = Math.max(
-			metrics.offsetY,
-			Math.min(metrics.offsetY + metrics.contentHeight, y)
-		);
+		const boundedY = Math.max(metrics.offsetY, Math.min(metrics.offsetY + metrics.contentHeight, y));
 		const sceneX = (boundedX - metrics.offsetX) / metrics.scale + sceneBounds.x;
 		const sceneY = (boundedY - metrics.offsetY) / metrics.scale + sceneBounds.y;
 
@@ -438,11 +386,7 @@
 		};
 	}
 
-	function startMinimapPan(
-		e: MouseEvent | TouchEvent,
-		minimapNode: HTMLDivElement | null,
-		getMetrics: () => MinimapMetrics
-	) {
+	function startMinimapPan(e: MouseEvent | TouchEvent, minimapNode: HTMLDivElement | null, getMetrics: () => MinimapMetrics) {
 		if (!minimapNode || disabled) return;
 		stopActiveMinimapPan?.();
 		e.preventDefault();
@@ -454,11 +398,7 @@
 			if (!minimapNode) return;
 			const rect = minimapNode.getBoundingClientRect();
 			const coords = getClientCoordinates(event);
-			const { x, y } = getScrollFromMinimapPoint(
-				coords.x - rect.left,
-				coords.y - rect.top,
-				getMetrics()
-			);
+			const { x, y } = getScrollFromMinimapPoint(coords.x - rect.left, coords.y - rect.top, getMetrics());
 
 			if (scrollRoot) {
 				scrollRoot.scrollTo({
@@ -505,11 +445,7 @@
 	}
 
 	// Click/tap on minimap to jump to position (supports both mouse and touch)
-	function handleMinimapClick(
-		e: MouseEvent | TouchEvent,
-		minimapNode: HTMLDivElement | null,
-		getMetrics: () => MinimapMetrics
-	) {
+	function handleMinimapClick(e: MouseEvent | TouchEvent, minimapNode: HTMLDivElement | null, getMetrics: () => MinimapMetrics) {
 		if (!minimapNode || disabled || isDragging) return;
 		if (suppressNextMinimapClick) {
 			suppressNextMinimapClick = false;
@@ -567,10 +503,7 @@
 		isMenuOpen = false;
 	}
 
-	function getPageMiniStyle(
-		page: { x: number; y: number; width: number; height: number },
-		metrics: MinimapMetrics
-	) {
+	function getPageMiniStyle(page: { x: number; y: number; width: number; height: number }, metrics: MinimapMetrics) {
 		return `
 			left: ${metrics.offsetX + (page.x - sceneBounds.x) * metrics.scale}px;
 			top: ${metrics.offsetY + (page.y - sceneBounds.y) * metrics.scale}px;
@@ -600,11 +533,7 @@
 		];
 		const cached = miniAnnotationSignatureCache.get(cacheId);
 
-		if (
-			cached &&
-			cached.snapshot.length === snapshot.length &&
-			cached.snapshot.every((value, snapshotIndex) => value === snapshot[snapshotIndex])
-		) {
+		if (cached && cached.snapshot.length === snapshot.length && cached.snapshot.every((value, snapshotIndex) => value === snapshot[snapshotIndex])) {
 			return cached.key;
 		}
 
@@ -628,9 +557,7 @@
 		}
 	}
 
-	function computeMiniAnnotationBox(
-		object: MiniAnnotationObject | null | undefined
-	): MiniAnnotationBox | null {
+	function computeMiniAnnotationBox(object: MiniAnnotationObject | null | undefined): MiniAnnotationBox | null {
 		if (!object) return null;
 
 		if (object.type === 'line') {
@@ -643,9 +570,7 @@
 		}
 
 		if ((object.type === 'drawing' || object.type === 'highlight') && object.path) {
-			const scale =
-				object.scale ??
-				(object.originWidth ? (object.width || object.originWidth) / object.originWidth : 1);
+			const scale = object.scale ?? (object.originWidth ? (object.width || object.originWidth) / object.originWidth : 1);
 			const pathBBox = getPathGeometry(object.path).bbox;
 			if (pathBBox) {
 				const transformedBox = getTransformedDrawingBBox(
@@ -710,11 +635,7 @@
 		return 'rgb(249 115 22 / 0.65)';
 	}
 
-	function ensureMiniAnnotationCanvasSize(
-		canvas: HTMLCanvasElement,
-		context: CanvasRenderingContext2D,
-		metrics: MinimapMetrics
-	) {
+	function ensureMiniAnnotationCanvasSize(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D, metrics: MinimapMetrics) {
 		const dpr = getCappedDevicePixelRatio();
 		const bitmapWidth = Math.max(1, Math.round(metrics.width * dpr));
 		const bitmapHeight = Math.max(1, Math.round(metrics.height * dpr));
@@ -789,27 +710,15 @@
 	}
 
 	function getViewportIndicatorStyle(metrics: MinimapMetrics) {
-		const indicatorWidth = Math.min(
-			metrics.contentWidth,
-			Math.max(8, viewportWidth * metrics.scale)
-		);
-		const indicatorHeight = Math.min(
-			metrics.contentHeight,
-			Math.max(8, viewportHeight * metrics.scale)
-		);
+		const indicatorWidth = Math.min(metrics.contentWidth, Math.max(8, viewportWidth * metrics.scale));
+		const indicatorHeight = Math.min(metrics.contentHeight, Math.max(8, viewportHeight * metrics.scale));
 		const indicatorX = Math.max(
 			metrics.offsetX,
-			Math.min(
-				metrics.offsetX + metrics.contentWidth - indicatorWidth,
-				metrics.offsetX + (scrollX - sceneBounds.x) * metrics.scale
-			)
+			Math.min(metrics.offsetX + metrics.contentWidth - indicatorWidth, metrics.offsetX + (scrollX - sceneBounds.x) * metrics.scale)
 		);
 		const indicatorY = Math.max(
 			metrics.offsetY,
-			Math.min(
-				metrics.offsetY + metrics.contentHeight - indicatorHeight,
-				metrics.offsetY + (scrollY - sceneBounds.y) * metrics.scale
-			)
+			Math.min(metrics.offsetY + metrics.contentHeight - indicatorHeight, metrics.offsetY + (scrollY - sceneBounds.y) * metrics.scale)
 		);
 
 		return `
@@ -932,12 +841,9 @@
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
 					bind:this={expandedMinimapRef}
-					onmousedown={(event) =>
-						startMinimapPan(event, expandedMinimapRef, () => expandedMinimapMetrics)}
-					onclick={(event) =>
-						handleMinimapClick(event, expandedMinimapRef, () => expandedMinimapMetrics)}
-					use:nonPassiveTouchStart={(event) =>
-						startMinimapPan(event, expandedMinimapRef, () => expandedMinimapMetrics)}
+					onmousedown={(event) => startMinimapPan(event, expandedMinimapRef, () => expandedMinimapMetrics)}
+					onclick={(event) => handleMinimapClick(event, expandedMinimapRef, () => expandedMinimapMetrics)}
+					use:nonPassiveTouchStart={(event) => startMinimapPan(event, expandedMinimapRef, () => expandedMinimapMetrics)}
 					class="relative touch-none rounded border border-gray-300 bg-white"
 					class:cursor-grab={!isDragging && !disabled}
 					class:cursor-grabbing={isDragging}
@@ -1134,8 +1040,7 @@
 				bind:this={miniMinimapRef}
 				onmousedown={(event) => startMinimapPan(event, miniMinimapRef, () => miniMinimapMetrics)}
 				onclick={(event) => handleMinimapClick(event, miniMinimapRef, () => miniMinimapMetrics)}
-				use:nonPassiveTouchStart={(event) =>
-					startMinimapPan(event, miniMinimapRef, () => miniMinimapMetrics)}
+				use:nonPassiveTouchStart={(event) => startMinimapPan(event, miniMinimapRef, () => miniMinimapMetrics)}
 				class="relative mx-2 mb-2 touch-none overflow-hidden rounded-md bg-gray-50"
 				class:cursor-grab={!isDragging && !disabled}
 				class:cursor-grabbing={isDragging}

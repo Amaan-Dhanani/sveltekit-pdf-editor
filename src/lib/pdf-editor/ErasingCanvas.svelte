@@ -1,12 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import {
-		getPathGeometry,
-		getTransformedDrawingBBox,
-		pointInBBox,
-		pointNearPath,
-		screenToDrawingCoords
-	} from './utils/hitTest';
+	import { getPathGeometry, getTransformedDrawingBBox, pointInBBox, pointNearPath, screenToDrawingCoords } from './utils/hitTest';
 	import type { BBox, DrawingObject, Point } from './utils/hitTest';
 	import { getCoalescedPointerEvents, isPenLikePointerEvent } from './utils/liveStroke';
 	import { createObjectSpatialIndex } from './utils/spatialIndex';
@@ -40,8 +34,7 @@
 	let currentDrawingType: string | null = null;
 	let canvasRect: DOMRect | null = null;
 	let eraserFrame: number | null = null;
-	let pendingEraserPoint: { clientX: number; clientY: number; mode: 'hover' | 'erase' } | null =
-		null;
+	let pendingEraserPoint: { clientX: number; clientY: number; mode: 'hover' | 'erase' } | null = null;
 	let appliedHighlightedObjects = new Set<string>();
 	let strokeNotified = false;
 	let objectById = $derived.by(() => {
@@ -188,10 +181,7 @@
 
 		if (
 			(isActivePen && currentDrawingType === 'pen') ||
-			(event.pointerType === 'mouse' &&
-				currentDrawingType === 'mouse' &&
-				activePointers.size === 1 &&
-				!isPenMode)
+			(event.pointerType === 'mouse' && currentDrawingType === 'mouse' && activePointers.size === 1 && !isPenMode)
 		) {
 			const events = getCoalescedPointerEvents(event);
 			const latestEvent = events[events.length - 1] || event;
@@ -208,12 +198,7 @@
 			isPenActive = false;
 			currentDrawingType = null;
 			endErasing();
-		} else if (
-			event.pointerType === 'mouse' &&
-			currentDrawingType === 'mouse' &&
-			activePointers.size === 0 &&
-			!isPenMode
-		) {
+		} else if (event.pointerType === 'mouse' && currentDrawingType === 'mouse' && activePointers.size === 0 && !isPenMode) {
 			currentDrawingType = null;
 			endErasing();
 		}
@@ -483,9 +468,7 @@
 	}
 
 	function getDrawingScale(drawing: any) {
-		const scale =
-			drawing.scale ??
-			(drawing.originWidth ? (drawing.width || drawing.originWidth) / drawing.originWidth : 1);
+		const scale = drawing.scale ?? (drawing.originWidth ? (drawing.width || drawing.originWidth) / drawing.originWidth : 1);
 
 		return Number.isFinite(scale) && scale !== 0 ? scale : 1;
 	}
@@ -517,12 +500,7 @@
 
 		const drawingObject = toDrawingObject(drawing);
 		const scale = getDrawingScale(drawingObject);
-		const transformedBox = getTransformedDrawingBBox(
-			drawingObject,
-			pathBox,
-			scale,
-			Number(drawingObject.rotation || 0)
-		);
+		const transformedBox = getTransformedDrawingBBox(drawingObject, pathBox, scale, Number(drawingObject.rotation || 0));
 		const strokePadding = Math.max(((drawing.brushSize || 1) * Math.abs(scale)) / 2, 1);
 		const pageBox = {
 			x: transformedBox.x - strokePadding,
@@ -539,11 +517,7 @@
 	function detectObjectsInEraserRadius(x: number, y: number) {
 		const objectsToErase: string[] = [];
 		const eraserPoint: Point = { x, y };
-		const candidates = objectSpatialIndex.queryPoint(
-			x,
-			y,
-			brushSize + 4 / Math.max(pageScale || 1, 0.1)
-		);
+		const candidates = objectSpatialIndex.queryPoint(x, y, brushSize + 4 / Math.max(pageScale || 1, 0.1));
 
 		for (const drawing of candidates) {
 			if (drawing.type === 'text') continue;
@@ -560,14 +534,7 @@
 			const eraserRadiusInLocalSpace = brushSize / scale;
 			const strokeRadiusInLocalSpace = Math.max((drawing.brushSize || 1) / 2, 1);
 
-			if (
-				drawing.id &&
-				pointNearPath(
-					localPoint,
-					geometry.points,
-					eraserRadiusInLocalSpace + strokeRadiusInLocalSpace
-				)
-			) {
+			if (drawing.id && pointNearPath(localPoint, geometry.points, eraserRadiusInLocalSpace + strokeRadiusInLocalSpace)) {
 				objectsToErase.push(String(drawing.id));
 			}
 		}
@@ -577,10 +544,7 @@
 
 	function setObjectEraserHighlight(id: string, shouldHighlight: boolean) {
 		const obj = objectById.get(id);
-		if (
-			(obj?.type === 'drawing' || obj?.type === 'highlight') &&
-			obj._eraserHighlight !== shouldHighlight
-		) {
+		if ((obj?.type === 'drawing' || obj?.type === 'highlight') && obj._eraserHighlight !== shouldHighlight) {
 			obj._eraserHighlight = shouldHighlight;
 			return true;
 		}
@@ -615,10 +579,7 @@
 	}
 </script>
 
-<div
-    bind:this={canvas}
-    class="absolute left-0 top-0 h-full w-full cursor-crosshair select-none"
->
+<div bind:this={canvas} class="absolute left-0 top-0 h-full w-full cursor-crosshair select-none">
 	{#if showCursor}
 		<div
 			class="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-red-500/80 bg-red-500/10"
@@ -630,13 +591,6 @@
 	{/if}
 
 	<svg class="pointer-events-none h-full w-full">
-		<path
-			stroke-width={brushSize}
-			stroke-linejoin="round"
-			stroke-linecap="round"
-			d={path}
-			stroke={brushColor}
-			fill="none"
-		/>
+		<path stroke-width={brushSize} stroke-linejoin="round" stroke-linecap="round" d={path} stroke={brushColor} fill="none" />
 	</svg>
 </div>

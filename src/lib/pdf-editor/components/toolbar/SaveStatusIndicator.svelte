@@ -1,12 +1,5 @@
 <script lang="ts">
-	import {
-		LucideFileCheck,
-		LucideTriangleAlert,
-		LucideRepeat,
-		LucideHardDrive,
-		LucideCloudLightning,
-		LucidePauseCircle
-	} from '@lucide/svelte';
+	import { LucideFileCheck, LucideTriangleAlert, LucideRepeat, LucideHardDrive, LucideCloudLightning, LucidePauseCircle } from '@lucide/svelte';
 	import type { SaveState } from '../../context/pdfEditorContext.svelte.ts';
 
 	interface Props {
@@ -19,16 +12,12 @@
 
 <div class="flex items-center gap-2">
 	{#if saveState.status === 'saved'}
-		<div
-			class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-emerald-600"
-		>
+		<div class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-emerald-600">
 			<LucideFileCheck size={18} />
 			<span class="hidden sm:inline">Saved</span>
 		</div>
 	{:else if saveState.status === 'saving'}
-		<div
-			class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-amber-500"
-		>
+		<div class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-amber-500">
 			<span class="loading loading-spinner loading-sm"></span>
 			<span class="hidden sm:inline">Saving</span>
 		</div>
@@ -41,24 +30,18 @@
 			<span class="hidden sm:inline">Saved locally only</span>
 		</div>
 	{:else if saveState.status === 'cloud_saved'}
-		<div
-			class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-emerald-600"
-		>
+		<div class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-emerald-600">
 			<LucideCloudLightning size={18} />
 			<span class="hidden sm:inline">Cloud Saved</span>
 		</div>
 	{:else if saveState.status === 'idle'}
-		<div
-			class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-500"
-		>
+		<div class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-500">
 			<LucidePauseCircle size={18} />
 			<span class="hidden sm:inline">Idle</span>
 		</div>
 	{:else}
 		<div class="flex flex-wrap items-center gap-2">
-			<div
-				class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-rose-500"
-			>
+			<div class="flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-rose-500">
 				<LucideTriangleAlert size={18} />
 				<span class="hidden sm:inline">Not saved</span>
 			</div>

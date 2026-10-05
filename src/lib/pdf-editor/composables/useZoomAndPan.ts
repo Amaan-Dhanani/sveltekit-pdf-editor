@@ -5,13 +5,7 @@
  */
 
 import { getPDFEditorContext } from '../context/pdfEditorContext.svelte';
-import {
-	clampPdfZoom,
-	MAX_PDF_ZOOM,
-	MIN_PDF_ZOOM,
-	PDF_ZOOM_STEP,
-	SOFT_MIN_PDF_ZOOM
-} from '../utils/zoomLimits';
+import { clampPdfZoom, MAX_PDF_ZOOM, MIN_PDF_ZOOM, PDF_ZOOM_STEP, SOFT_MIN_PDF_ZOOM } from '../utils/zoomLimits';
 import { canReleaseCameraRedraw } from '../utils/cameraRedrawGate';
 
 type ScrollRootGetter = () => HTMLElement | null | undefined;
@@ -19,10 +13,7 @@ type ScrollRootGetter = () => HTMLElement | null | undefined;
 function isIOSLikeDevice() {
 	if (typeof navigator === 'undefined') return false;
 
-	return (
-		/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-		(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-	);
+	return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
 export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
@@ -389,14 +380,8 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 		const viewport = getViewportMetrics();
 
 		return {
-			x: Math.max(
-				0,
-				Math.max(root?.scrollWidth || 0, body?.scrollWidth || 0) - viewport.width
-			),
-			y: Math.max(
-				0,
-				Math.max(root?.scrollHeight || 0, body?.scrollHeight || 0) - viewport.height
-			)
+			x: Math.max(0, Math.max(root?.scrollWidth || 0, body?.scrollWidth || 0) - viewport.width),
+			y: Math.max(0, Math.max(root?.scrollHeight || 0, body?.scrollHeight || 0) - viewport.height)
 		};
 	}
 
@@ -503,16 +488,8 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 
 				return {
 					element: lastZoomAnchorElement,
-					ratioX: clampNumber(
-						(documentPoint.x - documentRect.left) / documentRect.width,
-						0,
-						1
-					),
-					ratioY: clampNumber(
-						(documentPoint.y - documentRect.top) / documentRect.height,
-						0,
-						1
-					)
+					ratioX: clampNumber((documentPoint.x - documentRect.left) / documentRect.width, 0, 1),
+					ratioY: clampNumber((documentPoint.y - documentRect.top) / documentRect.height, 0, 1)
 				};
 			}
 		}
@@ -526,11 +503,7 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 			Array.from(document.querySelectorAll<HTMLElement>('[data-minimap-page]'))
 				.map((element) => ({ element, rect: element.getBoundingClientRect() }))
 				.filter(({ rect }) => rect.width > 0 && rect.height > 0)
-				.sort(
-					(a, b) =>
-						getDistanceToRect(a.rect, centerX, centerY) -
-						getDistanceToRect(b.rect, centerX, centerY)
-				)[0]?.element;
+				.sort((a, b) => getDistanceToRect(a.rect, centerX, centerY) - getDistanceToRect(b.rect, centerX, centerY))[0]?.element;
 
 		if (!pageElement) return null;
 
@@ -562,12 +535,8 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 			const targetY = rect.top + rect.height * correction.anchor.ratioY;
 			const maxScroll = getDocumentMaxScroll();
 			const scrollRoot = getActiveScrollRoot();
-			const viewportCenterX = scrollRoot
-				? correction.centerX - viewport.left
-				: correction.centerX + viewport.offsetLeft;
-			const viewportCenterY = scrollRoot
-				? correction.centerY - viewport.top
-				: correction.centerY + viewport.offsetTop;
+			const viewportCenterX = scrollRoot ? correction.centerX - viewport.left : correction.centerX + viewport.offsetLeft;
+			const viewportCenterY = scrollRoot ? correction.centerY - viewport.top : correction.centerY + viewport.offsetTop;
 
 			scrollToPosition(
 				clampNumber(targetX - viewportCenterX, 0, maxScroll.x),
@@ -577,12 +546,7 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 		});
 	}
 
-	function correctScrollToZoomAnchor(
-		anchor: ReturnType<typeof getPageZoomAnchor>,
-		centerX: number,
-		centerY: number,
-		settleDelay = 0
-	) {
+	function correctScrollToZoomAnchor(anchor: ReturnType<typeof getPageZoomAnchor>, centerX: number, centerY: number, settleDelay = 0) {
 		if (!anchor) return;
 
 		if (zoomSettleTimeout !== null) {
@@ -625,21 +589,14 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 			centerY = viewport.top + viewport.height / 2;
 		}
 		const pendingAnchor = pendingZoomCorrection?.anchor;
-		const pageAnchor = pendingAnchor?.element.isConnected
-			? pendingAnchor
-			: getPageZoomAnchor(centerX, centerY);
+		const pageAnchor = pendingAnchor?.element.isConnected ? pendingAnchor : getPageZoomAnchor(centerX, centerY);
 
 		// Update zoom
 		ctx.state.zoom = newZoom;
 
 		// Keep the same point on the editable PDF under the cursor/viewport center.
 		// This stays accurate even when the whiteboard padding or side-page layout does not scale.
-		correctScrollToZoomAnchor(
-			pageAnchor,
-			centerX,
-			centerY,
-			useTransition ? SMOOTH_ZOOM_DURATION + 50 : 0
-		);
+		correctScrollToZoomAnchor(pageAnchor, centerX, centerY, useTransition ? SMOOTH_ZOOM_DURATION + 50 : 0);
 		scheduleCameraIdle(useTransition ? SMOOTH_ZOOM_DURATION + 80 : CAMERA_IDLE_DELAY);
 	}
 
@@ -659,12 +616,7 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 		if (ctx.state.zoom > MIN_PDF_ZOOM) {
 			const minZoom = ctx.state.zoom <= SOFT_MIN_PDF_ZOOM ? MIN_PDF_ZOOM : SOFT_MIN_PDF_ZOOM;
 			const zoomStep = ctx.state.zoom <= SOFT_MIN_PDF_ZOOM ? OVERRIDE_ZOOM_STEP : PDF_ZOOM_STEP;
-			zoomAtPoint(
-				clampPdfZoom(ctx.state.zoom - zoomStep, minZoom),
-				undefined,
-				undefined,
-				true
-			);
+			zoomAtPoint(clampPdfZoom(ctx.state.zoom - zoomStep, minZoom), undefined, undefined, true);
 		}
 	}
 
@@ -740,10 +692,7 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 				gestureType = null;
 			} else {
 				const distanceChange = Math.abs(distance - initialDistance);
-				const centerMovement = Math.hypot(
-					currentCenter.x - initialCenter!.x,
-					currentCenter.y - initialCenter!.y
-				);
+				const centerMovement = Math.hypot(currentCenter.x - initialCenter!.x, currentCenter.y - initialCenter!.y);
 
 				const PINCH_THRESHOLD = 10; // adjust as needed
 				const PAN_THRESHOLD = 5; // adjust as needed
@@ -822,15 +771,8 @@ export function useZoomAndPan(getScrollRoot?: ScrollRootGetter) {
 		const currentPosition = { x: touch.clientX, y: touch.clientY };
 
 		// Check if this is a double-tap
-		if (
-			lastTapTime &&
-			currentTime - lastTapTime < DOUBLE_TAP_DELAY &&
-			lastTapPosition
-		) {
-			const distance = Math.hypot(
-				currentPosition.x - lastTapPosition.x,
-				currentPosition.y - lastTapPosition.y
-			);
+		if (lastTapTime && currentTime - lastTapTime < DOUBLE_TAP_DELAY && lastTapPosition) {
+			const distance = Math.hypot(currentPosition.x - lastTapPosition.x, currentPosition.y - lastTapPosition.y);
 
 			if (distance < DOUBLE_TAP_DISTANCE) {
 				e.preventDefault();

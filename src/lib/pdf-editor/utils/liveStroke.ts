@@ -36,10 +36,7 @@ export function getCoalescedPointerEvents(event: PointerEvent): PointerEvent[] {
 export function isIOSLikeDevice() {
 	if (typeof navigator === 'undefined') return false;
 
-	return (
-		/iPad|iPhone|iPod/.test(navigator.userAgent) ||
-		(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-	);
+	return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
 export function isPenLikePointerEvent(event: PointerEvent) {
@@ -71,22 +68,14 @@ export class LiveStroke {
 		options: LiveStrokeOptions = {}
 	) {
 		this.minPointDistance = Math.max(0, options.minPointDistance ?? DEFAULT_MIN_POINT_DISTANCE);
-		this.maxPointsPerSegment = Math.max(
-			8,
-			options.maxPointsPerSegment ?? DEFAULT_MAX_POINTS_PER_SEGMENT
-		);
+		this.maxPointsPerSegment = Math.max(8, options.maxPointsPerSegment ?? DEFAULT_MAX_POINTS_PER_SEGMENT);
 		this.renderCommands = options.renderCommands;
 	}
 
 	start(clientX: number, clientY: number, target: EventTarget | null) {
 		const canvas = this.getCanvas();
 		if (!canvas) return false;
-		if (
-			typeof Node !== 'undefined' &&
-			target instanceof Node &&
-			target !== canvas &&
-			!canvas.contains(target)
-		) {
+		if (typeof Node !== 'undefined' && target instanceof Node && target !== canvas && !canvas.contains(target)) {
 			return false;
 		}
 
@@ -120,10 +109,7 @@ export class LiveStroke {
 		if (!canvasRect || this.commands.length === 0) return null;
 
 		const normalize = roundCoordinates ? roundToTwoDecimals : (value: number) => value;
-		const scaledCommands = this.commands.map(
-			([command, x, y]) =>
-				[command, normalize(x / pageScale), normalize(y / pageScale)] as StrokeCommand
-		);
+		const scaledCommands = this.commands.map(([command, x, y]) => [command, normalize(x / pageScale), normalize(y / pageScale)] as StrokeCommand);
 
 		return {
 			originWidth: normalize(canvasRect.width / pageScale),
@@ -177,11 +163,7 @@ export class LiveStroke {
 			}
 		}
 
-		if (
-			command === 'L' &&
-			this.segmentPointCount >= this.maxPointsPerSegment &&
-			this.lastPoint
-		) {
+		if (command === 'L' && this.segmentPointCount >= this.maxPointsPerSegment && this.lastPoint) {
 			this.pushCommand('M', this.lastPoint.x, this.lastPoint.y);
 		}
 

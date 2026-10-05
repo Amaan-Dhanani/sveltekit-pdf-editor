@@ -1,14 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import {
-		isPenLikePointerEvent,
-		LiveStroke,
-		type StrokeCommand
-	} from './utils/liveStroke';
-	import {
-		getBoundedCanvasBackingScale,
-		getCappedDevicePixelRatio
-	} from './utils/annotationRendering';
+	import { isPenLikePointerEvent, LiveStroke, type StrokeCommand } from './utils/liveStroke';
+	import { getBoundedCanvasBackingScale, getCappedDevicePixelRatio } from './utils/annotationRendering';
 
 	let {
 		pageScale,
@@ -128,9 +121,7 @@
 		const bitmapWidth = Math.max(1, Math.round(rect.width * backingScale));
 		const bitmapHeight = Math.max(1, Math.round(rect.height * backingScale));
 
-		const resized =
-			lastPreviewBitmapWidth !== bitmapWidth ||
-			lastPreviewBitmapHeight !== bitmapHeight;
+		const resized = lastPreviewBitmapWidth !== bitmapWidth || lastPreviewBitmapHeight !== bitmapHeight;
 
 		if (resized) {
 			previewCanvas.width = bitmapWidth;
@@ -236,10 +227,7 @@
 
 		if (
 			(isActivePen && currentHighlightType === 'pen') ||
-			(event.pointerType === 'mouse' &&
-				currentHighlightType === 'mouse' &&
-				activePointers.size === 1 &&
-				!isPenActive)
+			(event.pointerType === 'mouse' && currentHighlightType === 'mouse' && activePointers.size === 1 && !isPenActive)
 		) {
 			continueHighlighting(event);
 		}
@@ -254,12 +242,7 @@
 			isPenActive = false;
 			currentHighlightType = null;
 			endHighlighting();
-		} else if (
-			event.pointerType === 'mouse' &&
-			currentHighlightType === 'mouse' &&
-			activePointers.size === 0 &&
-			!isPenMode
-		) {
+		} else if (event.pointerType === 'mouse' && currentHighlightType === 'mouse' && activePointers.size === 0 && !isPenMode) {
 			currentHighlightType = null;
 			endHighlighting();
 		}
@@ -416,10 +399,6 @@
 	}
 </script>
 
-<div
-	bind:this={canvas}
-	class="absolute top-0 left-0 h-full w-full select-none"
-	style="cursor: {isPenMode ? 'crosshair' : 'crosshair'};"
->
+<div bind:this={canvas} class="absolute top-0 left-0 h-full w-full select-none" style="cursor: {isPenMode ? 'crosshair' : 'crosshair'};">
 	<canvas bind:this={previewCanvas} class="pointer-events-none h-full w-full"></canvas>
 </div>

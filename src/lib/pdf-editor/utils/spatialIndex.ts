@@ -1,9 +1,4 @@
-import {
-	getPathGeometry,
-	getTransformedDrawingBBox,
-	type BBox,
-	type DrawingObject
-} from './hitTest';
+import { getPathGeometry, getTransformedDrawingBBox, type BBox, type DrawingObject } from './hitTest';
 
 export type SpatialIndexObject = {
 	id?: string | number;
@@ -68,9 +63,7 @@ function expandBox(box: BBox, padding = 0): BBox {
 }
 
 function getDrawingScale(object: SpatialIndexObject) {
-	const scale =
-		object.scale ??
-		(object.originWidth ? (object.width || object.originWidth) / object.originWidth : 1);
+	const scale = object.scale ?? (object.originWidth ? (object.width || object.originWidth) / object.originWidth : 1);
 
 	return Number.isFinite(scale) && scale !== 0 ? scale : 1;
 }
@@ -91,12 +84,7 @@ function getPathAnnotationBox(object: SpatialIndexObject): BBox | null {
 		originHeight: normalizeNumber(object.originHeight, object.height || 1),
 		path: object.path
 	} as DrawingObject;
-	const transformedBox = getTransformedDrawingBBox(
-		drawing,
-		pathBox,
-		scale,
-		normalizeNumber(object.rotation)
-	);
+	const transformedBox = getTransformedDrawingBBox(drawing, pathBox, scale, normalizeNumber(object.rotation));
 	const strokePadding = Math.max((object.brushSize || 1) * Math.abs(scale), 1) / 2;
 
 	return expandBox(transformedBox, strokePadding);
@@ -240,18 +228,10 @@ export class ObjectSpatialIndex<T extends SpatialIndexObject> {
 	}
 }
 
-export function createObjectSpatialIndex<T extends SpatialIndexObject>(
-	objects: readonly T[] = [],
-	options?: SpatialIndexOptions
-) {
+export function createObjectSpatialIndex<T extends SpatialIndexObject>(objects: readonly T[] = [], options?: SpatialIndexOptions) {
 	return new ObjectSpatialIndex(objects, options);
 }
 
 function boxesIntersect(a: BBox, b: BBox) {
-	return (
-		a.x <= b.x + b.width &&
-		a.x + a.width >= b.x &&
-		a.y <= b.y + b.height &&
-		a.y + a.height >= b.y
-	);
+	return a.x <= b.x + b.width && a.x + a.width >= b.x && a.y <= b.y + b.height && a.y + a.height >= b.y;
 }

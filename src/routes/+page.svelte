@@ -1,17 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { PdfEditor } from '$lib';
-	import {
-		Check,
-		ClipboardCopy,
-		Database,
-		FileText,
-		FileUp,
-		ShieldCheck,
-		Trash2,
-		UploadCloud,
-		X
-	} from '@lucide/svelte';
+	import { Check, ClipboardCopy, Database, FileText, FileUp, ShieldCheck, Trash2, UploadCloud, X } from '@lucide/svelte';
 
 	type SavedDocument = {
 		id: string;
@@ -68,9 +58,7 @@
 
 			const parsed = JSON.parse(savedDocsString);
 			savedDocuments = Array.isArray(parsed)
-				? parsed
-						.map((doc, index) => normalizeSavedDocument(doc, index))
-						.filter((doc): doc is SavedDocument => Boolean(doc))
+				? parsed.map((doc, index) => normalizeSavedDocument(doc, index)).filter((doc): doc is SavedDocument => Boolean(doc))
 				: [];
 		} catch (error) {
 			console.error('Failed to load saved PDF documents', error);
@@ -136,8 +124,7 @@
 			fileName = newDoc.name;
 			pageAnnotations = [];
 			pdfBlob = file;
-			uploadError =
-				'This PDF opened, but it could not be saved locally. Your browser storage may be full.';
+			uploadError = 'This PDF opened, but it could not be saved locally. Your browser storage may be full.';
 		} finally {
 			isUploading = false;
 			if (fileInput) fileInput.value = '';
@@ -164,11 +151,7 @@
 		const currentTarget = event.currentTarget;
 		const relatedTarget = event.relatedTarget;
 
-		if (
-			currentTarget instanceof HTMLElement &&
-			relatedTarget instanceof Node &&
-			currentTarget.contains(relatedTarget)
-		) {
+		if (currentTarget instanceof HTMLElement && relatedTarget instanceof Node && currentTarget.contains(relatedTarget)) {
 			return;
 		}
 
@@ -247,9 +230,7 @@
 	function updateCurrentDocumentAnnotations(annotations: any[][]) {
 		try {
 			const updatedDocs = savedDocuments.map((doc) => {
-				const isCurrentDocument =
-					(currentDocumentId && doc.id === currentDocumentId) ||
-					(!currentDocumentId && doc.name === fileName);
+				const isCurrentDocument = (currentDocumentId && doc.id === currentDocumentId) || (!currentDocumentId && doc.name === fileName);
 
 				return isCurrentDocument
 					? {
@@ -322,10 +303,7 @@
 	}
 
 	function getAnnotationCount(doc: SavedDocument) {
-		return normalizeAnnotationPages(doc.pageAnnotations).reduce(
-			(total, pageObjects) => total + pageObjects.length,
-			0
-		);
+		return normalizeAnnotationPages(doc.pageAnnotations).reduce((total, pageObjects) => total + pageObjects.length, 0);
 	}
 
 	function getAnnotationLabel(doc: SavedDocument) {
@@ -363,13 +341,9 @@
 		{:else}
 			<div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
 				<header class="grid gap-5 lg:grid-cols-[1.35fr_0.65fr] lg:items-end">
-					<h1 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
-						Open a PDF!
-					</h1>
+					<h1 class="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">Open a PDF!</h1>
 
-					<div
-						class="grid gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-950"
-					>
+					<div class="grid gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-950">
 						<div class="flex gap-3">
 							<ShieldCheck class="mt-0.5 h-5 w-5 shrink-0 text-orange-600" />
 							<span>PDF files are read by your browser only.</span>
@@ -392,24 +366,13 @@
 						ondragleave={handleDragLeave}
 						ondrop={handleDrop}
 					>
-						<input
-							bind:this={fileInput}
-							id="pdf-file"
-							type="file"
-							class="sr-only"
-							accept="application/pdf"
-							onchange={handleFileChange}
-						/>
+						<input bind:this={fileInput} id="pdf-file" type="file" class="sr-only" accept="application/pdf" onchange={handleFileChange} />
 
-						<span
-							class="rounded-full bg-orange-100 p-4 text-orange-600 transition group-hover:bg-orange-200"
-						>
+						<span class="rounded-full bg-orange-100 p-4 text-orange-600 transition group-hover:bg-orange-200">
 							<UploadCloud class="h-9 w-9" />
 						</span>
 						<h2 class="mt-5 text-xl font-semibold text-zinc-950">Select or drag a PDF here</h2>
-						<p class="mt-2 max-w-sm text-sm leading-6 text-zinc-600">
-							Drop a PDF to open it immediately.
-						</p>
+						<p class="mt-2 max-w-sm text-sm leading-6 text-zinc-600">Drop a PDF to open it immediately.</p>
 						<span
 							class="mt-6 inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition group-hover:bg-orange-600"
 						>
@@ -426,9 +389,7 @@
 						<div class="flex items-start justify-between gap-4">
 							<div>
 								<h2 class="text-xl font-semibold text-zinc-950">Previous PDFs</h2>
-								<p class="mt-1 text-sm text-zinc-500">
-									Resume documents stored in localStorage on this device.
-								</p>
+								<p class="mt-1 text-sm text-zinc-500">Resume documents stored in localStorage on this device.</p>
 							</div>
 							<span class="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
 								{savedDocuments.length} saved
@@ -441,23 +402,14 @@
 							>
 								<FileText class="h-10 w-10 text-zinc-400" />
 								<h3 class="mt-3 text-sm font-semibold text-zinc-800">No previous PDFs yet</h3>
-								<p class="mt-1 max-w-xs text-sm text-zinc-500">
-									Uploaded PDFs will appear here with a first-page preview after you open them.
-								</p>
+								<p class="mt-1 max-w-xs text-sm text-zinc-500">Uploaded PDFs will appear here with a first-page preview after you open them.</p>
 							</div>
 						{:else}
 							<div class="mt-6 grid max-h-136 gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
 								{#each savedDocuments as doc}
-									<article
-										class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm"
-									>
+									<article class="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm">
 										<div class="h-44 overflow-hidden bg-zinc-100">
-											<iframe
-												title={`${doc.name} preview`}
-												src={getPreviewUrl(doc)}
-												class="h-full w-full border-0 bg-white"
-												loading="lazy"
-											></iframe>
+											<iframe title={`${doc.name} preview`} src={getPreviewUrl(doc)} class="h-full w-full border-0 bg-white" loading="lazy"></iframe>
 										</div>
 
 										<div class="space-y-4 p-4">
@@ -472,16 +424,10 @@
 											</div>
 
 											<div class="flex flex-wrap gap-2 text-xs">
-												<span
-													class="rounded-full bg-orange-50 px-2.5 py-1 font-medium text-orange-700"
-												>
+												<span class="rounded-full bg-orange-50 px-2.5 py-1 font-medium text-orange-700">
 													{getAnnotationLabel(doc)}
 												</span>
-												<span
-													class="rounded-full bg-zinc-100 px-2.5 py-1 font-medium text-zinc-600"
-												>
-													Local only
-												</span>
+												<span class="rounded-full bg-zinc-100 px-2.5 py-1 font-medium text-zinc-600"> Local only </span>
 											</div>
 
 											<div class="flex gap-2">
@@ -514,12 +460,7 @@
 
 	{#if isSaveJsonModalOpen}
 		<div class="fixed inset-0 z-120 flex items-center justify-center bg-black/50 p-4">
-			<button
-				type="button"
-				class="absolute inset-0 cursor-default"
-				aria-label="Close JSON output modal"
-				onclick={closeSaveJsonModal}
-			></button>
+			<button type="button" class="absolute inset-0 cursor-default" aria-label="Close JSON output modal" onclick={closeSaveJsonModal}></button>
 			<div
 				class="relative z-10 flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
 				role="dialog"
@@ -528,12 +469,8 @@
 			>
 				<header class="flex items-center justify-between border-b border-gray-200 px-5 py-4">
 					<div>
-						<h2 id="save-json-title" class="text-lg font-semibold text-gray-900">
-							Saved annotation JSON
-						</h2>
-						<p class="mt-1 text-sm text-gray-500">
-							This annotation payload was also saved locally for the current demo PDF.
-						</p>
+						<h2 id="save-json-title" class="text-lg font-semibold text-gray-900">Saved annotation JSON</h2>
+						<p class="mt-1 text-sm text-gray-500">This annotation payload was also saved locally for the current demo PDF.</p>
 					</div>
 					<button
 						type="button"
@@ -546,17 +483,11 @@
 				</header>
 
 				<div class="min-h-0 flex-1 overflow-auto bg-gray-950 p-4">
-					<pre class="whitespace-pre-wrap wrap-break-word text-xs leading-5 text-amber-100"><code
-							>{saveJsonOutput}</code
-						></pre>
+					<pre class="whitespace-pre-wrap wrap-break-word text-xs leading-5 text-amber-100"><code>{saveJsonOutput}</code></pre>
 				</div>
 
-				<footer
-					class="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-				>
-					<p class="text-sm text-gray-500">
-						Copy this annotation-only JSON or reopen the PDF later from localStorage.
-					</p>
+				<footer class="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+					<p class="text-sm text-gray-500">Copy this annotation-only JSON or reopen the PDF later from localStorage.</p>
 					<button
 						type="button"
 						class="inline-flex items-center justify-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600"

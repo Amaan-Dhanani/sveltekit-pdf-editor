@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import {
-		DocumentContent,
-		useDocumentManagerCapability
-	} from '@embedpdf/plugin-document-manager/svelte';
+	import { DocumentContent, useDocumentManagerCapability } from '@embedpdf/plugin-document-manager/svelte';
 
 	let {
 		documentId,
@@ -85,9 +82,7 @@
 
 {#if openError}
 	<div class="flex h-64 w-full items-center justify-center">
-		<div
-			class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-		>
+		<div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
 			{openError}
 		</div>
 	</div>

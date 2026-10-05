@@ -1,15 +1,6 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import {
-		LucideX,
-		LucideBrush,
-		LucideMinus,
-		LucidePlus,
-		LucidePalette,
-		LucideTrash2,
-		LucideChevronDown,
-		LucideChevronUp
-	} from '@lucide/svelte';
+	import { LucideX, LucideBrush, LucideMinus, LucidePlus, LucidePalette, LucideTrash2, LucideChevronDown, LucideChevronUp } from '@lucide/svelte';
 	import { presetColors } from '../../utils/colorPresets';
 	import type { PDFObject } from '../../context/pdfEditorContext.svelte';
 
@@ -36,10 +27,7 @@
 
 {#if selectedLine}
 	<!-- Fixed Top-Right Panel -->
-	<div
-		transition:fly={{ x: 10, y: 0, duration: 200 }}
-		class="pdf-editor-touch-controls fixed top-20 right-3 z-110"
-	>
+	<div transition:fly={{ x: 10, y: 0, duration: 200 }} class="pdf-editor-touch-controls fixed top-20 right-3 z-110">
 		<div
 			class="border border-gray-200 bg-white shadow-2xl transition-all duration-200"
 			class:w-64={!isMinimized}
@@ -109,14 +97,11 @@
 			{#if !isMinimized}
 				<!-- Stroke Width Section -->
 				<div class="mb-4">
-					<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-						Line Width
-					</div>
+					<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Line Width</div>
 					<div class="flex items-center gap-2">
 						<button
 							class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
-							onclick={() =>
-								onStrokeWidthChange(Math.max(1, (Number(selectedLine?.strokeWidth) || 2) - 1))}
+							onclick={() => onStrokeWidthChange(Math.max(1, (Number(selectedLine?.strokeWidth) || 2) - 1))}
 							title="Decrease"
 						>
 							<LucideMinus size={16} />
@@ -137,8 +122,7 @@
 						</div>
 						<button
 							class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
-							onclick={() =>
-								onStrokeWidthChange(Math.min(20, (Number(selectedLine?.strokeWidth) || 2) + 1))}
+							onclick={() => onStrokeWidthChange(Math.min(20, (Number(selectedLine?.strokeWidth) || 2) + 1))}
 							title="Increase"
 						>
 							<LucidePlus size={16} />
@@ -148,9 +132,7 @@
 
 				<!-- Line Type Section -->
 				<div class="mb-4">
-					<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-						Line Style
-					</div>
+					<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Line Style</div>
 					<div class="grid grid-cols-3 gap-2">
 						<button
 							type="button"
@@ -176,15 +158,7 @@
 							title="Dotted line"
 						>
 							<svg width="32" height="4" class="overflow-visible">
-								<line
-									x1="0"
-									y1="2"
-									x2="32"
-									y2="2"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-dasharray="4,4"
-								/>
+								<line x1="0" y1="2" x2="32" y2="2" stroke="currentColor" stroke-width="2" stroke-dasharray="4,4" />
 							</svg>
 							<span class="text-xs text-gray-600">Dotted</span>
 						</button>
@@ -198,15 +172,7 @@
 							title="Dashed line"
 						>
 							<svg width="32" height="4" class="overflow-visible">
-								<line
-									x1="0"
-									y1="2"
-									x2="32"
-									y2="2"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-dasharray="8,4"
-								/>
+								<line x1="0" y1="2" x2="32" y2="2" stroke="currentColor" stroke-width="2" stroke-dasharray="8,4" />
 							</svg>
 							<span class="text-xs text-gray-600">Dashed</span>
 						</button>
@@ -236,24 +202,14 @@
 						<div class="relative h-10 w-10 transition-all hover:scale-105 active:scale-95">
 							<div
 								class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border-2"
-								class:border-gray-600={!presetColors.some(
-									(c) => c.hex === selectedLine?.strokeColor
-								)}
-								class:border-gray-200={presetColors.some(
-									(c) => c.hex === selectedLine?.strokeColor
-								)}
+								class:border-gray-600={!presetColors.some((c) => c.hex === selectedLine?.strokeColor)}
+								class:border-gray-200={presetColors.some((c) => c.hex === selectedLine?.strokeColor)}
 								class:shadow-md={!presetColors.some((c) => c.hex === selectedLine?.strokeColor)}
-								style="background-color: {!presetColors.some(
-									(c) => c.hex === selectedLine?.strokeColor
-								)
-									? selectedLine?.strokeColor
-									: '#ffffff'}"
+								style="background-color: {!presetColors.some((c) => c.hex === selectedLine?.strokeColor) ? selectedLine?.strokeColor : '#ffffff'}"
 							>
 								<LucidePalette
 									size={20}
-									class={!presetColors.some((c) => c.hex === selectedLine?.strokeColor)
-										? 'text-white mix-blend-difference'
-										: 'text-gray-600'}
+									class={!presetColors.some((c) => c.hex === selectedLine?.strokeColor) ? 'text-white mix-blend-difference' : 'text-gray-600'}
 								/>
 							</div>
 							<input

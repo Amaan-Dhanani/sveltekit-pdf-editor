@@ -17,16 +17,8 @@ type SaveCoordinatorOptions<T, TResult> = {
 	onLocalPersisted?: (snapshot: RevisionedPageSnapshot<T>) => void;
 	onLocalPersistFailed?: (snapshot: RevisionedPageSnapshot<T>, error: unknown) => void;
 	onSaveStarted?: (snapshot: RevisionedPageSnapshot<T>) => void;
-	onSaveFinished?: (
-		snapshot: RevisionedPageSnapshot<T>,
-		result: TResult,
-		isLatestRevision: boolean
-	) => void;
-	onSaveFailed?: (
-		snapshot: RevisionedPageSnapshot<T>,
-		error: unknown,
-		isLatestRevision: boolean
-	) => void;
+	onSaveFinished?: (snapshot: RevisionedPageSnapshot<T>, result: TResult, isLatestRevision: boolean) => void;
+	onSaveFailed?: (snapshot: RevisionedPageSnapshot<T>, error: unknown, isLatestRevision: boolean) => void;
 };
 
 type QueuedSave<T, TResult> = {
@@ -71,8 +63,7 @@ export class PageSaveCoordinator<T, TResult> {
 	hasPendingChanges() {
 		return Boolean(
 			this.latestSnapshot &&
-				(this.latestSnapshot.revision > this.locallyPersistedRevision ||
-					this.pendingByRevision.has(this.latestSnapshot.revision))
+			(this.latestSnapshot.revision > this.locallyPersistedRevision || this.pendingByRevision.has(this.latestSnapshot.revision))
 		);
 	}
 
@@ -154,18 +145,10 @@ export class PageSaveCoordinator<T, TResult> {
 				this.options.onSaveStarted?.(request.snapshot);
 				try {
 					const result = await this.options.saveRemote(request.snapshot);
-					this.options.onSaveFinished?.(
-						request.snapshot,
-						result,
-						this.isLatestRevision(request.snapshot.revision)
-					);
+					this.options.onSaveFinished?.(request.snapshot, result, this.isLatestRevision(request.snapshot.revision));
 					request.resolve(result);
 				} catch (error) {
-					this.options.onSaveFailed?.(
-						request.snapshot,
-						error,
-						this.isLatestRevision(request.snapshot.revision)
-					);
+					this.options.onSaveFailed?.(request.snapshot, error, this.isLatestRevision(request.snapshot.revision));
 					request.reject(error);
 				} finally {
 					this.pendingByRevision.delete(request.snapshot.revision);

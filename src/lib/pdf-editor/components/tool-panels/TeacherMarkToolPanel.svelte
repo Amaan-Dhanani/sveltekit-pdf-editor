@@ -51,9 +51,7 @@
 		const date = new Date(value);
 		if (Number.isNaN(date.getTime())) return '';
 
-		return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-			date.getHours()
-		)}:${pad(date.getMinutes())}`;
+		return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 	}
 
 	function updateDrafts() {
@@ -123,12 +121,7 @@
 			<h3 class="text-sm font-semibold text-gray-900">Teacher Stamp</h3>
 			<p class="text-xs text-gray-500">Visible to students on the marked page.</p>
 		</div>
-		<button
-			type="button"
-			onclick={onClose}
-			class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
-			title="Close"
-		>
+		<button type="button" onclick={onClose} class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100" title="Close">
 			<LucideX size={16} />
 		</button>
 	</div>
@@ -177,17 +170,11 @@
 						aria-pressed={selectedColor === preset.value}
 						title={preset.label}
 						class="flex h-9 w-9 items-center justify-center rounded-full border bg-white transition-transform hover:scale-105"
-						style="border-color: {selectedColor === preset.value
-							? preset.border
-							: '#d1d5db'}; box-shadow: {selectedColor === preset.value
+						style="border-color: {selectedColor === preset.value ? preset.border : '#d1d5db'}; box-shadow: {selectedColor === preset.value
 							? `0 0 0 2px white, 0 0 0 4px ${preset.border}`
 							: 'none'};"
 					>
-						<span
-							class="h-5 w-5 rounded-full"
-							style="background: {preset.border};"
-							aria-hidden="true"
-						></span>
+						<span class="h-5 w-5 rounded-full" style="background: {preset.border};" aria-hidden="true"></span>
 					</button>
 				{/each}
 			</div>
@@ -284,11 +271,7 @@
 	</div>
 
 	<div class="flex justify-end gap-2 border-t border-gray-100 px-4 py-3">
-		<button
-			type="button"
-			onclick={onDelete}
-			class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-		>
+		<button type="button" onclick={onDelete} class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
 			<LucideTrash2 size={15} />
 			Delete
 		</button>

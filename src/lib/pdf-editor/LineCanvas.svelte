@@ -144,9 +144,7 @@
 
 		// Only create line if there's meaningful movement
 		const minDistance = 5;
-		const distance = Math.sqrt(
-			Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2)
-		);
+		const distance = Math.sqrt(Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2));
 
 		if (distance > minDistance) {
 			createLine(startPoint, endPoint, canvasRect);
@@ -234,9 +232,7 @@
 
 		// Only create line if there's meaningful movement
 		const minDistance = 5;
-		const distance = Math.sqrt(
-			Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2)
-		);
+		const distance = Math.sqrt(Math.pow(endPoint.x - startPoint.x, 2) + Math.pow(endPoint.y - startPoint.y, 2));
 
 		if (distance > minDistance) {
 			createLine(startPoint, endPoint, canvasRect);
@@ -268,11 +264,7 @@
 		};
 	}
 
-	function createLine(
-		start: { x: number; y: number },
-		end: { x: number; y: number },
-		canvasRect: DOMRect
-	) {
+	function createLine(start: { x: number; y: number }, end: { x: number; y: number }, canvasRect: DOMRect) {
 		const lineData = {
 			originWidth: canvasRect.width / pageScale,
 			originHeight: canvasRect.height / pageScale,
@@ -292,10 +284,7 @@
 	}
 </script>
 
-<div
-    bind:this={canvas}
-    class="absolute left-0 top-0 h-full w-full cursor-crosshair select-none"
->
+<div bind:this={canvas} class="absolute left-0 top-0 h-full w-full cursor-crosshair select-none">
 	<!-- Preview line while creating -->
 	{#if isCreating && previewLine}
 		{@const dashArray =

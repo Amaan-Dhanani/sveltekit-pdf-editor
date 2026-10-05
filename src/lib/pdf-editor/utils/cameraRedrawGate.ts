@@ -6,10 +6,5 @@ export type CameraRedrawGateState = {
 };
 
 export function canReleaseCameraRedraw(state: CameraRedrawGateState) {
-	return (
-		!state.isDrawingStroke &&
-		!state.isPanning &&
-		!state.isMomentumScrolling &&
-		!state.hasGesture
-	);
+	return !state.isDrawingStroke && !state.isPanning && !state.isMomentumScrolling && !state.hasGesture;
 }

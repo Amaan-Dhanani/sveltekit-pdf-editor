@@ -54,10 +54,7 @@ export function getBoundedCanvasBackingScale(
 	const pixelScaleLimit = Math.sqrt(maxPixels / (width * height));
 	const dimensionScaleLimit = Math.min(maxDimension / width, maxDimension / height);
 
-	return Math.max(
-		0.01,
-		Math.min(Math.max(preferredScale || 1, minScale), pixelScaleLimit, dimensionScaleLimit)
-	);
+	return Math.max(0.01, Math.min(Math.max(preferredScale || 1, minScale), pixelScaleLimit, dimensionScaleLimit));
 }
 
 export function getAnnotationCanvasBackingScale(
@@ -67,10 +64,7 @@ export function getAnnotationCanvasBackingScale(
 	devicePixelRatio = getCappedDevicePixelRatio()
 ) {
 	const limits = getAnnotationCanvasLimits();
-	const preferredScale = Math.min(
-		devicePixelRatio * Math.max(pageScale || 1, 0.1),
-		limits.maxBackingScale
-	);
+	const preferredScale = Math.min(devicePixelRatio * Math.max(pageScale || 1, 0.1), limits.maxBackingScale);
 
 	return getBoundedCanvasBackingScale(pageWidth, pageHeight, preferredScale, {
 		maxPixels: limits.maxPixels,

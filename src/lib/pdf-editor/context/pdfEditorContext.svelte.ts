@@ -173,8 +173,7 @@ export function createPDFEditorContext(initialState: Partial<PDFEditorState> = {
 		isAddingLine: initialState.isAddingLine || false,
 		isAddingText: initialState.isAddingText || false,
 		isPointerMode: initialState.isPointerMode || false,
-		isSelectionMode:
-			initialState.isSelectionMode !== undefined ? initialState.isSelectionMode : false,
+		isSelectionMode: initialState.isSelectionMode !== undefined ? initialState.isSelectionMode : false,
 		isCursorMode: initialState.isCursorMode || false,
 		isPenMode: initialState.isPenMode || false,
 		isHandMode: initialState.isHandMode || false,
@@ -224,8 +223,7 @@ export function createPDFEditorContext(initialState: Partial<PDFEditorState> = {
 		showingZoom: initialState.showingZoom || false,
 		zoomEnabled: initialState.zoomEnabled !== undefined ? initialState.zoomEnabled : true,
 		doubleTapZoomEnabled: initialState.doubleTapZoomEnabled || false,
-		autoSaveEnabled:
-			initialState.autoSaveEnabled !== undefined ? initialState.autoSaveEnabled : true,
+		autoSaveEnabled: initialState.autoSaveEnabled !== undefined ? initialState.autoSaveEnabled : true,
 		renderQualityMode: initialState.renderQualityMode || 'default',
 		isFullscreen: initialState.isFullscreen || false,
 		stroke_visibility: initialState.stroke_visibility || 'all',
@@ -285,10 +283,7 @@ export function createPDFEditorContext(initialState: Partial<PDFEditorState> = {
 
 		get paginatedPages(): number[] {
 			const itemsPerPage = 1;
-			return state.pages.slice(
-				(state.currentPage - 1) * itemsPerPage,
-				state.currentPage * itemsPerPage
-			);
+			return state.pages.slice((state.currentPage - 1) * itemsPerPage, state.currentPage * itemsPerPage);
 		},
 
 		// Utility: Reset all tool modes
@@ -311,14 +306,7 @@ export function createPDFEditorContext(initialState: Partial<PDFEditorState> = {
 		activateMode(
 			mode: keyof Pick<
 				PDFEditorState,
-				| 'addingDrawing'
-				| 'isErasing'
-				| 'isHighlighting'
-				| 'isAddingLine'
-				| 'isAddingText'
-				| 'isPointerMode'
-				| 'isSelectionMode'
-				| 'isHandMode'
+				'addingDrawing' | 'isErasing' | 'isHighlighting' | 'isAddingLine' | 'isAddingText' | 'isPointerMode' | 'isSelectionMode' | 'isHandMode'
 			>
 		) {
 			context.resetAllModes();

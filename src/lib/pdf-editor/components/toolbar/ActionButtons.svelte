@@ -36,9 +36,7 @@
 
 	let isDoneProcessing = $derived(isCompleting || saveState.status === 'saving');
 	let isDoneDisabled = $derived(isDoneProcessing || !pdfFile);
-	let doneLabel = $derived(
-		isCompleting ? 'Finishing...' : saveState.status === 'saving' ? 'Saving...' : 'Done'
-	);
+	let doneLabel = $derived(isCompleting ? 'Finishing...' : saveState.status === 'saving' ? 'Saving...' : 'Done');
 </script>
 
 <div class="flex items-center gap-2">

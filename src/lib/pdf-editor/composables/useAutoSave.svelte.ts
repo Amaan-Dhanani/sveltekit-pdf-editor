@@ -9,19 +9,14 @@ import { getPDFEditorContext } from '../context/pdfEditorContext.svelte';
 import { DeferredSaveQueue } from '../utils/deferredSaveQueue';
 import { toast, TOAST_ERROR } from '../utils/toast';
 
-
 export function useAutoSave(saveFunction: () => Promise<void>, debounceMs: number = 5000) {
 	const ctx = getPDFEditorContext();
 	let lastChangeTime = $state(0);
 	const queue = new DeferredSaveQueue(saveFunction, {
 		delayMs: debounceMs,
-		shouldDefer: () =>
-			ctx.state.isDrawingStroke || ctx.state.activeInteraction === 'drawing',
+		shouldDefer: () => ctx.state.isDrawingStroke || ctx.state.activeInteraction === 'drawing',
 		onError: (error) => {
-			toast.push(
-				`Auto save failed: ${error instanceof Error ? error.message : String(error)}`,
-				{ theme: TOAST_ERROR }
-			);
+			toast.push(`Auto save failed: ${error instanceof Error ? error.message : String(error)}`, { theme: TOAST_ERROR });
 		}
 	});
 
@@ -86,5 +81,3 @@ export function useAutoSave(saveFunction: () => Promise<void>, debounceMs: numbe
 		}
 	};
 }
-
-

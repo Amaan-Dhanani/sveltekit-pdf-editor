@@ -115,22 +115,15 @@
 	});
 
 	$effect(() => {
-		if (
-			(!previewList || previewPages.length === 0) &&
-			(!pageNumberList || quickPages.length === 0)
-		) {
+		if ((!previewList || previewPages.length === 0) && (!pageNumberList || quickPages.length === 0)) {
 			return;
 		}
 
 		currentPage;
 
 		tick().then(() => {
-			const activePreview = previewList?.querySelector<HTMLButtonElement>(
-				`[data-preview-page="${currentPage}"]`
-			);
-			const activeButton = pageNumberList?.querySelector<HTMLButtonElement>(
-				`[data-page="${currentPage}"]`
-			);
+			const activePreview = previewList?.querySelector<HTMLButtonElement>(`[data-preview-page="${currentPage}"]`);
+			const activeButton = pageNumberList?.querySelector<HTMLButtonElement>(`[data-page="${currentPage}"]`);
 
 			activePreview?.scrollIntoView({ block: 'nearest', inline: 'center' });
 			activeButton?.scrollIntoView({ block: 'center', inline: 'nearest' });
@@ -157,10 +150,7 @@
 					class:ring-amber-200={page === currentPage}
 					onclick={() => selectPage(page)}
 				>
-					<div
-						class="relative overflow-hidden rounded bg-white shadow-inner"
-						style="width: {previewWidth}px; height: {previewHeight}px;"
-					>
+					<div class="relative overflow-hidden rounded bg-white shadow-inner" style="width: {previewWidth}px; height: {previewHeight}px;">
 						<div
 							class="absolute top-0 left-0 origin-top-left"
 							style="width: {pageWidth}px; height: {pageHeight}px; transform: scale({previewScale});"
@@ -230,13 +220,7 @@
 												onDelete={() => {}}
 											/>
 										{:else if object.type === 'teacher-mark'}
-											<TeacherMark
-												{object}
-												x={object.x}
-												y={object.y}
-												width={object.width}
-												height={object.height}
-											/>
+											<TeacherMark {object} x={object.x} y={object.y} width={object.width} height={object.height} />
 										{/if}
 									{/each}
 								</div>
@@ -244,10 +228,7 @@
 						</div>
 					</div>
 					<div class="mt-1 flex h-5 items-center justify-center gap-1 text-xs font-medium">
-						<span
-							class:font-semibold={page === currentPage}
-							class:text-amber-700={page === currentPage}
-						>
+						<span class:font-semibold={page === currentPage} class:text-amber-700={page === currentPage}>
 							{page}
 						</span>
 						{#if pendingPage === page}

@@ -1,14 +1,8 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { getPathGeometry } from './utils/hitTest';
-	import {
-		getAnnotationCanvasBackingScale,
-		getCappedDevicePixelRatio
-	} from './utils/annotationRendering';
-	import {
-		createRenderSignature,
-		mixRenderSignature
-	} from './utils/renderSignature';
+	import { getAnnotationCanvasBackingScale, getCappedDevicePixelRatio } from './utils/annotationRendering';
+	import { createRenderSignature, mixRenderSignature } from './utils/renderSignature';
 	import type { BBox, Point } from './utils/hitTest';
 
 	type StrokeVisibility = 'all' | 'self' | 'others';
@@ -89,11 +83,7 @@
 		];
 		const cached = objectSignatureCache.get(cacheId);
 
-		if (
-			cached &&
-			cached.snapshot.length === snapshot.length &&
-			cached.snapshot.every((value, snapshotIndex) => value === snapshot[snapshotIndex])
-		) {
+		if (cached && cached.snapshot.length === snapshot.length && cached.snapshot.every((value, snapshotIndex) => value === snapshot[snapshotIndex])) {
 			return cached.signature;
 		}
 
@@ -148,9 +138,7 @@
 	}
 
 	function getDrawingScale(object: DrawableAnnotation) {
-		const scale =
-			object.scale ??
-			(object.originWidth ? (object.width || object.originWidth) / object.originWidth : 1);
+		const scale = object.scale ?? (object.originWidth ? (object.width || object.originWidth) / object.originWidth : 1);
 
 		return Number.isFinite(scale) && scale !== 0 ? scale : 1;
 	}
@@ -172,11 +160,7 @@
 		return stroke_visibility === 'self' ? isSelf : !isSelf;
 	}
 
-	function drawPointFallback(
-		context: CanvasRenderingContext2D,
-		points: Point[],
-		brushSize: number
-	) {
+	function drawPointFallback(context: CanvasRenderingContext2D, points: Point[], brushSize: number) {
 		if (points.length === 0) return;
 
 		context.beginPath();
@@ -193,11 +177,7 @@
 		context.stroke();
 	}
 
-	function drawAnnotation(
-		context: CanvasRenderingContext2D,
-		object: DrawableAnnotation,
-		geometry: CachedGeometry
-	) {
+	function drawAnnotation(context: CanvasRenderingContext2D, object: DrawableAnnotation, geometry: CachedGeometry) {
 		if (!geometry.boundingBox || (!geometry.path2d && geometry.points.length === 0)) return;
 
 		const brushSize = object.brushSize || 1;
@@ -258,11 +238,7 @@
 		pruneGeometryCache();
 
 		for (const object of objects) {
-			if (
-				(object.type !== 'drawing' && object.type !== 'highlight') ||
-				object._eraserHighlight ||
-				!isVisibleForStrokeFilter(object)
-			) {
+			if ((object.type !== 'drawing' && object.type !== 'highlight') || object._eraserHighlight || !isVisibleForStrokeFilter(object)) {
 				continue;
 			}
 

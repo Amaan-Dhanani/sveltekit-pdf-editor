@@ -1,15 +1,6 @@
 import type { ComponentType } from 'svelte';
 
-export type PdfEditorToolId =
-	| 'select'
-	| 'hand'
-	| 'pen'
-	| 'eraser'
-	| 'highlighter'
-	| 'text'
-	| 'line'
-	| 'pointer'
-	| 'teacher-mark';
+export type PdfEditorToolId = 'select' | 'hand' | 'pen' | 'eraser' | 'highlighter' | 'text' | 'line' | 'pointer' | 'teacher-mark';
 
 export type PdfEditorPlugin = {
 	id: string;
@@ -49,9 +40,7 @@ export function createPdfEditorPlugin(plugin: PdfEditorPlugin): PdfEditorPlugin 
 }
 
 export function resolvePdfEditorPlugins(plugins?: PdfEditorPlugin[] | null) {
-	const activePlugins = (plugins?.length ? plugins : defaultPdfEditorPlugins).filter(
-		(plugin) => plugin.enabled !== false
-	);
+	const activePlugins = (plugins?.length ? plugins : defaultPdfEditorPlugins).filter((plugin) => plugin.enabled !== false);
 	const enabledTools = new Set<PdfEditorToolId>();
 	const embedPdfRegistrations: unknown[] = [];
 
@@ -63,9 +52,7 @@ export function resolvePdfEditorPlugins(plugins?: PdfEditorPlugin[] | null) {
 	return {
 		activePlugins,
 		enabledTools,
-		enabledToolMap: Object.fromEntries([...enabledTools].map((tool) => [tool, true])) as Partial<
-			Record<PdfEditorToolId, boolean>
-		>,
+		enabledToolMap: Object.fromEntries([...enabledTools].map((tool) => [tool, true])) as Partial<Record<PdfEditorToolId, boolean>>,
 		embedPdfRegistrations
 	};
 }

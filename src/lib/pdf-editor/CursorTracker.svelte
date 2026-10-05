@@ -1,12 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 
-	let {
-		pageScale = 1,
-		onCursorMove = () => {},
-		onCursorClicked = () => {},
-		showDebugInfo = false
-	} = $props();
+	let { pageScale = 1, onCursorMove = () => {}, onCursorClicked = () => {}, showDebugInfo = false } = $props();
 
 	let container: HTMLDivElement | undefined = $state();
 	let cursorX = $state(0);
@@ -174,15 +169,10 @@
 </script>
 
 <!-- Invisible overlay that captures cursor events -->
-<div
-	bind:this={container}
-	class="pointer-events-auto absolute top-0 left-0 h-full w-full z-1"
->
+<div bind:this={container} class="pointer-events-auto absolute top-0 left-0 h-full w-full z-1">
 	<!-- Optional debug info -->
 	{#if showDebugInfo && isTracking}
-		<div
-			class="pointer-events-none absolute top-2 left-2 rounded bg-gray-900 p-2 text-xs text-white shadow-lg"
-		>
+		<div class="pointer-events-none absolute top-2 left-2 rounded bg-gray-900 p-2 text-xs text-white shadow-lg">
 			<div>Raw: ({cursorX.toFixed(1)}, {cursorY.toFixed(1)})</div>
 			<div>Scaled: ({scaledX.toFixed(1)}, {scaledY.toFixed(1)})</div>
 			<div>Scale: {pageScale.toFixed(2)}</div>

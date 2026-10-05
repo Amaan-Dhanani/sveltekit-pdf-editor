@@ -1,24 +1,9 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import {
-		isPenLikePointerEvent,
-		LiveStroke,
-		type StrokeCommand,
-		type StrokeRenderRange
-	} from './utils/liveStroke';
-	import {
-		getBoundedCanvasBackingScale,
-		getCappedDevicePixelRatio
-	} from './utils/annotationRendering';
+	import { isPenLikePointerEvent, LiveStroke, type StrokeCommand, type StrokeRenderRange } from './utils/liveStroke';
+	import { getBoundedCanvasBackingScale, getCappedDevicePixelRatio } from './utils/annotationRendering';
 
-	let {
-		pageScale,
-		isPenMode = $bindable(false),
-		onStrokeStart,
-		onStrokeEnd,
-		onStrokeCancel,
-		onFinishPointing
-	} = $props();
+	let { pageScale, isPenMode = $bindable(false), onStrokeStart, onStrokeEnd, onStrokeCancel, onFinishPointing } = $props();
 
 	let canvas: HTMLElement | undefined = $state();
 	let previewCanvas: HTMLCanvasElement | undefined = $state();
@@ -129,9 +114,7 @@
 		const bitmapWidth = Math.max(1, Math.round(rect.width * backingScale));
 		const bitmapHeight = Math.max(1, Math.round(rect.height * backingScale));
 
-		const resized =
-			lastPreviewBitmapWidth !== bitmapWidth ||
-			lastPreviewBitmapHeight !== bitmapHeight;
+		const resized = lastPreviewBitmapWidth !== bitmapWidth || lastPreviewBitmapHeight !== bitmapHeight;
 
 		if (resized) {
 			previewCanvas.width = bitmapWidth;
@@ -247,10 +230,7 @@
 
 		if (
 			(isActivePen && currentDrawingType === 'pen') ||
-			(event.pointerType === 'mouse' &&
-				currentDrawingType === 'mouse' &&
-				activePointers.size === 1 &&
-				!isPenMode)
+			(event.pointerType === 'mouse' && currentDrawingType === 'mouse' && activePointers.size === 1 && !isPenMode)
 		) {
 			continueDrawing(event);
 		}
@@ -265,12 +245,7 @@
 			isPenActive = false;
 			currentDrawingType = null;
 			endDrawing();
-		} else if (
-			event.pointerType === 'mouse' &&
-			currentDrawingType === 'mouse' &&
-			activePointers.size === 0 &&
-			!isPenMode
-		) {
+		} else if (event.pointerType === 'mouse' && currentDrawingType === 'mouse' && activePointers.size === 0 && !isPenMode) {
 			currentDrawingType = null;
 			endDrawing();
 		}
@@ -424,9 +399,6 @@
 	}
 </script>
 
-<div
-    bind:this={canvas}
-    class="absolute left-0 top-0 h-full w-full cursor-crosshair select-none"
->
+<div bind:this={canvas} class="absolute left-0 top-0 h-full w-full cursor-crosshair select-none">
 	<canvas bind:this={previewCanvas} class="pointer-events-none h-full w-full"></canvas>
 </div>

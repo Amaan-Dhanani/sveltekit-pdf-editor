@@ -1,12 +1,15 @@
 # PDFEditor Testing Guide
 
 ## Overview
+
 This guide provides a comprehensive checklist to test the PDFEditor component after refactoring. Use this to verify that all functionality remains intact.
 
 ## Quick Smoke Test (5 minutes)
+
 Use this for rapid verification after each component extraction:
 
 ### ✅ Basic Functionality
+
 - [ ] PDF loads and displays correctly
 - [ ] Page navigation works (next/previous buttons)
 - [ ] Can type page number and jump to page
@@ -15,6 +18,7 @@ Use this for rapid verification after each component extraction:
 - [ ] Done button is clickable
 
 ### ✅ Core Tools
+
 - [ ] Add Text: Click "Add Text" → Click on PDF → Text box appears
 - [ ] Draw: Click "Draw" → Draw on PDF → Line appears
 - [ ] Erase: Click "Erase" → Draw over existing annotation → It disappears
@@ -23,6 +27,7 @@ Use this for rapid verification after each component extraction:
 ## Comprehensive Test Suite (20 minutes)
 
 ### 1. Initial Load
+
 **Test:** Open a page with PDFEditor component
 
 - [ ] PDF renders correctly
@@ -36,6 +41,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 2. Save State Indicator
+
 **Test:** Observe save state changes
 
 - [ ] Shows "Idle" initially
@@ -52,6 +58,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 3. Page Navigation
+
 **Test:** Navigate between pages
 
 - [ ] **Next button:** Advances to next page
@@ -69,9 +76,11 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 4. Text Tool
+
 **Test:** Add and edit text annotations
 
 #### Adding Text
+
 - [ ] Click "Add Text" button → Button text changes to "Click anywhere to add text"
 - [ ] Click on PDF → Text box appears at click location
 - [ ] Can type text immediately
@@ -79,6 +88,7 @@ Use this for rapid verification after each component extraction:
 - [ ] Clicking "Add Text" again toggles off the mode
 
 #### Editing Text
+
 - [ ] Click on existing text → Text toolbar appears
 - [ ] **Font size:** Click +/- buttons → Size changes
 - [ ] **Color picker:** Click color → Text color changes
@@ -88,6 +98,7 @@ Use this for rapid verification after each component extraction:
 - [ ] **Close button:** Closes toolbar
 
 #### Text Ownership
+
 - [ ] Can only edit own text (if user owns it)
 - [ ] Cannot edit other users' text (viewOnly mode)
 
@@ -96,6 +107,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 5. Drawing Tool
+
 **Test:** Draw freehand annotations
 
 - [ ] Click "Draw" button → Activates drawing mode
@@ -115,6 +127,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 6. Highlight Tool
+
 **Test:** Add highlighted annotations
 
 - [ ] Click "Highlight" button → Activates highlight mode
@@ -131,6 +144,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 7. Eraser Tool
+
 **Test:** Remove annotations
 
 - [ ] Click "Erase" button → Activates eraser mode
@@ -147,9 +161,11 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 8. Line Tool
+
 **Test:** Draw straight lines
 
 #### Adding Lines
+
 - [ ] Click "Line" button → Activates line mode
 - [ ] Line tool panel appears
 - [ ] **Stroke width:** Can adjust with +/- buttons
@@ -159,6 +175,7 @@ Use this for rapid verification after each component extraction:
 - [ ] After adding line → Line is auto-selected
 
 #### Editing Selected Line
+
 - [ ] Click on existing line → Line toolbar appears
 - [ ] Shows current stroke width
 - [ ] **Stroke width:** Can change with +/- buttons
@@ -167,6 +184,7 @@ Use this for rapid verification after each component extraction:
 - [ ] Close button deselects line
 
 #### Line Ownership
+
 - [ ] Can only select and edit own lines
 
 **Expected:** Precise line drawing with full editing capabilities
@@ -174,6 +192,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 9. Pointer Mode
+
 **Test:** Temporary pointer annotations
 
 - [ ] Click "Pointer" button → Activates pointer mode
@@ -188,26 +207,31 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 10. Selection Mode
+
 **Test:** Select and move annotations
 
 #### Lasso Selection
+
 - [ ] Click "Select" button → Activates selection mode
 - [ ] Draw a lasso around objects → Objects get selected
 - [ ] Selection toolbar appears showing count (e.g., "2 Selected")
 - [ ] Selected objects show visual indication
 
 #### Click Selection
+
 - [ ] Click on single object → Selects it
 - [ ] Click on empty space → Deselects all
 - [ ] **Shift/Ctrl/Cmd + Click:** Adds to selection
 - [ ] Click on selected object → Deselects it (with modifier)
 
 #### Moving Selected Objects
+
 - [ ] Click and drag selected objects → They move together
 - [ ] Release mouse → Objects stay at new position
 - [ ] Movement respects zoom level
 
 #### Selection Actions
+
 - [ ] **Delete button:** Removes all selected objects
 - [ ] **Close button:** Clears selection
 - [ ] Can only select and delete own objects
@@ -217,6 +241,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 11. Zoom Controls
+
 **Test:** Zoom in/out functionality
 
 - [ ] Click "Zoom" button → Zoom panel appears
@@ -229,11 +254,13 @@ Use this for rapid verification after each component extraction:
 - [ ] Zoom out disabled at min zoom
 
 #### Touch Gestures (Mobile/Tablet)
+
 - [ ] Pinch to zoom works (if touch enabled)
 - [ ] Two-finger pan works
 - [ ] Gesture detection (pinch vs pan) works correctly
 
 #### Zoom Behavior
+
 - [ ] Zooming preserves center point
 - [ ] Annotations scale with zoom
 - [ ] Drawing tools respect zoom level
@@ -243,6 +270,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 12. Undo/Redo
+
 **Test:** Undo and redo actions
 
 - [ ] Add annotation → Click "Undo" → Annotation disappears
@@ -257,6 +285,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 13. Fullscreen Mode
+
 **Test:** Fullscreen toggle
 
 - [ ] Click fullscreen button → Enters fullscreen
@@ -270,6 +299,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 14. Stroke Visibility Filter
+
 **Test:** Filter annotations by owner
 
 - [ ] **"All Notes":** Shows all annotations
@@ -283,6 +313,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 15. Homework Info (if applicable)
+
 **Test:** Homework info modal
 
 - [ ] "Homework Info" button visible (if homework_info prop provided)
@@ -295,9 +326,11 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 16. Save and Done Buttons
+
 **Test:** Save/Done actions
 
 #### Save Button
+
 - [ ] Enabled when pdfFile is loaded
 - [ ] Disabled while saving
 - [ ] Disabled if no pdfFile
@@ -305,6 +338,7 @@ Use this for rapid verification after each component extraction:
 - [ ] Save status updates accordingly
 
 #### Done Button
+
 - [ ] Enabled when pdfFile is loaded
 - [ ] Disabled while saving
 - [ ] Triggers `handleComplete` callback with allObjects
@@ -315,6 +349,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 17. Print Button (if allowPrinting = true)
+
 **Test:** Print functionality
 
 - [ ] Button visible when `allowPrinting={true}`
@@ -327,6 +362,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 18. Disabled Pages
+
 **Test:** Page restrictions
 
 - [ ] Navigate to disabled page
@@ -340,6 +376,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 19. Touch/Pen Mode
+
 **Test:** Touch device behavior
 
 - [ ] Touch drawing activates pen mode
@@ -353,6 +390,7 @@ Use this for rapid verification after each component extraction:
 ---
 
 ### 20. Mobile Responsiveness
+
 **Test:** Layout on small screens
 
 - [ ] Toolbar buttons stack/wrap correctly
@@ -368,6 +406,7 @@ Use this for rapid verification after each component extraction:
 ## Edge Cases & Error Scenarios
 
 ### 21. Empty/Invalid States
+
 - [ ] No PDF loaded → Tools disabled appropriately
 - [ ] PDF load failure → Shows error state
 - [ ] Invalid page number → Clamps to valid range
@@ -375,12 +414,14 @@ Use this for rapid verification after each component extraction:
 - [ ] Corrupted annotation data → Graceful handling
 
 ### 22. Performance
+
 - [ ] Large PDFs (100+ pages) → Pagination works
 - [ ] Many annotations (100+) → Renders smoothly
 - [ ] Rapid tool switching → No lag
 - [ ] Fast drawing → Strokes render correctly
 
 ### 23. Concurrent Editing (if multi-user)
+
 - [ ] Other user adds annotation → Appears in real-time
 - [ ] Other user deletes annotation → Disappears
 - [ ] Cannot edit others' annotations
@@ -393,40 +434,49 @@ Use this for rapid verification after each component extraction:
 After extracting each component, run this **quick checklist**:
 
 ### 🟢 Phase 1: Context + Composables
+
 - [ ] Run Quick Smoke Test
 - [ ] Check console for errors
 - [ ] Verify state updates correctly
 
 ### 🟢 Phase 2: SaveStatusIndicator
+
 - [ ] Test section #2 (Save State Indicator)
 - [ ] All states display correctly
 
 ### 🟢 Phase 3: PageNavigation
+
 - [ ] Test section #3 (Page Navigation)
 - [ ] Navigation works smoothly
 
 ### 🟢 Phase 4: ActionButtons
+
 - [ ] Test sections #13, #16, #17 (Fullscreen, Save/Done, Print)
 - [ ] All buttons work
 
 ### 🟢 Phase 5: ToolButtons
+
 - [ ] Test sections #4-10 (All tools activate correctly)
 - [ ] Mode switching works
 
 ### 🟢 Phase 6: Tool Panels
+
 - [ ] Test all relevant tool sections
 - [ ] Each panel displays and functions correctly
 
 ### 🟢 Phase 7: Overlays
+
 - [ ] Test sections #19 (Pen mode notification)
 - [ ] Test section #10 (Selection toolbar)
 
 ### 🟢 Phase 8: PDFCanvas
+
 - [ ] **CRITICAL:** Run full comprehensive test suite
 - [ ] All drawing/interaction works
 - [ ] All annotations render correctly
 
 ### 🟢 Phase 9: Final Integration
+
 - [ ] Run **FULL** comprehensive test suite
 - [ ] Test on multiple devices/browsers
 - [ ] Performance testing with large PDFs
@@ -436,6 +486,7 @@ After extracting each component, run this **quick checklist**:
 ## Automated Testing (Future)
 
 Consider adding automated tests for:
+
 - Component rendering (Vitest + @testing-library/svelte)
 - User interactions (Playwright)
 - Visual regression testing (Percy/Chromatic)
@@ -445,6 +496,7 @@ Consider adding automated tests for:
 ## Browser Compatibility
 
 Test on:
+
 - [ ] Chrome/Edge (latest)
 - [ ] Firefox (latest)
 - [ ] Safari (latest)
@@ -470,27 +522,35 @@ Before considering refactoring complete:
 ## Troubleshooting Common Issues
 
 ### Issue: Annotations not appearing
+
 **Check:**
+
 - Is the object in `allObjects` array?
 - Is `stroke_visibility` filtering it out?
 - Is the page disabled?
 - Is zoom causing it to be off-screen?
 
 ### Issue: Tools not activating
+
 **Check:**
+
 - Is page disabled?
 - Is `isPageDisabled` true?
 - Is `selectedPageIndex` valid?
 - Check mode state in context
 
 ### Issue: State not updating
+
 **Check:**
+
 - Is context properly initialized?
 - Are event handlers bound correctly?
 - Is reactivity triggered (using `$state`)?
 
 ### Issue: Touch not working
+
 **Check:**
+
 - Is pen mode active?
 - Are touch events prevented?
 - Is zoom/pan interfering?
@@ -500,6 +560,7 @@ Before considering refactoring complete:
 ## Success Criteria
 
 ✅ **Refactoring is successful when:**
+
 1. All tests pass
 2. No functionality is lost
 3. No performance regression

@@ -103,11 +103,7 @@
 		const viewportWidth = window.innerWidth;
 
 		if (toolbarPosition === 'bottom') {
-			const left = clamp(
-				rect.left + rect.width / 2 - menuWidth / 2,
-				margin,
-				viewportWidth - menuWidth - margin
-			);
+			const left = clamp(rect.left + rect.width / 2 - menuWidth / 2, margin, viewportWidth - menuWidth - margin);
 			const bottom = Math.max(viewportHeight - rect.top + gap, margin);
 			const availableAboveToolbar = rect.top - margin - gap;
 
@@ -208,9 +204,7 @@
 				class="pdf-editor-touch-controls fixed z-120 w-56 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
 				style={menuStyle}
 			>
-				<div class="mb-2 px-3 py-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Drawing Tools
-				</div>
+				<div class="mb-2 px-3 py-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Drawing Tools</div>
 
 				<!-- Selection & Hand -->
 				<button

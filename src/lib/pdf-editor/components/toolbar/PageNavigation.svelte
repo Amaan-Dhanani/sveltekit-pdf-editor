@@ -1,11 +1,6 @@
 <script lang="ts">
 	import type { SaveState } from '../../context/pdfEditorContext.svelte';
-	import {
-		LucideChevronRight,
-		LucideChevronLeft,
-		LucideFileText,
-		LucideLoader2
-	} from '@lucide/svelte';
+	import { LucideChevronRight, LucideChevronLeft, LucideFileText, LucideLoader2 } from '@lucide/svelte';
 
 	interface Props {
 		internalPage: number;
@@ -41,9 +36,7 @@
 
 	// Disable navigation only when actively saving or there are unsaved changes
 	// Allow navigation when status is 'saved', 'local_saved', or 'cloud_saved'
-	let isNavigationDisabled = $derived(
-		saveState.status === 'saving'
-	);
+	let isNavigationDisabled = $derived(saveState.status === 'saving');
 
 	function handlePreviewToggle(event: MouseEvent) {
 		event.stopPropagation();
@@ -53,9 +46,7 @@
 
 <!-- PAGE NAVIGATION -->
 <div class="relative inline-flex items-center">
-	<div
-		class="flex shrink-0 items-center gap-2 rounded-lg border-2 border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50 p-1 shadow-sm"
-	>
+	<div class="flex shrink-0 items-center gap-2 rounded-lg border-2 border-amber-300 bg-linear-to-r from-amber-50 to-yellow-50 p-1 shadow-sm">
 		<button
 			onclick={onPrev}
 			disabled={internalPage === minPage || isNavigationDisabled}
@@ -110,4 +101,3 @@
 		</div>
 	{/if}
 </div>
-

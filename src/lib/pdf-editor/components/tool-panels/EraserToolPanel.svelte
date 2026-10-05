@@ -1,13 +1,6 @@
 <script lang="ts">
 	import { fly } from 'svelte/transition';
-	import {
-		LucideX,
-		LucideEraser,
-		LucideMinus,
-		LucidePlus,
-		LucideChevronDown,
-		LucideChevronUp
-	} from '@lucide/svelte';
+	import { LucideX, LucideEraser, LucideMinus, LucidePlus, LucideChevronDown, LucideChevronUp } from '@lucide/svelte';
 
 	interface Props {
 		erasingBrushSize: number;
@@ -17,13 +10,7 @@
 		user: any;
 	}
 
-	let {
-		erasingBrushSize,
-		isMinimized = $bindable(false),
-		onClose,
-		onSizeChange,
-		user
-	}: Props = $props();
+	let { erasingBrushSize, isMinimized = $bindable(false), onClose, onSizeChange, user }: Props = $props();
 </script>
 
 <!-- Fixed Top-Right Panel -->
@@ -90,9 +77,7 @@
 		{#if !isMinimized}
 			<!-- Size Section -->
 			<div>
-				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-					Eraser Size
-				</div>
+				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Eraser Size</div>
 				<div class="flex items-center gap-2">
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"

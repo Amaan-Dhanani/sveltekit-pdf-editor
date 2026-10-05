@@ -5,7 +5,6 @@
 
 import { toast, TOAST_SUCCESS, TOAST_WARNING } from './toast';
 
-
 export interface PageSyncValidation {
 	isValid: boolean;
 	warning?: string;
@@ -25,11 +24,7 @@ export interface PageSyncValidation {
  * @param operation - Description of the operation being performed
  * @returns Validation result with warning if mismatch detected
  */
-export function validatePageSync(
-	currentPage: number,
-	internalPage?: number,
-	operation: string = 'save'
-): PageSyncValidation {
+export function validatePageSync(currentPage: number, internalPage?: number, operation: string = 'save'): PageSyncValidation {
 	// If internalPage is provided, check for mismatch
 	if (internalPage !== undefined && currentPage !== internalPage) {
 		const warning = `⚠️ Page sync warning during ${operation}: currentPage=${currentPage}, internalPage=${internalPage}`;
@@ -59,11 +54,7 @@ export function validatePageSync(
  * @param annotationCount - Number of annotations being saved
  * @returns Validation result with warning if mismatch detected
  */
-export function validateAnnotationSave(
-	pageToSave: number,
-	expectedPage: number,
-	annotationCount: number
-): PageSyncValidation {
+export function validateAnnotationSave(pageToSave: number, expectedPage: number, annotationCount: number): PageSyncValidation {
 	if (pageToSave !== expectedPage) {
 		const warning = `⚠️ Annotation save mismatch: saving ${annotationCount} annotations to page ${pageToSave} but expected page ${expectedPage}`;
 		toast.push(warning, { theme: TOAST_WARNING });
@@ -95,15 +86,7 @@ export function validateAnnotationSave(
  * @param toPage - Page number being navigated to
  * @param hasUnsavedChanges - Whether there are unsaved changes on the old page
  */
-export function logPageTransition(
-	fromPage: number,
-	toPage: number,
-	hasUnsavedChanges: boolean = false
-): void {
+export function logPageTransition(fromPage: number, toPage: number, hasUnsavedChanges: boolean = false): void {
 	const changeStatus = hasUnsavedChanges ? '(with unsaved changes)' : '(clean)';
-	toast.push(
-		`Page transition: ${fromPage} -> ${toPage} ${changeStatus}\nTimestamp: ${new Date().toISOString()}`
-	);
+	toast.push(`Page transition: ${fromPage} -> ${toPage} ${changeStatus}\nTimestamp: ${new Date().toISOString()}`);
 }
-
-
