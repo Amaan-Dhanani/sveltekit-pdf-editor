@@ -3588,6 +3588,10 @@
 			font-family: 'Noto Sans CJK';
 			src: url('/fonts/NotoSansSC-Regular.ttf') format('truetype');
 		}
+		@font-face {
+			font-family: 'Roboto';
+			src: url('/fonts/Roboto-Regular.ttf') format('truetype');
+		}
 	</style>
 </svelte:head>
 

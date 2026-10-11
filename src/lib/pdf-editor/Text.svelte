@@ -563,9 +563,10 @@
 		{#if !viewOnly && showPlaceholder}
 			<div
 				aria-hidden="true"
-				class="pointer-events-none absolute inset-0 z-0 inline-block select-none overflow-hidden whitespace-nowrap text-gray-400"
+				class="pointer-events-none absolute inset-0 z-0 inline-block select-none overflow-hidden whitespace-nowrap text-gray-400 align-top"
 				style="
                     font-size: {size}px;
+					padding-top: {size * 0.15}px;
                     font-family: {fontFamily ? `'${fontFamily}', serif` : 'serif'};
                     color: {fontColor};
                     line-height: {lineHeight || 1.2};
@@ -597,8 +598,9 @@
                 min-w-5
                 whitespace-nowrap
                 p-0
-                m-0
+				m-0
                 outline-none
+				align-top
             "
 			class:cursor-text={!viewOnly && isEditing}
 			class:cursor-default={viewOnly || !isEditing}
@@ -606,6 +608,7 @@
                 font-size: {size}px;
                 font-family: {fontFamily ? `'${fontFamily}', serif` : 'serif'};
                 color: {fontColor};
+				padding-top: {size * 0.15}px;
                 line-height: {lineHeight || 1.2};
                 -webkit-user-select: {viewOnly || !isEditing ? 'none' : 'text'};
             "
