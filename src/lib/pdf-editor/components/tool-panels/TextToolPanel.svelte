@@ -187,31 +187,47 @@
 			<!-- Font Size Section -->
 			<div class="mb-4">
 				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Font Size</div>
+
 				<div class="flex items-center gap-2">
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
-						onclick={() => onUpdateSize(Math.max(12, displaySize - 2))}
+						onclick={() => onUpdateSize(Math.max(1, displaySize - 1))}
 						title="Decrease"
 					>
 						<LucideMinus size={16} />
 					</button>
+
 					<div class="flex flex-1 items-center gap-2">
 						<input
 							type="range"
-							min="12"
+							min="1"
 							max="120"
-							step="2"
+							step="1"
 							value={displaySize}
-							oninput={(e) => onUpdateSize(Math.round(parseFloat(e.currentTarget.value)))}
+							oninput={(e) => onUpdateSize(Number(e.currentTarget.value))}
 							class="h-1.5 w-full appearance-none rounded-full bg-gray-200 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500 [&::-webkit-slider-thumb]:transition-colors [&::-webkit-slider-thumb]:hover:bg-purple-600"
 						/>
-						<div class="w-10 text-center text-sm font-medium text-gray-700">
-							{displaySize}
-						</div>
+
+						<input
+							type="number"
+							min="1"
+							max="120"
+							step="1"
+							value={displaySize}
+							onchange={(e) => {
+								const value = e.currentTarget.valueAsNumber;
+
+								if (Number.isFinite(value)) {
+									onUpdateSize(Math.min(120, Math.max(1, Math.round(value))));
+								}
+							}}
+							class="w-16 rounded-md border border-gray-200 bg-transparent px-1 py-1 text-center text-sm font-medium text-gray-700 outline-none focus:border-purple-500"
+						/>
 					</div>
+
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
-						onclick={() => onUpdateSize(Math.min(120, displaySize + 2))}
+						onclick={() => onUpdateSize(Math.min(120, displaySize + 1))}
 						title="Increase"
 					>
 						<LucidePlus size={16} />
@@ -222,31 +238,47 @@
 			<!-- Line Height Section -->
 			<div class="mb-4">
 				<div class="mb-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">Line Height</div>
+
 				<div class="flex items-center gap-2">
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
-						onclick={() => onUpdateLineHeight(Math.max(1, _lineHeight - 0.1))}
+						onclick={() => onUpdateLineHeight(Number(Math.max(0.1, _lineHeight - 0.1).toFixed(2)))}
 						title="Decrease"
 					>
 						<LucideMinus size={16} />
 					</button>
+
 					<div class="flex flex-1 items-center gap-2">
 						<input
 							type="range"
-							min="1"
+							min="0.1"
 							max="10"
-							step="0.1"
+							step="0.01"
 							value={_lineHeight}
-							oninput={(e) => onUpdateLineHeight(parseFloat(e.currentTarget.value))}
+							oninput={(e) => onUpdateLineHeight(Number(Number(e.currentTarget.value).toFixed(2)))}
 							class="h-1.5 w-full appearance-none rounded-full bg-gray-200 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-purple-500 [&::-webkit-slider-thumb]:transition-colors [&::-webkit-slider-thumb]:hover:bg-purple-600"
 						/>
-						<div class="w-10 text-center text-sm font-medium text-gray-700">
-							{_lineHeight.toFixed(1)}
-						</div>
+
+						<input
+							type="number"
+							min="0.1"
+							max="10"
+							step="0.01"
+							value={_lineHeight}
+							onchange={(e) => {
+								const rawValue = e.currentTarget.valueAsNumber;
+
+								if (Number.isFinite(rawValue)) {
+									onUpdateLineHeight(Number(Math.min(10, Math.max(0.1, rawValue)).toFixed(2)));
+								}
+							}}
+							class="w-16 rounded-md border border-gray-200 bg-transparent px-1 py-1 text-center text-sm font-medium text-gray-700 outline-none focus:border-purple-500"
+						/>
 					</div>
+
 					<button
 						class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 active:scale-95"
-						onclick={() => onUpdateLineHeight(Math.min(10, _lineHeight + 0.1))}
+						onclick={() => onUpdateLineHeight(Number(Math.min(10, _lineHeight + 0.1).toFixed(2)))}
 						title="Increase"
 					>
 						<LucidePlus size={16} />
