@@ -1,3 +1,4 @@
+
 <script lang="ts">
 	import {
 		LucideType,
@@ -10,12 +11,12 @@
 		LucideUndo2,
 		LucideRedo2,
 		LucideHand,
-		LucideClipboardCheck
+		LucideClipboardCheck,
+		LucideEllipsis,
+		LucideX
 	} from '@lucide/svelte';
 	import type { Component } from 'svelte';
-	import { onMount } from 'svelte';
 
-	import ToolbarOverflow from './ToolbarOverflow.svelte';
 	import { getPDFEditorContext } from '../../context/pdfEditorContext.svelte';
 
 	interface Props {
@@ -49,6 +50,27 @@
 		handleRedo: () => void;
 	}
 
+	interface Theme {
+		border: string;
+		kbd: string;
+		iconColor: string;
+		hoverBg: string;
+	}
+
+	interface ToolConfig {
+		id: string;
+		icon: Component;
+		title: string;
+		description: string;
+		shortcut?: string;
+		onclick: () => void;
+		active: boolean;
+		disabled: boolean;
+		show?: boolean;
+		toolKey?: string;
+		theme: Theme;
+	}
+
 	let {
 		isAddingText,
 		addingDrawing,
@@ -79,26 +101,80 @@
 
 	const ctx = getPDFEditorContext();
 
-	let isMobile = $state(false);
+	const themes: Record<string, Theme> = {
+		blue: {
+			border: 'border-blue-400',
+			kbd: 'bg-blue-100 text-blue-600',
+			iconColor: 'text-blue-500',
+			hoverBg: 'hover:bg-blue-100'
+		},
+		emerald: {
+			border: 'border-emerald-400',
+			kbd: 'bg-emerald-100 text-emerald-600',
+			iconColor: 'text-emerald-500',
+			hoverBg: 'hover:bg-emerald-100'
+		},
+		amber: {
+			border: 'border-amber-400',
+			kbd: 'bg-amber-100 text-amber-600',
+			iconColor: 'text-amber-500',
+			hoverBg: 'hover:bg-amber-100'
+		},
+		red: {
+			border: 'border-red-400',
+			kbd: 'bg-red-100 text-red-600',
+			iconColor: 'text-red-500',
+			hoverBg: 'hover:bg-red-100'
+		},
+		yellow: {
+			border: 'border-yellow-400',
+			kbd: 'bg-yellow-100 text-yellow-600',
+			iconColor: 'text-yellow-500',
+			hoverBg: 'hover:bg-yellow-100'
+		},
+		purple: {
+			border: 'border-purple-400',
+			kbd: 'bg-purple-100 text-purple-600',
+			iconColor: 'text-purple-500',
+			hoverBg: 'hover:bg-purple-100'
+		},
+		slate: {
+			border: 'border-slate-400',
+			kbd: 'bg-slate-100 text-slate-600',
+			iconColor: 'text-slate-600',
+			hoverBg: 'hover:bg-slate-100'
+		},
+		orange: {
+			border: 'border-orange-400',
+			kbd: 'bg-orange-100 text-orange-600',
+			iconColor: 'text-orange-500',
+			hoverBg: 'hover:bg-orange-100'
+		}
+	};
 
-	// Store hovered tool details & button rect coordinates
+	const ctxPosition = $derived(ctx.state.toolbarPosition);
+	const isHorizontal = $derived(ctxPosition === 'bottom');
+	const isDisabled = $derived(disabled || isPageDisabled);
+	const hasExplicitToolMap = $derived(Object.keys(enabledToolMap).length > 0);
+
+	let isOverflowExpanded = $state(false);
 	let hoveredTool = $state<ToolConfig | null>(null);
 	let activeBtnRect = $state<DOMRect | null>(null);
 
-	let isDisabled = $derived(disabled || isPageDisabled);
-	let hasExplicitToolMap = $derived(Object.keys(enabledToolMap).length > 0);
-	let toolbarPosition = $derived(ctx.state.toolbarPosition);
-	let isToolButtons = $derived(toolbarPosition === 'bottom');
+	const mobileVisibleIds = new Set([
+		'undo',
+		'redo',
+		'selection',
+		'drawing',
+		'eraser'
+	]);
 
-	function isToolEnabled(toolKey?: string) {
-		if (!toolKey) return true;
-		return !hasExplicitToolMap || enabledToolMap[toolKey] === true;
+	function isToolEnabled(key?: string) {
+		return !key || !hasExplicitToolMap || enabledToolMap[key] === true;
 	}
 
-	function handleMouseEnter(e: MouseEvent, tool: ToolConfig) {
-		if (isMobile) return;
-		const target = e.currentTarget as HTMLElement;
-		activeBtnRect = target.getBoundingClientRect();
+	function handleMouseEnter(event: MouseEvent, tool: ToolConfig) {
+		activeBtnRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
 		hoveredTool = tool;
 	}
 
@@ -107,36 +183,7 @@
 		activeBtnRect = null;
 	}
 
-	onMount(() => {
-		const checkMobile = () => {
-			isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
-		};
-		checkMobile();
-		window.addEventListener('resize', checkMobile);
-		return () => window.removeEventListener('resize', checkMobile);
-	});
-
-	interface ToolConfig {
-		id: string;
-		icon: Component;
-		title: string;
-		description: string;
-		shortcut?: string;
-		onclick: () => void;
-		active: boolean;
-		disabled: boolean;
-		show?: boolean;
-		toolKey?: string;
-		theme?: {
-			border: string;
-			kbd: string;
-			iconColor: string;
-			hoverBg: string;
-		};
-	}
-
-	let toolGroups = $derived<ToolConfig[][]>([
-		// Group 1: History
+	const toolGroups = $derived<ToolConfig[][]>([
 		[
 			{
 				id: 'undo',
@@ -147,7 +194,7 @@
 				onclick: handleUndo,
 				active: false,
 				disabled: isDisabled,
-				theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500', hoverBg: 'hover:bg-blue-100' }
+				theme: themes.blue
 			},
 			{
 				id: 'redo',
@@ -158,13 +205,13 @@
 				onclick: handleRedo,
 				active: false,
 				disabled: isDisabled,
-				theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500', hoverBg: 'hover:bg-blue-100' }
+				theme: themes.blue
 			}
 		],
-		// Group 2: Navigation & Selection
 		[
 			{
 				id: 'selection',
+				toolKey: 'select',
 				icon: LucideMousePointerClick,
 				title: 'Select & Move',
 				description: 'Select and move annotations',
@@ -172,10 +219,11 @@
 				onclick: onSelectionMode,
 				active: isSelectionMode,
 				disabled: selectedPageIndex < 0 || isDisabled,
-				theme: { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500', hoverBg: 'hover:bg-blue-100' }
+				theme: themes.blue
 			},
 			{
 				id: 'hand',
+				toolKey: 'hand',
 				icon: LucideHand,
 				title: 'Hand Tool',
 				description: 'Pan and navigate (Space holds temporarily)',
@@ -183,18 +231,13 @@
 				onclick: onHandMode,
 				active: isHandMode,
 				disabled: selectedPageIndex < 0,
-				theme: {
-					border: 'border-emerald-400',
-					kbd: 'bg-emerald-100 text-emerald-600',
-					iconColor: 'text-emerald-500',
-					hoverBg: 'hover:bg-emerald-100'
-				}
+				theme: themes.emerald
 			}
 		],
-		// Group 3: Freehand & Erase
 		[
 			{
 				id: 'drawing',
+				toolKey: 'pen',
 				icon: LucidePencilLine,
 				title: 'Draw',
 				description: 'Draw freehand annotations',
@@ -202,10 +245,11 @@
 				onclick: onAddDrawing,
 				active: addingDrawing,
 				disabled: selectedPageIndex < 0 || isDisabled,
-				theme: { border: 'border-amber-400', kbd: 'bg-amber-100 text-amber-600', iconColor: 'text-amber-500', hoverBg: 'hover:bg-amber-100' }
+				theme: themes.amber
 			},
 			{
 				id: 'eraser',
+				toolKey: 'eraser',
 				icon: LucideEraser,
 				title: 'Erase',
 				description: 'Remove annotations by drawing',
@@ -213,10 +257,9 @@
 				onclick: onErasing,
 				active: isErasing,
 				disabled: isDisabled,
-				theme: { border: 'border-red-400', kbd: 'bg-red-100 text-red-600', iconColor: 'text-red-500', hoverBg: 'hover:bg-red-100' }
+				theme: themes.red
 			}
 		],
-		// Group 4: Annotations & Utilities
 		[
 			{
 				id: 'highlighter',
@@ -227,7 +270,7 @@
 				onclick: onHighlighting,
 				active: isHighlighting,
 				disabled: selectedPageIndex < 0 || isDisabled,
-				theme: { border: 'border-yellow-400', kbd: 'bg-yellow-100 text-yellow-600', iconColor: 'text-yellow-500', hoverBg: 'hover:bg-yellow-100' }
+				theme: themes.yellow
 			},
 			{
 				id: 'text',
@@ -239,7 +282,7 @@
 				onclick: onAddTextField,
 				active: isAddingText,
 				disabled: isAddingDisabled || isDisabled,
-				theme: { border: 'border-purple-400', kbd: 'bg-purple-100 text-purple-600', iconColor: 'text-purple-500', hoverBg: 'hover:bg-purple-100' }
+				theme: themes.purple
 			},
 			{
 				id: 'line',
@@ -250,7 +293,7 @@
 				onclick: activateLineMode,
 				active: isAddingLine,
 				disabled: selectedPageIndex < 0 || isDisabled,
-				theme: { border: 'border-slate-400', kbd: 'bg-slate-100 text-slate-600', iconColor: 'text-slate-600', hoverBg: 'hover:bg-slate-100' }
+				theme: themes.slate
 			},
 			{
 				id: 'teacherMark',
@@ -261,166 +304,160 @@
 				active: false,
 				disabled: selectedPageIndex < 0 || isDisabled,
 				show: allowTeacherMark,
-				theme: {
-					border: 'border-emerald-400',
-					kbd: 'bg-emerald-100 text-emerald-600',
-					iconColor: 'text-emerald-500',
-					hoverBg: 'hover:bg-emerald-100'
-				}
+				theme: themes.emerald
 			},
 			{
 				id: 'pointer',
+				toolKey: 'pointer',
 				icon: LucidePen,
 				title: 'Pointer',
 				description: 'Draw temporary strokes',
 				onclick: onPointerMode,
 				active: isPointerMode,
 				disabled: selectedPageIndex < 0 || isDisabled,
-				theme: { border: 'border-orange-400', kbd: 'bg-orange-100 text-orange-600', iconColor: 'text-orange-500', hoverBg: 'hover:bg-orange-100' }
+				theme: themes.orange
 			}
 		]
 	]);
 
-	let mobileVisibleIds = new Set(['undo', 'redo', 'selection', 'drawing', 'eraser']);
+	const visibleTools = (group: ToolConfig[]) =>
+		group.filter((tool) => (tool.show ?? true) && isToolEnabled(tool.toolKey));
 
-	// Calculate absolute position for the floating tooltip dynamically
-	let tooltipStyle = $derived.by(() => {
+	const tooltipStyle = $derived.by(() => {
 		if (!activeBtnRect) return '';
 
-		const offset = 12; // Gap between button and tooltip
+		const offset = 12;
+		const { top, left, right, width, height } = activeBtnRect;
 
-		if (toolbarPosition === 'bottom') {
-			return `bottom: ${window.innerHeight - activeBtnRect.top + offset}px; left: ${activeBtnRect.left + activeBtnRect.width / 2}px; transform: translateX(-50%);`;
-		} else if (toolbarPosition === 'left') {
-			return `top: ${activeBtnRect.top + activeBtnRect.height / 2}px; left: ${activeBtnRect.right + offset}px; transform: translateY(-50%);`;
-		} else {
-			// right position
-			return `top: ${activeBtnRect.top + activeBtnRect.height / 2}px; right: ${window.innerWidth - activeBtnRect.left + offset}px; transform: translateY(-50%);`;
+		if (ctxPosition === 'bottom') {
+			return `bottom:${window.innerHeight - top + offset}px;left:${left + width / 2}px;transform:translateX(-50%)`;
 		}
+
+		if (ctxPosition === 'left') {
+			return `top:${top + height / 2}px;left:${right + offset}px;transform:translateY(-50%)`;
+		}
+
+		return `top:${top + height / 2}px;right:${window.innerWidth - left + offset}px;transform:translateY(-50%)`;
 	});
 </script>
 
 {#snippet toolButton(tool: ToolConfig)}
 	{@const Icon = tool.icon}
-	{@const theme = tool.theme ?? {
-		border: 'border-blue-400',
-		kbd: 'bg-blue-100 text-blue-600',
-		iconColor: 'text-blue-500',
-		hoverBg: 'hover:bg-blue-100'
-	}}
 
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		role="tooltip"
 		class="relative flex items-center justify-center"
-		onmouseenter={(e) => handleMouseEnter(e, tool)}
+		onmouseenter={(event) => handleMouseEnter(event, tool)}
 		onmouseleave={handleMouseLeave}
 	>
 		<button
 			onclick={tool.onclick}
 			disabled={tool.disabled}
-			class="flex h-9 w-9 items-center justify-center rounded-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 {tool.active
-				? theme.kbd
-				: `${theme.hoverBg}`}"
+			aria-label={tool.title}
+			aria-pressed={tool.active}
+			class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 {tool.active
+				? tool.theme.kbd
+				: tool.theme.hoverBg}"
 		>
-			<Icon size={18} class={theme.iconColor} />
+			<Icon size={18} class={tool.theme.iconColor} />
 		</button>
 	</div>
 {/snippet}
 
 <div
-	class="pdf-editor-touch-controls fixed z-70 transform transition-all duration-300 {toolbarPosition === 'bottom'
+	class="pdf-editor-touch-controls fixed z-70 transform transition-all duration-300 {ctxPosition === 'bottom'
 		? 'bottom-6 left-1/2 max-w-[calc(100vw-1rem)] -translate-x-1/2'
-		: toolbarPosition === 'left'
+		: ctxPosition === 'left'
 			? 'top-1/2 left-4 max-h-[calc(100dvh-12rem)] -translate-y-1/2'
 			: 'top-1/2 right-4 max-h-[calc(100dvh-12rem)] -translate-y-1/2'}"
 >
 	<div
-		class="scrollbar-thin flex gap-1 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-2xl transition-all duration-300 {isToolButtons
+		class="scrollbar-thin flex gap-1 rounded-xl border border-gray-200 bg-white px-2 py-2 shadow-2xl transition-all duration-300 {isHorizontal
 			? 'max-w-[calc(100vw-1rem)] items-center'
 			: 'max-h-[calc(100dvh-12rem)] flex-col items-center'}"
 	>
-		<div class="hidden gap-1 md:flex {isToolButtons ? 'items-center' : 'flex-col items-center'}">
-			{#each toolGroups as group, groupIdx}
-				{#if groupIdx > 0}
-					<div class="bg-gray-300 self-center {isToolButtons ? 'mx-1 h-6 w-px' : 'my-1 h-px w-6'}"></div>
+		<!-- Desktop toolbar -->
+		<div class="hidden gap-1 md:flex {isHorizontal ? 'items-center' : 'flex-col items-center'}">
+			{#each toolGroups as group, index}
+				{#if index > 0}
+					<div class="bg-gray-300 self-center {isHorizontal ? 'mx-1 h-6 w-px' : 'my-1 h-px w-6'}"></div>
 				{/if}
 
-				{#each group as tool}
-					{#if (tool.show ?? true) && isToolEnabled(tool.toolKey)}
-						{@render toolButton(tool)}
-					{/if}
+				{#each visibleTools(group) as tool}
+					{@render toolButton(tool)}
 				{/each}
 			{/each}
 		</div>
 
-		<div class="flex gap-1 md:hidden {isToolButtons ? 'items-center' : 'flex-col items-center'}">
-			{#each toolGroups.slice(0, 3) as group, groupIdx}
-				{#if groupIdx > 0}
-					<div class="bg-gray-300 self-center {isToolButtons ? 'mx-1 h-6 w-px' : 'my-1 h-px w-6'}"></div>
+		<!-- Mobile toolbar -->
+		<div class="flex items-center gap-1 md:hidden">
+			{#each toolGroups.slice(0, 3) as group, index}
+				{#if index > 0}
+					<div class="bg-gray-300 mx-1 h-6 w-px self-center"></div>
 				{/if}
 
-				{#each group as tool}
-					{#if mobileVisibleIds.has(tool.id) && isToolEnabled(tool.toolKey)}
-						{@render toolButton(tool)}
-					{/if}
+				{#each visibleTools(group).filter((tool) => mobileVisibleIds.has(tool.id)) as tool}
+					{@render toolButton(tool)}
 				{/each}
 			{/each}
 
-			<div class="bg-gray-300 self-center {isToolButtons ? 'mx-1 h-6 w-px' : 'my-1 h-px w-6'}"></div>
+			<div class="relative flex shrink-0 flex-col items-center">
+				{#if isOverflowExpanded}
+					<div class="absolute bottom-full left-1/2 z-90 mb-2 flex max-h-[65dvh] -translate-x-1/2 flex-col items-center gap-1 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 shadow-2xl">
+						{#each toolGroups.slice(3) as group, index}
+							{#each visibleTools(group) as tool}
+								{@render toolButton(tool)}
+							{/each}
 
-			<ToolbarOverflow
-				{enabledToolMap}
-				{isAddingText}
-				{addingDrawing}
-				{isErasing}
-				{isAddingLine}
-				{isHighlighting}
-				{isPointerMode}
-				{isSelectionMode}
-				{isHandMode}
-				{allowTeacherMark}
-				{selectedPageIndex}
-				{isPageDisabled}
-				{disabled}
-				{isAddingDisabled}
-				{onAddTextField}
-				{onAddDrawing}
-				{onErasing}
-				{activateLineMode}
-				{onHighlighting}
-				{onPointerMode}
-				{onSelectionMode}
-				{onHandMode}
-				{onTeacherMark}
-			/>
+							{#if index < toolGroups.slice(3).length - 1}
+								<div class="my-1 h-px w-6 shrink-0 bg-gray-300"></div>
+							{/if}
+						{/each}
+					</div>
+				{/if}
+
+				<button
+					onclick={() => (isOverflowExpanded = !isOverflowExpanded)}
+					aria-label={isOverflowExpanded ? 'Collapse tools' : 'Expand tools'}
+					aria-expanded={isOverflowExpanded}
+					class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-600 transition-all hover:bg-gray-100 active:scale-95"
+				>
+					{#if isOverflowExpanded}
+						<LucideX size={18} />
+					{:else}
+						<LucideEllipsis size={18} />
+					{/if}
+				</button>
+			</div>
 		</div>
 	</div>
 </div>
 
-{#if !isMobile && hoveredTool && activeBtnRect}
-	{@const theme = hoveredTool.theme ?? { border: 'border-blue-400', kbd: 'bg-blue-100 text-blue-600', iconColor: 'text-blue-500' }}
+<!-- Shared hover tooltip -->
+{#if hoveredTool && activeBtnRect}
 	{@const ToolIcon = hoveredTool.icon}
 
-	<div class="fixed z-80 pointer-events-none transition-all duration-150" style={tooltipStyle}>
-		<div class="max-w-xs rounded-lg border-2 {theme.border} bg-white px-3 py-2 text-black shadow-lg">
-			<div>
-				<div class="flex items-center justify-between gap-2 text-sm font-medium text-gray-800">
-					<div class="flex items-center gap-1.5 min-w-0">
-						<ToolIcon size={16} class="shrink-0 {theme.iconColor}" />
-						<span class="truncate">{hoveredTool.title}</span>
-					</div>
-
-					{#if hoveredTool.shortcut}
-						<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold {theme.kbd}">
-							{hoveredTool.shortcut}
-						</span>
-					{/if}
+	<div
+		class="pointer-events-none fixed z-80 transition-all duration-150"
+		style={tooltipStyle}
+	>
+		<div class="max-w-xs rounded-lg border-2 {hoveredTool.theme.border} bg-white px-3 py-2 text-black shadow-lg">
+			<div class="flex items-center justify-between gap-2 text-sm font-medium text-gray-800">
+				<div class="flex min-w-0 items-center gap-1.5">
+					<ToolIcon size={16} class="shrink-0 {hoveredTool.theme.iconColor}" />
+					<span class="truncate">{hoveredTool.title}</span>
 				</div>
 
-				<p class="mt-1 text-xs leading-tight text-gray-500">
-					{hoveredTool.description}
-				</p>
+				{#if hoveredTool.shortcut}
+					<span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold {hoveredTool.theme.kbd}">
+						{hoveredTool.shortcut}
+					</span>
+				{/if}
 			</div>
+
+			<p class="mt-1 text-xs leading-tight text-gray-500">
+				{hoveredTool.description}
+			</p>
 		</div>
 	</div>
 {/if}
